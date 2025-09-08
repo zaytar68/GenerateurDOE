@@ -1,0 +1,435 @@
+@page "/configuration"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Components.Shared
+@inject IConfigurationService ConfigurationService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Configuration</PageTitle>
+
+<div class="container-fluid">
+    <h1 class="mb-4">
+        <span class="oi oi-cog" aria-hidden="true"></span>
+        Configuration de l'Application
+    </h1>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="appSettings" OnValidSubmit="SaveConfiguration">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger mb-3" />
+
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+                    @statusMessage
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="ClearMessage"></button>
+                </div>
+            }
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <span class="oi oi-folder" aria-hidden="true"></span>
+                                Répertoires de Stockage
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="repertoirePDF" class="form-label">Répertoire des fichiers PDF</label>
+                                    <div class="input-group">
+                                        <InputText @bind-Value="appSettings.RepertoireStockagePDF" 
+                                                 class="form-control" id="repertoirePDF" placeholder="C:\GenerateurDOE\Documents\PDF" />
+                                        <button type="button" class="btn btn-outline-info" 
+                                                @onclick="() => OpenFolderExplorer(FolderType.PDF)">
+                                            <span class="oi oi-folder" aria-hidden="true"></span>
+                                            Parcourir
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" 
+                                                @onclick="() => TestDirectoryPDF()">
+                                            <span class="oi oi-magnifying-glass" aria-hidden="true"></span>
+                                            Tester
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" 
+                                                @onclick="() => CreateDirectoryPDF()">
+                                            <span class="oi oi-plus" aria-hidden="true"></span>
+                                            Créer
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="() => appSettings.RepertoireStockagePDF" class="text-danger" />
+                                    @if (pdfDirectoryInfo != null)
+                                    {
+                                        <DirectoryStatusDisplay DirectoryInfo="pdfDirectoryInfo" />
+                                    }
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="repertoireImages" class="form-label">Répertoire des images</label>
+                                    <div class="input-group">
+                                        <InputText @bind-Value="appSettings.RepertoireStockageImages" 
+                                                 class="form-control" id="repertoireImages" placeholder="C:\GenerateurDOE\Documents\Images" />
+                                        <button type="button" class="btn btn-outline-info" 
+                                                @onclick="() => OpenFolderExplorer(FolderType.Images)">
+                                            <span class="oi oi-folder" aria-hidden="true"></span>
+                                            Parcourir
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" 
+                                                @onclick="() => TestDirectoryImages()">
+                                            <span class="oi oi-magnifying-glass" aria-hidden="true"></span>
+                                            Tester
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" 
+                                                @onclick="() => CreateDirectoryImages()">
+                                            <span class="oi oi-plus" aria-hidden="true"></span>
+                                            Créer
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="() => appSettings.RepertoireStockageImages" class="text-danger" />
+                                    @if (imagesDirectoryInfo != null)
+                                    {
+                                        <DirectoryStatusDisplay DirectoryInfo="imagesDirectoryInfo" />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <span class="oi oi-building" aria-hidden="true"></span>
+                                Informations de l'Entreprise
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label for="nomSociete" class="form-label">Nom de la société</label>
+                                    <InputText @bind-Value="appSettings.NomSociete" 
+                                             class="form-control" id="nomSociete" placeholder="Votre Société" />
+                                    <ValidationMessage For="() => appSettings.NomSociete" class="text-danger" />
+                                </div>
+
+                                <div class="col-md-4 mb-3">
+                                    <label for="tailleMaxPDF" class="form-label">Taille max fichiers PDF</label>
+                                    <InputText @bind-Value="appSettings.TailleMaxFichierPDF" 
+                                             class="form-control" id="tailleMaxPDF" placeholder="50MB" />
+                                    <ValidationMessage For="() => appSettings.TailleMaxFichierPDF" class="text-danger" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <button type="button" class="btn btn-secondary" @onclick="ResetToDefaults">
+                            <span class="oi oi-reload" aria-hidden="true"></span>
+                            Valeurs par défaut
+                        </button>
+                        
+                        <div>
+                            <button type="button" class="btn btn-outline-primary me-2" @onclick="TestAllDirectories">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                                Tester tout
+                            </button>
+                            <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                }
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                                Enregistrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <span class="oi oi-info" aria-hidden="true"></span>
+                                Aide
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text small">
+                                <strong>Répertoires de stockage :</strong><br />
+                                Spécifiez les chemins où seront stockés les fichiers PDF et les images.
+                                Ces répertoires doivent être accessibles en écriture.
+                            </p>
+                            <p class="card-text small">
+                                <strong>Taille max PDF :</strong><br />
+                                Format accepté : 50MB, 100KB, 2GB
+                            </p>
+                            <hr />
+                            <h6 class="small">Statut des répertoires</h6>
+                            <div class="small">
+                                <span class="badge bg-success">Disponible</span> Répertoire accessible<br />
+                                <span class="badge bg-warning">Attention</span> Répertoire existe mais problème<br />
+                                <span class="badge bg-danger">Erreur</span> Répertoire inaccessible
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    @* Modal pour l'explorateur de dossiers *@
+    @if (showFolderExplorer)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <span class="oi oi-folder" aria-hidden="true"></span>
+                            Sélectionner un dossier @(currentFolderType == FolderType.PDF ? "PDF" : "Images")
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CloseFolderExplorer" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <FolderExplorer InitialPath="@GetCurrentPath()"
+                                      OnFolderSelected="OnFolderSelected"
+                                      OnCancelled="CloseFolderExplorer" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private AppSettings appSettings = new();
+    private CustomDirectoryInfo? pdfDirectoryInfo;
+    private CustomDirectoryInfo? imagesDirectoryInfo;
+    
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string statusMessage = string.Empty;
+    private bool isSuccess = false;
+
+    // Explorateur de dossiers
+    private bool showFolderExplorer = false;
+    private FolderType currentFolderType = FolderType.PDF;
+
+    private enum FolderType
+    {
+        PDF,
+        Images
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfiguration();
+    }
+
+    private async Task LoadConfiguration()
+    {
+        try
+        {
+            isLoading = true;
+            appSettings = await ConfigurationService.GetAppSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors du chargement : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveConfiguration()
+    {
+        try
+        {
+            isSaving = true;
+            ClearMessage();
+
+            var success = await ConfigurationService.UpdateAppSettingsAsync(appSettings);
+            
+            if (success)
+            {
+                statusMessage = "Configuration sauvegardée avec succès !";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = "Erreur lors de la sauvegarde de la configuration.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task TestDirectoryPDF()
+    {
+        await TestDirectory(appSettings.RepertoireStockagePDF, "PDF");
+    }
+
+    private async Task TestDirectoryImages()
+    {
+        await TestDirectory(appSettings.RepertoireStockageImages, "Images");
+    }
+
+    private async Task CreateDirectoryPDF()
+    {
+        await CreateDirectory(appSettings.RepertoireStockagePDF, "PDF");
+    }
+
+    private async Task CreateDirectoryImages()
+    {
+        await CreateDirectory(appSettings.RepertoireStockageImages, "Images");
+    }
+
+    private async Task TestDirectory(string directoryPath, string type)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+            return;
+
+        try
+        {
+            var info = await ConfigurationService.GetDirectoryInfoAsync(directoryPath);
+            
+            if (type == "PDF")
+                pdfDirectoryInfo = info;
+            else
+                imagesDirectoryInfo = info;
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors du test du répertoire {type} : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task CreateDirectory(string directoryPath, string type)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+            return;
+
+        try
+        {
+            var success = await ConfigurationService.CreateDirectoryAsync(directoryPath);
+            
+            if (success)
+            {
+                statusMessage = $"Répertoire {type} créé avec succès !";
+                isSuccess = true;
+                await TestDirectory(directoryPath, type);
+            }
+            else
+            {
+                statusMessage = $"Impossible de créer le répertoire {type}.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de la création du répertoire {type} : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task TestAllDirectories()
+    {
+        await TestDirectory(appSettings.RepertoireStockagePDF, "PDF");
+        await TestDirectory(appSettings.RepertoireStockageImages, "Images");
+        
+        statusMessage = "Test des répertoires terminé. Vérifiez les statuts ci-dessous.";
+        isSuccess = true;
+    }
+
+    private async Task ResetToDefaults()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+            "Êtes-vous sûr de vouloir restaurer les valeurs par défaut ?");
+        
+        if (confirmed)
+        {
+            appSettings = new AppSettings
+            {
+                RepertoireStockagePDF = "C:\\GenerateurDOE\\Documents\\PDF",
+                RepertoireStockageImages = "C:\\GenerateurDOE\\Documents\\Images",
+                NomSociete = "Votre Société",
+                TailleMaxFichierPDF = "50MB"
+            };
+            
+            pdfDirectoryInfo = null;
+            imagesDirectoryInfo = null;
+            
+            statusMessage = "Configuration restaurée aux valeurs par défaut.";
+            isSuccess = true;
+        }
+    }
+
+    private void ClearMessage()
+    {
+        statusMessage = string.Empty;
+    }
+
+    // Méthodes pour l'explorateur de dossiers
+    private void OpenFolderExplorer(FolderType folderType)
+    {
+        currentFolderType = folderType;
+        showFolderExplorer = true;
+    }
+
+    private void CloseFolderExplorer()
+    {
+        showFolderExplorer = false;
+    }
+
+    private string GetCurrentPath()
+    {
+        return currentFolderType switch
+        {
+            FolderType.PDF => appSettings.RepertoireStockagePDF,
+            FolderType.Images => appSettings.RepertoireStockageImages,
+            _ => string.Empty
+        };
+    }
+
+    private async Task OnFolderSelected(string selectedPath)
+    {
+        switch (currentFolderType)
+        {
+            case FolderType.PDF:
+                appSettings.RepertoireStockagePDF = selectedPath;
+                await TestDirectoryPDF();
+                break;
+            case FolderType.Images:
+                appSettings.RepertoireStockageImages = selectedPath;
+                await TestDirectoryImages();
+                break;
+        }
+
+        CloseFolderExplorer();
+        statusMessage = $"Dossier {currentFolderType} sélectionné : {selectedPath}";
+        isSuccess = true;
+    }
+}

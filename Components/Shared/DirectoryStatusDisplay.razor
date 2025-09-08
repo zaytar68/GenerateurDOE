@@ -1,0 +1,86 @@
+@using GenerateurDOE.Services.Interfaces
+
+<div class="mt-2">
+    @if (DirectoryInfo != null)
+    {
+        <div class="d-flex align-items-center mb-1">
+            @if (DirectoryInfo.Exists && DirectoryInfo.HasWriteAccess)
+            {
+                <span class="badge bg-success me-2">
+                    <span class="oi oi-check" aria-hidden="true"></span>
+                    Disponible
+                </span>
+            }
+            else if (DirectoryInfo.Exists && !DirectoryInfo.HasWriteAccess)
+            {
+                <span class="badge bg-warning me-2">
+                    <span class="oi oi-warning" aria-hidden="true"></span>
+                    Attention
+                </span>
+            }
+            else
+            {
+                <span class="badge bg-danger me-2">
+                    <span class="oi oi-x" aria-hidden="true"></span>
+                    Erreur
+                </span>
+            }
+            
+            <small class="text-muted">@DirectoryInfo.Path</small>
+        </div>
+
+        @if (DirectoryInfo.Exists)
+        {
+            <div class="small text-muted">
+                @if (DirectoryInfo.HasWriteAccess)
+                {
+                    <span class="text-success">✓ Accès en écriture</span>
+                }
+                else
+                {
+                    <span class="text-warning">⚠ Pas d'accès en écriture</span>
+                }
+                
+                @if (DirectoryInfo.AvailableSpace > 0)
+                {
+                    <span class="ms-3">
+                        Espace libre : @FormatBytes(DirectoryInfo.AvailableSpace)
+                    </span>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="small text-danger">
+                Le répertoire n'existe pas
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(DirectoryInfo.ErrorMessage))
+        {
+            <div class="small text-danger mt-1">
+                <span class="oi oi-warning" aria-hidden="true"></span>
+                @DirectoryInfo.ErrorMessage
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public CustomDirectoryInfo? DirectoryInfo { get; set; }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int suffixIndex = 0;
+        double value = bytes;
+
+        while (value >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            value /= 1024;
+            suffixIndex++;
+        }
+
+        return $"{value:N1} {suffixes[suffixIndex]}";
+    }
+}

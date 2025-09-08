@@ -1,0 +1,325 @@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IFileExplorerService FileExplorerService
+
+<div class="folder-explorer">
+    <div class="explorer-header">
+        <div class="d-flex align-items-center mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm me-2" @onclick="NavigateUp" disabled="@(currentPath == null || IsRootPath(currentPath))">
+                <span class="oi oi-arrow-left" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm me-2" @onclick="NavigateToRoot">
+                <span class="oi oi-home" aria-hidden="true"></span>
+            </button>
+            <div class="flex-grow-1">
+                <input type="text" class="form-control form-control-sm" @bind="currentPath" @onkeypress="OnPathKeyPress" placeholder="Chemin du dossier..." />
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm ms-2" @onclick="RefreshCurrentPath">
+                <span class="oi oi-reload" aria-hidden="true"></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="explorer-content">
+        @if (isLoading)
+        {
+            <div class="text-center py-3">
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <span class="ms-2">Chargement...</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger py-2" role="alert">
+                <span class="oi oi-warning" aria-hidden="true"></span>
+                @errorMessage
+            </div>
+        }
+        else if (currentItems.Any())
+        {
+            <div class="folder-list">
+                @foreach (var item in currentItems)
+                {
+                    <div class="folder-item @(item.FullPath == selectedPath ? "selected" : "")" 
+                         @onclick="() => OnItemClick(item)"
+                         @ondblclick="() => OnItemDoubleClick(item)">
+                        <div class="d-flex align-items-center">
+                            <span class="folder-icon me-2">
+                                @if (item.IsParentDirectory)
+                                {
+                                    <span class="oi oi-arrow-up text-secondary"></span>
+                                }
+                                else if (item.IsDirectory)
+                                {
+                                    <span class="oi oi-folder text-warning"></span>
+                                }
+                                else
+                                {
+                                    <span class="oi oi-file text-muted"></span>
+                                }
+                            </span>
+                            <div class="flex-grow-1">
+                                <div class="folder-name">@item.Name</div>
+                                @if (!item.IsParentDirectory && item.IsDirectory)
+                                {
+                                    <div class="folder-path text-muted small">@item.FullPath</div>
+                                }
+                            </div>
+                            @if (item.HasSubDirectories && !item.IsParentDirectory)
+                            {
+                                <span class="oi oi-chevron-right text-muted"></span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-3 text-muted">
+                <span class="oi oi-folder" aria-hidden="true"></span>
+                <div class="mt-2">Aucun dossier trouvé</div>
+            </div>
+        }
+    </div>
+
+    <div class="explorer-footer">
+        @if (!string.IsNullOrEmpty(selectedPath))
+        {
+            <div class="selected-path">
+                <strong>Sélectionné :</strong>
+                <span class="text-primary">@selectedPath</span>
+            </div>
+        }
+        <div class="d-flex justify-content-end mt-2">
+            <button type="button" class="btn btn-secondary btn-sm me-2" @onclick="OnCancel">
+                Annuler
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" @onclick="OnSelect" disabled="@(string.IsNullOrEmpty(selectedPath))">
+                <span class="oi oi-check" aria-hidden="true"></span>
+                Sélectionner
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .folder-explorer {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        height: 400px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .explorer-header {
+        padding: 0.75rem;
+        border-bottom: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+    }
+
+    .explorer-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .explorer-footer {
+        padding: 0.75rem;
+        border-top: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+    }
+
+    .folder-list {
+        max-height: 100%;
+    }
+
+    .folder-item {
+        padding: 0.5rem;
+        margin-bottom: 0.25rem;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
+    }
+
+    .folder-item:hover {
+        background-color: #e9ecef;
+    }
+
+    .folder-item.selected {
+        background-color: #cce5ff;
+        border: 1px solid #80bdff;
+    }
+
+    .folder-name {
+        font-weight: 500;
+    }
+
+    .folder-path {
+        font-size: 0.85em;
+    }
+
+    .folder-icon {
+        width: 20px;
+        text-align: center;
+    }
+
+    .selected-path {
+        font-size: 0.9em;
+        padding: 0.5rem;
+        background-color: #f1f3f4;
+        border-radius: 0.25rem;
+        margin-bottom: 0.5rem;
+        word-break: break-all;
+    }
+</style>
+
+@code {
+    [Parameter] public string? InitialPath { get; set; }
+    [Parameter] public EventCallback<string> OnFolderSelected { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private List<FolderItem> currentItems = new List<FolderItem>();
+    private string? currentPath;
+    private string? selectedPath;
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeExplorer();
+    }
+
+    private async Task InitializeExplorer()
+    {
+        if (!string.IsNullOrEmpty(InitialPath) && await FileExplorerService.DirectoryExistsAsync(InitialPath))
+        {
+            currentPath = InitialPath;
+            selectedPath = InitialPath;
+        }
+        else
+        {
+            await NavigateToRoot();
+        }
+
+        await LoadCurrentDirectory();
+    }
+
+    private async Task LoadCurrentDirectory()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            if (string.IsNullOrEmpty(currentPath))
+            {
+                currentItems = await FileExplorerService.GetDrivesAsync();
+            }
+            else
+            {
+                currentItems = await FileExplorerService.GetDirectoriesAsync(currentPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors du chargement du dossier : {ex.Message}";
+            currentItems.Clear();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnItemClick(FolderItem item)
+    {
+        if (item.IsDirectory)
+        {
+            selectedPath = item.FullPath;
+        }
+    }
+
+    private async Task OnItemDoubleClick(FolderItem item)
+    {
+        if (item.IsDirectory)
+        {
+            currentPath = item.FullPath;
+            selectedPath = item.FullPath;
+            await LoadCurrentDirectory();
+        }
+    }
+
+    private async Task NavigateUp()
+    {
+        if (!string.IsNullOrEmpty(currentPath))
+        {
+            var parentPath = FileExplorerService.GetParentDirectory(currentPath);
+            if (!string.IsNullOrEmpty(parentPath))
+            {
+                currentPath = parentPath;
+                selectedPath = parentPath;
+                await LoadCurrentDirectory();
+            }
+        }
+    }
+
+    private async Task NavigateToRoot()
+    {
+        currentPath = null;
+        selectedPath = null;
+        await LoadCurrentDirectory();
+    }
+
+    private async Task RefreshCurrentPath()
+    {
+        await LoadCurrentDirectory();
+    }
+
+    private async Task OnPathKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            if (!string.IsNullOrEmpty(currentPath) && await FileExplorerService.DirectoryExistsAsync(currentPath))
+            {
+                selectedPath = currentPath;
+                await LoadCurrentDirectory();
+            }
+            else
+            {
+                errorMessage = "Le chemin spécifié n'existe pas ou n'est pas accessible.";
+            }
+        }
+    }
+
+    private bool IsRootPath(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return true;
+
+        try
+        {
+            var rootPath = Path.GetPathRoot(path);
+            return string.Equals(path.TrimEnd('\\'), rootPath?.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task OnSelect()
+    {
+        if (!string.IsNullOrEmpty(selectedPath))
+        {
+            await OnFolderSelected.InvokeAsync(selectedPath);
+        }
+    }
+
+    private async Task OnCancel()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}
