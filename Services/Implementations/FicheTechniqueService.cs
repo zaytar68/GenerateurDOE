@@ -124,19 +124,32 @@ public class FicheTechniqueService : IFicheTechniqueService
     {
         var repertoireStockage = _appSettings.RepertoireStockagePDF;
         
-        if (!Directory.Exists(repertoireStockage))
+        try
         {
-            Directory.CreateDirectory(repertoireStockage);
+            if (!Directory.Exists(repertoireStockage))
+            {
+                Directory.CreateDirectory(repertoireStockage);
+            }
+
+            var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(originalFileName)}";
+            var filePath = Path.Combine(repertoireStockage, fileName);
+
+            using (var outputFileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await fileStream.CopyToAsync(outputFileStream);
+            }
+
+            // Vérifier que le fichier a été créé
+            if (!File.Exists(filePath))
+            {
+                throw new IOException($"Le fichier n'a pas pu être sauvegardé à : {filePath}");
+            }
+
+            return filePath;
         }
-
-        var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(originalFileName)}";
-        var filePath = Path.Combine(repertoireStockage, fileName);
-
-        using (var outputFileStream = new FileStream(filePath, FileMode.Create))
+        catch (Exception ex)
         {
-            await fileStream.CopyToAsync(outputFileStream);
+            throw new IOException($"Erreur lors de la sauvegarde du fichier PDF '{originalFileName}' dans '{repertoireStockage}': {ex.Message}", ex);
         }
-
-        return filePath;
     }
 }

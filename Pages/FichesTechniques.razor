@@ -513,9 +513,10 @@
             
             FiltrerFiches();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // TODO: Afficher message d'erreur
+            // TODO: Afficher un toast ou modal d'erreur
+            await JSRuntime.InvokeVoidAsync("console.error", $"Erreur lors de la suppression du PDF: {ex.Message}");
         }
     }
 
@@ -530,23 +531,36 @@
             {
                 if (file.ContentType == "application/pdf" && file.Size <= 10 * 1024 * 1024) // 10MB max
                 {
-                    using var stream = file.OpenReadStream(10 * 1024 * 1024);
-                    var cheminFichier = await FicheTechniqueService.SavePDFFileAsync(stream, file.Name);
-                    
-                    var nouveauPDF = new ImportPDF
+                    try
                     {
-                        CheminFichier = cheminFichier,
-                        NomFichierOriginal = file.Name,
-                        TypeDocument = TypeDocument.FicheTechnique,
-                        TailleFichier = file.Size
-                    };
+                        using var stream = file.OpenReadStream(10 * 1024 * 1024);
+                        var cheminFichier = await FicheTechniqueService.SavePDFFileAsync(stream, file.Name);
+                        
+                        var nouveauPDF = new ImportPDF
+                        {
+                            CheminFichier = cheminFichier,
+                            NomFichierOriginal = file.Name,
+                            TypeDocument = TypeDocument.FicheTechnique,
+                            TailleFichier = file.Size
+                        };
 
-                    var pdfCree = await FicheTechniqueService.AddPDFAsync(fichePDFEnCours.Id, nouveauPDF);
-                    pdfsFiche.Add(pdfCree);
-                    
-                    // Mettre à jour la fiche dans la liste principale
-                    var ficheAMettreAJour = fiches.FirstOrDefault(f => f.Id == fichePDFEnCours.Id);
-                    ficheAMettreAJour?.ImportsPDF.Add(pdfCree);
+                        var pdfCree = await FicheTechniqueService.AddPDFAsync(fichePDFEnCours.Id, nouveauPDF);
+                        pdfsFiche.Add(pdfCree);
+                        
+                        // Mettre à jour la fiche dans la liste principale
+                        var ficheAMettreAJour = fiches.FirstOrDefault(f => f.Id == fichePDFEnCours.Id);
+                        ficheAMettreAJour?.ImportsPDF.Add(pdfCree);
+                        
+                        await JSRuntime.InvokeVoidAsync("console.log", $"PDF sauvegardé avec succès: {file.Name} -> {cheminFichier}");
+                    }
+                    catch (Exception ex)
+                    {
+                        await JSRuntime.InvokeVoidAsync("console.error", $"Erreur lors du téléchargement de {file.Name}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("console.warn", $"Fichier ignoré - {file.Name}: Type={file.ContentType}, Taille={file.Size} bytes");
                 }
             }
             
