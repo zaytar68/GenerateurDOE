@@ -3,6 +3,8 @@
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Components.Shared
 @inject IConfigurationService ConfigurationService
+@inject ITypeProduitService TypeProduitService
+@inject ITypeDocumentImportService TypeDocumentService
 @inject IJSRuntime JSRuntime
 
 <PageTitle>Configuration</PageTitle>
@@ -131,6 +133,266 @@
                         </div>
                     </div>
 
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <span class="oi oi-tags" aria-hidden="true"></span>
+                                Types de Produits
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            @if (chargementTypes)
+                            {
+                                <div class="text-center">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Chargement...</span>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" placeholder="Nom du nouveau type de produit..." 
+                                                   @bind="nouveauTypeProduit.Nom" @onkeyup="@(async (e) => { if (((KeyboardEventArgs)e).Key == "Enter") await AjouterTypeProduit(); })" />
+                                            <input type="text" class="form-control" placeholder="Description (optionnel)..." 
+                                                   @bind="nouveauTypeProduit.Description" @onkeyup="@(async (e) => { if (((KeyboardEventArgs)e).Key == "Enter") await AjouterTypeProduit(); })" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-primary" @onclick="AjouterTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduit.Nom) || ajoutEnCours)">
+                                            @if (ajoutEnCours)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            <span class="oi oi-plus" aria-hidden="true"></span>
+                                            Ajouter
+                                        </button>
+                                    </div>
+                                </div>
+
+                                @if (!typesProduits.Any())
+                                {
+                                    <div class="text-center text-muted py-4">
+                                        <span class="oi oi-info" aria-hidden="true"></span>
+                                        Aucun type de produit configuré.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Nom</th>
+                                                    <th>Description</th>
+                                                    <th>Statut</th>
+                                                    <th>Usage</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var type in typesProduits.OrderBy(t => t.Nom))
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            @if (typeEnEdition?.Id == type.Id)
+                                                            {
+                                                                <input type="text" class="form-control form-control-sm" @bind="typeEnEdition.Nom" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <strong>@type.Nom</strong>
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            @if (typeEnEdition?.Id == type.Id)
+                                                            {
+                                                                <input type="text" class="form-control form-control-sm" @bind="typeEnEdition.Description" />
+                                                            }
+                                                            else
+                                                            {
+                                                                @type.Description
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge @(type.IsActive ? "bg-success" : "bg-secondary")">
+                                                                @(type.IsActive ? "Actif" : "Inactif")
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-info">@type.FichesTechniques.Count</span>
+                                                        </td>
+                                                        <td>
+                                                            @if (typeEnEdition?.Id == type.Id)
+                                                            {
+                                                                <div class="btn-group btn-group-sm">
+                                                                    <button class="btn btn-success btn-sm" @onclick="SauvegarderTypeEdition" disabled="@isSaving">
+                                                                        <span class="oi oi-check"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-secondary btn-sm" @onclick="AnnulerEdition">
+                                                                        <span class="oi oi-x"></span>
+                                                                    </button>
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="btn-group btn-group-sm">
+                                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => CommencerEdition(type)" title="Modifier">
+                                                                        <span class="oi oi-pencil"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-@(type.IsActive ? "warning" : "success") btn-sm" 
+                                                                            @onclick="() => ToggleActifType(type)" title="@(type.IsActive ? "Désactiver" : "Activer")">
+                                                                        <span class="oi oi-@(type.IsActive ? "ban" : "check")"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => SupprimerType(type)" 
+                                                                            title="Supprimer" disabled="@(type.FichesTechniques.Count > 0)">
+                                                                        <span class="oi oi-trash"></span>
+                                                                    </button>
+                                                                </div>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <span class="oi oi-document" aria-hidden="true"></span>
+                                Types de Documents
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            @if (chargementTypesDocuments)
+                            {
+                                <div class="text-center">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Chargement...</span>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" placeholder="Nom du nouveau type de document..." 
+                                                   @bind="nouveauTypeDocument.Nom" @onkeyup="@(async (e) => { if (((KeyboardEventArgs)e).Key == "Enter") await AjouterTypeDocument(); })" />
+                                            <input type="text" class="form-control" placeholder="Description (optionnel)..." 
+                                                   @bind="nouveauTypeDocument.Description" @onkeyup="@(async (e) => { if (((KeyboardEventArgs)e).Key == "Enter") await AjouterTypeDocument(); })" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-primary" @onclick="AjouterTypeDocument" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeDocument.Nom) || ajoutDocumentEnCours)">
+                                            @if (ajoutDocumentEnCours)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            <span class="oi oi-plus" aria-hidden="true"></span>
+                                            Ajouter
+                                        </button>
+                                    </div>
+                                </div>
+
+                                @if (!typesDocuments.Any())
+                                {
+                                    <div class="text-center text-muted py-4">
+                                        <span class="oi oi-info" aria-hidden="true"></span>
+                                        Aucun type de document configuré.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Nom</th>
+                                                    <th>Description</th>
+                                                    <th>Statut</th>
+                                                    <th>Usage</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var type in typesDocuments.OrderBy(t => t.Nom))
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            @if (typeDocumentEnEdition?.Id == type.Id)
+                                                            {
+                                                                <input type="text" class="form-control form-control-sm" @bind="typeDocumentEnEdition.Nom" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <strong>@type.Nom</strong>
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            @if (typeDocumentEnEdition?.Id == type.Id)
+                                                            {
+                                                                <input type="text" class="form-control form-control-sm" @bind="typeDocumentEnEdition.Description" />
+                                                            }
+                                                            else
+                                                            {
+                                                                @type.Description
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge @(type.IsActive ? "bg-success" : "bg-secondary")">
+                                                                @(type.IsActive ? "Actif" : "Inactif")
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-info">0</span>
+                                                        </td>
+                                                        <td>
+                                                            @if (typeDocumentEnEdition?.Id == type.Id)
+                                                            {
+                                                                <div class="btn-group btn-group-sm">
+                                                                    <button class="btn btn-success btn-sm" @onclick="SauvegarderTypeDocumentEdition" disabled="@isSaving">
+                                                                        <span class="oi oi-check"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-secondary btn-sm" @onclick="AnnulerEditionDocument">
+                                                                        <span class="oi oi-x"></span>
+                                                                    </button>
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="btn-group btn-group-sm">
+                                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => CommencerEditionDocument(type)" title="Modifier">
+                                                                        <span class="oi oi-pencil"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-@(type.IsActive ? "warning" : "success") btn-sm" 
+                                                                            @onclick="() => ToggleActifTypeDocument(type)" title="@(type.IsActive ? "Désactiver" : "Activer")">
+                                                                        <span class="oi oi-@(type.IsActive ? "ban" : "check")"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => SupprimerTypeDocument(type)" 
+                                                                            title="Supprimer" disabled="false">
+                                                                        <span class="oi oi-trash"></span>
+                                                                    </button>
+                                                                </div>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between mt-4">
                         <button type="button" class="btn btn-secondary" @onclick="ResetToDefaults">
                             <span class="oi oi-reload" aria-hidden="true"></span>
@@ -224,6 +486,20 @@
     private bool showFolderExplorer = false;
     private FolderType currentFolderType = FolderType.PDF;
 
+    // Gestion des types de produits
+    private List<TypeProduit> typesProduits = new();
+    private TypeProduit nouveauTypeProduit = new();
+    private TypeProduit? typeEnEdition = null;
+    private bool chargementTypes = false;
+    private bool ajoutEnCours = false;
+
+    // Gestion des types de documents
+    private List<TypeDocumentImport> typesDocuments = new();
+    private TypeDocumentImport nouveauTypeDocument = new();
+    private TypeDocumentImport? typeDocumentEnEdition = null;
+    private bool chargementTypesDocuments = false;
+    private bool ajoutDocumentEnCours = false;
+
     private enum FolderType
     {
         PDF,
@@ -241,6 +517,8 @@
         {
             isLoading = true;
             appSettings = await ConfigurationService.GetAppSettingsAsync();
+            await ChargerTypesProduits();
+            await ChargerTypesDocuments();
         }
         catch (Exception ex)
         {
@@ -431,5 +709,319 @@
         CloseFolderExplorer();
         statusMessage = $"Dossier {currentFolderType} sélectionné : {selectedPath}";
         isSuccess = true;
+    }
+
+    // Méthodes pour la gestion des types de produits
+    private async Task ChargerTypesProduits()
+    {
+        try
+        {
+            chargementTypes = true;
+            typesProduits = (await TypeProduitService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors du chargement des types de produits : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            chargementTypes = false;
+        }
+    }
+
+    private async Task AjouterTypeProduit()
+    {
+        if (string.IsNullOrWhiteSpace(nouveauTypeProduit.Nom))
+            return;
+
+        ajoutEnCours = true;
+        try
+        {
+            if (await TypeProduitService.ExistsAsync(nouveauTypeProduit.Nom))
+            {
+                statusMessage = "Ce type de produit existe déjà.";
+                isSuccess = false;
+                return;
+            }
+
+            await TypeProduitService.CreateAsync(nouveauTypeProduit);
+            nouveauTypeProduit = new TypeProduit();
+            await ChargerTypesProduits();
+            
+            statusMessage = "Type de produit ajouté avec succès !";
+            isSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de l'ajout : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            ajoutEnCours = false;
+        }
+    }
+
+    private void CommencerEdition(TypeProduit type)
+    {
+        typeEnEdition = new TypeProduit
+        {
+            Id = type.Id,
+            Nom = type.Nom,
+            Description = type.Description,
+            IsActive = type.IsActive
+        };
+    }
+
+    private void AnnulerEdition()
+    {
+        typeEnEdition = null;
+    }
+
+    private async Task SauvegarderTypeEdition()
+    {
+        if (typeEnEdition == null || string.IsNullOrWhiteSpace(typeEnEdition.Nom))
+            return;
+
+        try
+        {
+            var success = await TypeProduitService.UpdateAsync(typeEnEdition);
+            if (success)
+            {
+                await ChargerTypesProduits();
+                typeEnEdition = null;
+                statusMessage = "Type de produit modifié avec succès !";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = "Erreur lors de la modification.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de la modification : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task ToggleActifType(TypeProduit type)
+    {
+        try
+        {
+            var success = await TypeProduitService.ToggleActiveAsync(type.Id);
+            if (success)
+            {
+                await ChargerTypesProduits();
+                statusMessage = $"Type de produit {(type.IsActive ? "désactivé" : "activé")} avec succès !";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = "Erreur lors du changement de statut.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task SupprimerType(TypeProduit type)
+    {
+        if (!await TypeProduitService.CanDeleteAsync(type.Id))
+        {
+            statusMessage = "Impossible de supprimer ce type : il est utilisé par des fiches techniques.";
+            isSuccess = false;
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"Êtes-vous sûr de vouloir supprimer le type '{type.Nom}' ?");
+        
+        if (confirmed)
+        {
+            try
+            {
+                var success = await TypeProduitService.DeleteAsync(type.Id);
+                if (success)
+                {
+                    await ChargerTypesProduits();
+                    statusMessage = "Type de produit supprimé avec succès !";
+                    isSuccess = true;
+                }
+                else
+                {
+                    statusMessage = "Erreur lors de la suppression.";
+                    isSuccess = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                statusMessage = $"Erreur lors de la suppression : {ex.Message}";
+                isSuccess = false;
+            }
+        }
+    }
+
+    // Méthodes pour la gestion des types de documents
+    private async Task ChargerTypesDocuments()
+    {
+        try
+        {
+            chargementTypesDocuments = true;
+            typesDocuments = (await TypeDocumentService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors du chargement des types de documents : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            chargementTypesDocuments = false;
+        }
+    }
+
+    private async Task AjouterTypeDocument()
+    {
+        if (string.IsNullOrWhiteSpace(nouveauTypeDocument.Nom))
+            return;
+
+        ajoutDocumentEnCours = true;
+        try
+        {
+            if (await TypeDocumentService.ExistsAsync(nouveauTypeDocument.Nom))
+            {
+                statusMessage = "Ce type de document existe déjà.";
+                isSuccess = false;
+                return;
+            }
+
+            await TypeDocumentService.CreateAsync(nouveauTypeDocument);
+            nouveauTypeDocument = new TypeDocumentImport();
+            await ChargerTypesDocuments();
+            
+            statusMessage = "Type de document ajouté avec succès !";
+            isSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de l'ajout : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            ajoutDocumentEnCours = false;
+        }
+    }
+
+    private void CommencerEditionDocument(TypeDocumentImport type)
+    {
+        typeDocumentEnEdition = new TypeDocumentImport
+        {
+            Id = type.Id,
+            Nom = type.Nom,
+            Description = type.Description,
+            IsActive = type.IsActive
+        };
+    }
+
+    private void AnnulerEditionDocument()
+    {
+        typeDocumentEnEdition = null;
+    }
+
+    private async Task SauvegarderTypeDocumentEdition()
+    {
+        if (typeDocumentEnEdition == null || string.IsNullOrWhiteSpace(typeDocumentEnEdition.Nom))
+            return;
+
+        try
+        {
+            var success = await TypeDocumentService.UpdateAsync(typeDocumentEnEdition);
+            if (success)
+            {
+                await ChargerTypesDocuments();
+                typeDocumentEnEdition = null;
+                statusMessage = "Type de document modifié avec succès !";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = "Erreur lors de la modification.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de la modification : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task ToggleActifTypeDocument(TypeDocumentImport type)
+    {
+        try
+        {
+            var success = await TypeDocumentService.ToggleActiveAsync(type.Id);
+            if (success)
+            {
+                await ChargerTypesDocuments();
+                statusMessage = $"Type de document {(type.IsActive ? "désactivé" : "activé")} avec succès !";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = "Erreur lors du changement de statut.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task SupprimerTypeDocument(TypeDocumentImport type)
+    {
+        if (!await TypeDocumentService.CanDeleteAsync(type.Id))
+        {
+            statusMessage = "Impossible de supprimer ce type : il est utilisé par des documents PDF.";
+            isSuccess = false;
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"Êtes-vous sûr de vouloir supprimer le type '{type.Nom}' ?");
+        
+        if (confirmed)
+        {
+            try
+            {
+                var success = await TypeDocumentService.DeleteAsync(type.Id);
+                if (success)
+                {
+                    await ChargerTypesDocuments();
+                    statusMessage = "Type de document supprimé avec succès !";
+                    isSuccess = true;
+                }
+                else
+                {
+                    statusMessage = "Erreur lors de la suppression.";
+                    isSuccess = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                statusMessage = $"Erreur lors de la suppression : {ex.Message}";
+                isSuccess = false;
+            }
+        }
     }
 }

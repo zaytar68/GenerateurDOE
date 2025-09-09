@@ -3,7 +3,10 @@
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Data
 @using Microsoft.EntityFrameworkCore
+@using Components
 @inject IFicheTechniqueService FicheTechniqueService
+@inject ITypeProduitService TypeProduitService
+@inject ITypeDocumentImportService TypeDocumentImportService
 @inject ApplicationDbContext Context
 @inject IJSRuntime JSRuntime
 
@@ -23,22 +26,34 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <div class="row">
+                        <div class="col-md-8">
+                            <AutoComplete T="FicheTechnique"
+                                          Items="fiches"
+                                          DisplaySelector="GetFicheDisplayText"
+                                          Placeholder="Rechercher par produit, fabricant ou type..."
+                                          Value="@rechercheText"
+                                          OnItemSelected="OnFicheTechniqueSearchSelected"
+                                          OnTextChanged="OnFicheTechniqueSearchChanged"
+                                          MinSearchLength="2">
+                                <ItemTemplate Context="fiche">
+                                    <div>
+                                        <strong>@fiche.NomProduit</strong>
+                                        <br />
+                                        <small class="text-muted">
+                                            <i class="oi oi-person me-1"></i>@fiche.NomFabricant
+                                            <span class="mx-2">•</span>
+                                            <i class="oi oi-tag me-1"></i>@fiche.TypeProduit
+                                        </small>
+                                        @if (!string.IsNullOrEmpty(fiche.Description))
+                                        {
+                                            <br />
+                                            <small class="text-muted"><i class="oi oi-document me-1"></i>@fiche.Description.Substring(0, Math.Min(50, fiche.Description.Length))@(fiche.Description.Length > 50 ? "..." : "")</small>
+                                        }
+                                    </div>
+                                </ItemTemplate>
+                            </AutoComplete>
+                        </div>
                         <div class="col-md-4">
-                            <input class="form-control" type="text" placeholder="Rechercher..." @bind="filtreRecherche" @onkeyup="FiltrerFiches" />
-                        </div>
-                        <div class="col-md-3">
-                            <select class="form-select" @bind="filtreChantierId" @bind:after="FiltrerFiches">
-                                <option value="">Tous les chantiers</option>
-                                @foreach (var chantier in chantiers)
-                                {
-                                    <option value="@chantier.Id">@chantier.NomProjet</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <input class="form-control" type="text" placeholder="Filtrer par fabricant..." @bind="filtreFabricant" @onkeyup="FiltrerFiches" />
-                        </div>
-                        <div class="col-md-2">
                             <button class="btn btn-outline-secondary" @onclick="ReinitialiserFiltres">
                                 <i class="oi oi-x"></i> Effacer
                             </button>
@@ -70,10 +85,8 @@
                             <table class="table table-striped table-hover">
                                 <thead class="table-dark">
                                     <tr>
-                                        <th>Nom Produit</th>
-                                        <th>Fabricant</th>
+                                        <th>Marque - Produit</th>
                                         <th>Type</th>
-                                        <th>Chantier</th>
                                         <th>PDF</th>
                                         <th>Date Création</th>
                                         <th class="text-center">Actions</th>
@@ -82,11 +95,15 @@
                                 <tbody>
                                     @foreach (var fiche in fichesFiltrees)
                                     {
-                                        <tr>
-                                            <td><strong>@fiche.NomProduit</strong></td>
-                                            <td>@fiche.NomFabricant</td>
+                                        <tr class="@(fiche == ficheSelectionnee ? "table-warning" : "")">
+                                            <td>
+                                                <strong>@fiche.NomFabricant</strong> - @fiche.NomProduit
+                                                @if (fiche == ficheSelectionnee)
+                                                {
+                                                    <span class="badge bg-primary ms-2">Sélectionnée</span>
+                                                }
+                                            </td>
                                             <td>@fiche.TypeProduit</td>
-                                            <td>@GetChantiersUtilisation(fiche)</td>
                                             <td>
                                                 <span class="badge bg-info">@fiche.ImportsPDF.Count</span>
                                             </td>
@@ -138,15 +155,38 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Nom du Fabricant *</label>
-                                <InputText class="form-control" @bind-Value="ficheEnCours.NomFabricant" />
-                                <ValidationMessage For="@(() => ficheEnCours.NomFabricant)" />
+                                <AutoComplete T="string"
+                                              Items="fabricantsDisponibles"
+                                              DisplaySelector="f => f"
+                                              Placeholder="Sélectionner ou saisir un fabricant..."
+                                              OnItemSelected="OnFabricantSelected"
+                                              OnTextChanged="OnFabricantTextChanged"
+                                              ValidationMessage="@GetValidationMessage(() => ficheEnCours.NomFabricant)"
+                                              MinSearchLength="1" />
                             </div>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Type de Produit *</label>
-                        <InputText class="form-control" @bind-Value="ficheEnCours.TypeProduit" />
-                        <ValidationMessage For="@(() => ficheEnCours.TypeProduit)" />
+                        <AutoComplete T="TypeProduit"
+                                      Items="typesProduits"
+                                      DisplaySelector="t => t.Nom"
+                                      Placeholder="Sélectionner ou saisir un type de produit..."
+                                      OnItemSelected="OnTypeProduitSelected"
+                                      OnTextChanged="OnTypeProduitTextChanged"
+                                      ValidationMessage="@GetValidationMessage(() => ficheEnCours.TypeProduit)"
+                                      MinSearchLength="1">
+                            <ItemTemplate Context="typeProduit">
+                                <div>
+                                    <strong>@typeProduit.Nom</strong>
+                                    @if (!string.IsNullOrEmpty(typeProduit.Description))
+                                    {
+                                        <br />
+                                        <small class="text-muted">@typeProduit.Description</small>
+                                    }
+                                </div>
+                            </ItemTemplate>
+                        </AutoComplete>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description</label>
@@ -285,8 +325,7 @@
                                                             @pdf.NomFichierOriginal
                                                         </h6>
                                                         <div class="mb-2">
-                                                            <select class="form-select form-select-sm" @bind="pdf.TypeDocument" 
-                                                                    @bind:after="@(() => ModifierTypePDF(pdf))">
+                                                            <select class="form-select form-select-sm" @bind="pdf.TypeDocument">
                                                                 @foreach (TypeDocument type in Enum.GetValues<TypeDocument>())
                                                                 {
                                                                     <option value="@type">@GetNomTypeDocument(type)</option>
@@ -334,7 +373,9 @@
 @code {
     private List<FicheTechnique> fiches = new();
     private List<FicheTechnique> fichesFiltrees = new();
-    private List<Chantier> chantiers = new();
+    private List<TypeProduit> typesProduits = new();
+    private List<TypeDocumentImport> typesDocuments = new();
+    private List<string> fabricantsDisponibles = new();
     
     private FicheTechnique ficheEnCours = new();
     private FicheTechnique? ficheASupprimer;
@@ -348,8 +389,8 @@
     private bool afficherModalPDF = false;
     
     private string filtreRecherche = string.Empty;
-    private string filtreFabricant = string.Empty;
-    private string filtreChantierId = string.Empty;
+    private string rechercheText = string.Empty;
+    private FicheTechnique? ficheSelectionnee;
 
     protected override async Task OnInitializedAsync()
     {
@@ -362,11 +403,17 @@
         try
         {
             fiches = (await FicheTechniqueService.GetAllAsync()).ToList();
-            chantiers = await Context.Chantiers
-                .Include(c => c.FichesTechniques)
-                .OrderBy(c => c.NomProjet)
-                .ToListAsync();
+            typesProduits = (await TypeProduitService.GetActiveAsync()).ToList();
+            typesDocuments = (await TypeDocumentImportService.GetActiveAsync()).ToList();
             fichesFiltrees = fiches.ToList();
+            
+            // Extraire les fabricants uniques pour l'autocomplétion (gardé pour les formulaires)
+            fabricantsDisponibles = fiches
+                .Select(f => f.NomFabricant)
+                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .Distinct()
+                .OrderBy(f => f)
+                .ToList();
         }
         finally
         {
@@ -377,22 +424,21 @@
     private void FiltrerFiches()
     {
         fichesFiltrees = fiches.Where(f =>
-            (string.IsNullOrEmpty(filtreRecherche) ||
-             f.NomProduit.Contains(filtreRecherche, StringComparison.OrdinalIgnoreCase) ||
-             f.TypeProduit.Contains(filtreRecherche, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrEmpty(filtreFabricant) ||
-             f.NomFabricant.Contains(filtreFabricant, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrEmpty(filtreChantierId) ||
-             (f.ChantierId?.ToString() == filtreChantierId))
+            string.IsNullOrEmpty(filtreRecherche) ||
+            f.NomProduit.Contains(filtreRecherche, StringComparison.OrdinalIgnoreCase) ||
+            f.NomFabricant.Contains(filtreRecherche, StringComparison.OrdinalIgnoreCase) ||
+            f.TypeProduit.Contains(filtreRecherche, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrEmpty(f.Description) && f.Description.Contains(filtreRecherche, StringComparison.OrdinalIgnoreCase))
         ).ToList();
     }
 
     private void ReinitialiserFiltres()
     {
         filtreRecherche = string.Empty;
-        filtreFabricant = string.Empty;
-        filtreChantierId = string.Empty;
+        rechercheText = string.Empty; // Vide le champ AutoComplete
+        ficheSelectionnee = null; // Désélectionner la fiche
         fichesFiltrees = fiches.ToList();
+        StateHasChanged(); // Force le rafraîchissement du composant AutoComplete
     }
 
     private void OuvrirModalCreation()
@@ -606,23 +652,73 @@
         return $"{taille / (1024 * 1024 * 1024):F1} GB";
     }
 
-    private string GetChantiersUtilisation(FicheTechnique fiche)
+    // Méthodes pour l'autocomplétion (conservées pour les formulaires de création/édition)
+
+    private void OnFabricantSelected(string fabricant)
     {
-        var chantiersUtilises = chantiers
-            .Where(c => c.FichesTechniques.Any(f => f.Id == fiche.Id))
-            .Select(c => c.NomProjet)
-            .ToList();
-
-        if (!chantiersUtilises.Any())
-        {
-            return "Non utilisé";
-        }
-
-        if (chantiersUtilises.Count == 1)
-        {
-            return chantiersUtilises.First();
-        }
-
-        return $"{chantiersUtilises.First()} (+{chantiersUtilises.Count - 1} autre{(chantiersUtilises.Count > 2 ? "s" : "")})";
+        ficheEnCours.NomFabricant = fabricant;
     }
+
+    private void OnFabricantTextChanged(string text)
+    {
+        ficheEnCours.NomFabricant = text;
+    }
+
+    private void OnTypeProduitSelected(TypeProduit typeProduit)
+    {
+        ficheEnCours.TypeProduit = typeProduit.Nom;
+    }
+
+    private void OnTypeProduitTextChanged(string text)
+    {
+        ficheEnCours.TypeProduit = text;
+    }
+
+    private string? GetValidationMessage(System.Linq.Expressions.Expression<Func<string>> accessor)
+    {
+        // Cette méthode pourrait être améliorée pour retourner les messages de validation
+        // Pour l'instant, on retourne null pour simplifier
+        return null;
+    }
+
+    // Méthode helper pour l'affichage
+    private string GetFicheDisplayText(FicheTechnique fiche)
+    {
+        return $"{fiche.NomProduit} - {fiche.NomFabricant}";
+    }
+
+    // Méthodes pour la recherche de fiches techniques
+    private void OnFicheTechniqueSearchSelected(FicheTechnique fiche)
+    {
+        ficheSelectionnee = fiche;
+        // Conserver le filtrage actuel au lieu de montrer seulement la fiche sélectionnée
+        // Le filtrage est maintenu par le texte de recherche existant
+    }
+
+    private void OnFicheTechniqueSearchChanged(string searchText)
+    {
+        filtreRecherche = searchText;
+        rechercheText = searchText; // Synchroniser la variable de contrôle
+        
+        if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < 2)
+        {
+            // Si le texte est vide ou trop court, afficher toutes les fiches (ou appliquer les autres filtres)
+            FiltrerFiches();
+            ficheSelectionnee = null;
+        }
+        else
+        {
+            // Filtrer en temps réel basé sur la recherche textuelle unifiée
+            fichesFiltrees = fiches.Where(f =>
+                f.NomProduit.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                f.NomFabricant.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                f.TypeProduit.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(f.Description) && f.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+        }
+        
+        // Force le rafraîchissement de l'affichage
+        StateHasChanged();
+    }
+
 }

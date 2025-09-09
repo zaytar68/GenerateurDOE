@@ -1,0 +1,226 @@
+@typeparam T
+@using Microsoft.AspNetCore.Components.Web
+@inject IJSRuntime JSRuntime
+
+<div class="autocomplete-container">
+    <div class="position-relative">
+        <input type="text" 
+               class="form-control @CssClass @(IsInvalid ? "is-invalid" : "")" 
+               value="@searchText"
+               @oninput="OnInput"
+               @onkeydown="OnKeyDown"
+               @onfocus="OnFocus"
+               @onblur="OnBlur"
+               placeholder="@Placeholder"
+               autocomplete="off"
+               disabled="@IsDisabled" />
+        
+        @if (showDropdown && filteredItems.Any())
+        {
+            <div class="autocomplete-dropdown" @onmousedown:preventDefault="true">
+                @for (int i = 0; i < filteredItems.Count; i++)
+                {
+                    var index = i;
+                    var item = filteredItems[i];
+                    <div class="autocomplete-item @(index == selectedIndex ? "selected" : "")"
+                         @onclick="() => SelectItem(item)"
+                         @onmouseover="() => selectedIndex = index">
+                        @if (ItemTemplate != null)
+                        {
+                            @ItemTemplate(item)
+                        }
+                        else
+                        {
+                            @GetDisplayText(item)
+                        }
+                    </div>
+                }
+            </div>
+        }
+        
+        @if (showDropdown && !filteredItems.Any() && !string.IsNullOrWhiteSpace(searchText))
+        {
+            <div class="autocomplete-dropdown">
+                <div class="autocomplete-item no-results">
+                    @NoResultsText
+                </div>
+            </div>
+        }
+    </div>
+    
+    @if (!string.IsNullOrEmpty(ValidationMessage))
+    {
+        <div class="invalid-feedback d-block">
+            @ValidationMessage
+        </div>
+    }
+</div>
+
+<style>
+    .autocomplete-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        max-height: 300px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    .autocomplete-item {
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f8f9fa;
+        transition: background-color 0.15s ease-in-out;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #e9ecef;
+    }
+
+    .autocomplete-item.no-results {
+        color: #6c757d;
+        font-style: italic;
+        cursor: default;
+    }
+
+    .autocomplete-item.no-results:hover {
+        background-color: transparent;
+    }
+</style>
+
+@code {
+    [Parameter] public List<T> Items { get; set; } = new List<T>();
+    [Parameter] public Func<T, string> DisplaySelector { get; set; } = item => item?.ToString() ?? "";
+    [Parameter] public Func<T, object> ValueSelector { get; set; } = item => item!;
+    [Parameter] public RenderFragment<T>? ItemTemplate { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Rechercher...";
+    [Parameter] public string CssClass { get; set; } = "";
+    [Parameter] public bool IsDisabled { get; set; } = false;
+    [Parameter] public string NoResultsText { get; set; } = "Aucun résultat trouvé";
+    [Parameter] public int MinSearchLength { get; set; } = 1;
+    [Parameter] public EventCallback<T> OnItemSelected { get; set; }
+    [Parameter] public EventCallback<string> OnTextChanged { get; set; }
+    [Parameter] public string? ValidationMessage { get; set; }
+    [Parameter] public string Value { get; set; } = "";
+    
+    private string searchText = "";
+    private List<T> filteredItems = new List<T>();
+    private bool showDropdown = false;
+    private int selectedIndex = -1;
+    private bool isInputFocused = false;
+    
+    private bool IsInvalid => !string.IsNullOrEmpty(ValidationMessage);
+
+    protected override void OnParametersSet()
+    {
+        // Synchroniser searchText avec le paramètre Value externe
+        if (searchText != Value)
+        {
+            searchText = Value ?? "";
+        }
+        FilterItems();
+        base.OnParametersSet();
+    }
+
+    private void FilterItems()
+    {
+        if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < MinSearchLength)
+        {
+            filteredItems.Clear();
+            showDropdown = false;
+            selectedIndex = -1;
+            return;
+        }
+
+        filteredItems = Items
+            .Where(item => GetDisplayText(item).Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .Take(10)
+            .ToList();
+        
+        showDropdown = isInputFocused && filteredItems.Any();
+        selectedIndex = filteredItems.Any() ? 0 : -1;
+    }
+
+    private string GetDisplayText(T item)
+    {
+        return DisplaySelector?.Invoke(item) ?? item?.ToString() ?? "";
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (!showDropdown || !filteredItems.Any())
+            return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex = Math.Min(selectedIndex + 1, filteredItems.Count - 1);
+                break;
+            
+            case "ArrowUp":
+                selectedIndex = Math.Max(selectedIndex - 1, 0);
+                break;
+            
+            case "Enter":
+                if (selectedIndex >= 0 && selectedIndex < filteredItems.Count)
+                {
+                    await SelectItem(filteredItems[selectedIndex]);
+                }
+                break;
+            
+            case "Escape":
+                showDropdown = false;
+                selectedIndex = -1;
+                break;
+        }
+    }
+
+    private async Task SelectItem(T item)
+    {
+        // Conserver le texte de recherche actuel au lieu de le remplacer
+        // searchText reste inchangé pour maintenir le contexte de filtrage
+        showDropdown = false;
+        selectedIndex = -1;
+        
+        await OnItemSelected.InvokeAsync(item);
+        // OnTextChanged n'est pas appelé pour éviter de modifier le filtrage
+    }
+
+    private void OnFocus()
+    {
+        isInputFocused = true;
+        FilterItems();
+    }
+
+    private async Task OnBlur()
+    {
+        await Task.Delay(150); // Petit délai pour permettre le clic sur les items
+        isInputFocused = false;
+        showDropdown = false;
+        selectedIndex = -1;
+    }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? "";
+        FilterItems();
+        await OnTextChanged.InvokeAsync(searchText);
+        StateHasChanged(); // Force le rafraîchissement immédiat
+    }
+}

@@ -41,7 +41,7 @@ public class DocumentExportService : IDocumentExportService
         if (chantier == null)
             throw new ArgumentException("Chantier non trouvé", nameof(chantierId));
 
-        var fichesTechniques = await _ficheTechniqueService.GetByChantierId(chantierId);
+        var fichesTechniques = await _ficheTechniqueService.GetAllAsync();
 
         var content = new StringBuilder();
 
@@ -92,7 +92,7 @@ public class DocumentExportService : IDocumentExportService
         if (chantier == null)
             throw new ArgumentException("Chantier non trouvé", nameof(chantierId));
 
-        var fichesTechniques = await _ficheTechniqueService.GetByChantierId(chantierId);
+        var fichesTechniques = await _ficheTechniqueService.GetAllAsync();
 
         var content = new StringBuilder();
 

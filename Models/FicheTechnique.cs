@@ -24,8 +24,6 @@ public class FicheTechnique
     public DateTime DateCreation { get; set; } = DateTime.Now;
     public DateTime DateModification { get; set; } = DateTime.Now;
     
-    public int? ChantierId { get; set; }
-    public virtual Chantier? Chantier { get; set; }
     
     public virtual ICollection<ImportPDF> ImportsPDF { get; set; } = new List<ImportPDF>();
 }

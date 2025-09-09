@@ -1,0 +1,162 @@
+@page "/autocomplete-example"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject ITypeProduitService TypeProduitService
+@inject IFicheTechniqueService FicheTechniqueService
+
+<div class="container mt-4">
+    <h3>Exemples d'utilisation du composant AutoComplete</h3>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Recherche par Type de Produit</h5>
+                </div>
+                <div class="card-body">
+                    <AutoComplete T="TypeProduit"
+                                  Items="typesProduits"
+                                  DisplaySelector="t => t.Nom"
+                                  ValueSelector="t => t.Id"
+                                  Placeholder="Rechercher un type de produit..."
+                                  OnItemSelected="OnTypeProduitSelected"
+                                  MinSearchLength="2">
+                        <ItemTemplate Context="type">
+                            <div>
+                                <strong>@type.Nom</strong>
+                                @if (!string.IsNullOrEmpty(type.Description))
+                                {
+                                    <br />
+                                    <small class="text-muted">@type.Description</small>
+                                }
+                            </div>
+                        </ItemTemplate>
+                    </AutoComplete>
+                    
+                    @if (selectedTypeProduit != null)
+                    {
+                        <div class="mt-2 p-2 bg-light rounded">
+                            <strong>Sélectionné :</strong> @selectedTypeProduit.Nom
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Recherche par Fabricant</h5>
+                </div>
+                <div class="card-body">
+                    <AutoComplete T="string"
+                                  Items="fabricants"
+                                  DisplaySelector="f => f"
+                                  ValueSelector="f => f"
+                                  Placeholder="Rechercher un fabricant..."
+                                  OnItemSelected="OnFabricantSelected"
+                                  MinSearchLength="2" />
+                    
+                    @if (!string.IsNullOrEmpty(selectedFabricant))
+                    {
+                        <div class="mt-2 p-2 bg-light rounded">
+                            <strong>Fabricant sélectionné :</strong> @selectedFabricant
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recherche par Nom de Produit</h5>
+                </div>
+                <div class="card-body">
+                    <AutoComplete T="FicheTechnique"
+                                  Items="fichesTechniques"
+                                  DisplaySelector="f => f.NomProduit"
+                                  ValueSelector="f => f.Id"
+                                  Placeholder="Rechercher un produit..."
+                                  OnItemSelected="OnFicheTechniqueSelected"
+                                  MinSearchLength="2">
+                        <ItemTemplate Context="fiche">
+                            <div>
+                                <strong>@fiche.NomProduit</strong>
+                                <br />
+                                <small class="text-muted">
+                                    @fiche.NomFabricant - @fiche.TypeProduit
+                                </small>
+                            </div>
+                        </ItemTemplate>
+                    </AutoComplete>
+                    
+                    @if (selectedFicheTechnique != null)
+                    {
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <h6>Fiche technique sélectionnée :</h6>
+                            <ul class="list-unstyled mb-0">
+                                <li><strong>Produit :</strong> @selectedFicheTechnique.NomProduit</li>
+                                <li><strong>Fabricant :</strong> @selectedFicheTechnique.NomFabricant</li>
+                                <li><strong>Type :</strong> @selectedFicheTechnique.TypeProduit</li>
+                                @if (!string.IsNullOrEmpty(selectedFicheTechnique.Description))
+                                {
+                                    <li><strong>Description :</strong> @selectedFicheTechnique.Description</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TypeProduit> typesProduits = new();
+    private List<string> fabricants = new();
+    private List<FicheTechnique> fichesTechniques = new();
+    
+    private TypeProduit? selectedTypeProduit;
+    private string? selectedFabricant;
+    private FicheTechnique? selectedFicheTechnique;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        // Charger les types de produits
+        typesProduits = (await TypeProduitService.GetAllAsync()).ToList();
+        
+        // Charger les fiches techniques
+        fichesTechniques = (await FicheTechniqueService.GetAllAsync()).ToList();
+        
+        // Extraire les fabricants uniques
+        fabricants = fichesTechniques
+            .Select(f => f.NomFabricant)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct()
+            .OrderBy(f => f)
+            .ToList();
+    }
+
+    private void OnTypeProduitSelected(TypeProduit typeProduit)
+    {
+        selectedTypeProduit = typeProduit;
+    }
+
+    private void OnFabricantSelected(string fabricant)
+    {
+        selectedFabricant = fabricant;
+    }
+
+    private void OnFicheTechniqueSelected(FicheTechnique fiche)
+    {
+        selectedFicheTechnique = fiche;
+    }
+}

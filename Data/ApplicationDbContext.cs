@@ -16,6 +16,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Methode> Methodes { get; set; }
     public DbSet<ImageMethode> ImagesMethode { get; set; }
     public DbSet<DocumentExport> DocumentsExport { get; set; }
+    public DbSet<TypeProduit> TypesProduits { get; set; }
+    public DbSet<TypeDocumentImport> TypesDocuments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,11 +45,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
-            
-            entity.HasOne(d => d.Chantier)
-                .WithMany(p => p.FichesTechniques)
-                .HasForeignKey(d => d.ChantierId)
-                .OnDelete(DeleteBehavior.SetNull);
+                
         });
 
         modelBuilder.Entity<ImportPDF>(entity =>
@@ -101,6 +99,26 @@ public class ApplicationDbContext : DbContext
                 .WithMany(p => p.DocumentsExportes)
                 .HasForeignKey(d => d.ChantierId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TypeProduit>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+        });
+
+        modelBuilder.Entity<TypeDocumentImport>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
         });
     }
 }

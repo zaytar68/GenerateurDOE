@@ -21,7 +21,6 @@ public class FicheTechniqueService : IFicheTechniqueService
     {
         return await _context.FichesTechniques
             .Include(f => f.ImportsPDF)
-            .Include(f => f.Chantier)
             .OrderBy(f => f.NomProduit)
             .ToListAsync();
     }
@@ -30,18 +29,9 @@ public class FicheTechniqueService : IFicheTechniqueService
     {
         return await _context.FichesTechniques
             .Include(f => f.ImportsPDF)
-            .Include(f => f.Chantier)
             .FirstOrDefaultAsync(f => f.Id == id);
     }
 
-    public async Task<IEnumerable<FicheTechnique>> GetByChantierId(int chantierId)
-    {
-        return await _context.FichesTechniques
-            .Include(f => f.ImportsPDF)
-            .Where(f => f.ChantierId == chantierId)
-            .OrderBy(f => f.NomProduit)
-            .ToListAsync();
-    }
 
     public async Task<FicheTechnique> CreateAsync(FicheTechnique ficheTechnique)
     {

@@ -23,11 +23,23 @@ builder.Services.AddServerSideBlazor();
 // Injection des services métier
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 builder.Services.AddScoped<IFileExplorerService, FileExplorerService>();
+builder.Services.AddScoped<ITypeProduitService, TypeProduitService>();
+builder.Services.AddScoped<ITypeDocumentImportService, TypeDocumentImportService>();
 builder.Services.AddScoped<IFicheTechniqueService, FicheTechniqueService>();
 builder.Services.AddScoped<IMemoireTechniqueService, MemoireTechniqueService>();
 builder.Services.AddScoped<IDocumentExportService, DocumentExportService>();
 
 var app = builder.Build();
+
+// Initialize default types on startup
+using (var scope = app.Services.CreateScope())
+{
+    var typeProduitService = scope.ServiceProvider.GetRequiredService<ITypeProduitService>();
+    await typeProduitService.InitializeDefaultTypesAsync();
+    
+    var typeDocumentService = scope.ServiceProvider.GetRequiredService<ITypeDocumentImportService>();
+    await typeDocumentService.InitializeDefaultTypesAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
