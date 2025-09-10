@@ -4,6 +4,7 @@
     <RadzenHtmlEditor @bind-Value="@CurrentValue"
                      Placeholder="@Placeholder"
                      Style="@($"height: {Height}; min-height: {Height};")"
+                     UploadUrl="/api/images/upload"
                      class="@CssClass" />
     
     @if (!string.IsNullOrEmpty(ErrorMessage))
