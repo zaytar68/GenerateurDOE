@@ -142,4 +142,9 @@ public class FicheTechniqueService : IFicheTechniqueService
             throw new IOException($"Erreur lors de la sauvegarde du fichier PDF '{originalFileName}' dans '{repertoireStockage}': {ex.Message}", ex);
         }
     }
+
+    public async Task<ImportPDF?> GetPDFFileAsync(int importPDFId)
+    {
+        return await _context.ImportsPDF.FindAsync(importPDFId);
+    }
 }

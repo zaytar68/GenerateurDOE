@@ -12,4 +12,5 @@ public interface IFicheTechniqueService
     Task<ImportPDF> AddPDFAsync(int ficheTechniqueId, ImportPDF importPDF);
     Task<bool> RemovePDFAsync(int importPDFId);
     Task<string> SavePDFFileAsync(Stream fileStream, string originalFileName);
+    Task<ImportPDF?> GetPDFFileAsync(int importPDFId);
 }
