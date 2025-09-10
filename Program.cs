@@ -5,8 +5,15 @@ using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using GenerateurDOE.Services.Implementations;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext());
 
 // Add Entity Framework
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -19,6 +26,9 @@ builder.Services.Configure<AppSettings>(
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+
+// Add Controllers for API endpoints
+builder.Services.AddControllers();
 
 // Add Radzen services
 builder.Services.AddScoped<Radzen.DialogService>();
@@ -36,6 +46,8 @@ builder.Services.AddScoped<IMemoireTechniqueService, MemoireTechniqueService>();
 builder.Services.AddScoped<IDocumentExportService, DocumentExportService>();
 builder.Services.AddScoped<ITypeSectionService, TypeSectionService>();
 builder.Services.AddScoped<ISectionLibreService, SectionLibreService>();
+builder.Services.AddScoped<IImageService, ImageService>();
+builder.Services.AddScoped<ILoggingService, LoggingService>();
 
 var app = builder.Build();
 
@@ -64,7 +76,28 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 
+// Configure static files for uploaded images
+using (var scope = app.Services.CreateScope())
+{
+    var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
+    var appSettings = await configService.GetAppSettingsAsync();
+    
+    if (!string.IsNullOrEmpty(appSettings.RepertoireStockageImages) && 
+        Directory.Exists(appSettings.RepertoireStockageImages))
+    {
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+                appSettings.RepertoireStockageImages),
+            RequestPath = "/images"
+        });
+    }
+}
+
 app.UseRouting();
+
+// Map API controllers
+app.MapControllers();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
