@@ -2,12 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GenerateurDOE.Models;
 
-public class DocumentExport
+public class DocumentGenere
 {
     public int Id { get; set; }
     
     [Required(ErrorMessage = "Le type de document est requis")]
-    public TypeDocumentExport TypeDocument { get; set; }
+    public TypeDocumentGenere TypeDocument { get; set; }
     
     [Required(ErrorMessage = "Le format d'export est requis")]
     public FormatExport FormatExport { get; set; }
@@ -30,9 +30,11 @@ public class DocumentExport
     [Required]
     public int ChantierId { get; set; }
     public virtual Chantier Chantier { get; set; } = null!;
+    
+    public virtual ICollection<FicheTechnique> FichesTechniques { get; set; } = new List<FicheTechnique>();
 }
 
-public enum TypeDocumentExport
+public enum TypeDocumentGenere
 {
     DOE, // Dossier d'Ouvrages Exécutés
     DossierTechnique,

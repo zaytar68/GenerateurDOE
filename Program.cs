@@ -43,7 +43,7 @@ builder.Services.AddScoped<ITypeProduitService, TypeProduitService>();
 builder.Services.AddScoped<ITypeDocumentImportService, TypeDocumentImportService>();
 builder.Services.AddScoped<IFicheTechniqueService, FicheTechniqueService>();
 builder.Services.AddScoped<IMemoireTechniqueService, MemoireTechniqueService>();
-builder.Services.AddScoped<IDocumentExportService, DocumentExportService>();
+builder.Services.AddScoped<IDocumentGenereService, DocumentGenereService>();
 builder.Services.AddScoped<ITypeSectionService, TypeSectionService>();
 builder.Services.AddScoped<ISectionLibreService, SectionLibreService>();
 builder.Services.AddScoped<IImageService, ImageService>();

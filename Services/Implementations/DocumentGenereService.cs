@@ -8,14 +8,14 @@ using GenerateurDOE.Services.Interfaces;
 
 namespace GenerateurDOE.Services.Implementations;
 
-public class DocumentExportService : IDocumentExportService
+public class DocumentGenereService : IDocumentGenereService
 {
     private readonly ApplicationDbContext _context;
     private readonly AppSettings _appSettings;
     private readonly IFicheTechniqueService _ficheTechniqueService;
     private readonly IMemoireTechniqueService _memoireTechniqueService;
 
-    public DocumentExportService(ApplicationDbContext context, IOptions<AppSettings> appSettings,
+    public DocumentGenereService(ApplicationDbContext context, IOptions<AppSettings> appSettings,
         IFicheTechniqueService ficheTechniqueService, IMemoireTechniqueService memoireTechniqueService)
     {
         _context = context;
@@ -24,13 +24,13 @@ public class DocumentExportService : IDocumentExportService
         _memoireTechniqueService = memoireTechniqueService;
     }
 
-    public async Task<string> ExportDocumentAsync(int chantierId, TypeDocumentExport typeDocument, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
+    public async Task<string> ExportDocumentAsync(int chantierId, TypeDocumentGenere typeDocument, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
     {
         return typeDocument switch
         {
-            TypeDocumentExport.DOE => await GenerateDOEAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
-            TypeDocumentExport.DossierTechnique => await GenerateDossierTechniqueAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
-            TypeDocumentExport.MemoireTechnique => await GenerateMemoireTechniqueAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
+            TypeDocumentGenere.DOE => await GenerateDOEAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
+            TypeDocumentGenere.DossierTechnique => await GenerateDossierTechniqueAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
+            TypeDocumentGenere.MemoireTechnique => await GenerateMemoireTechniqueAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
             _ => throw new ArgumentException("Type de document non supporté", nameof(typeDocument))
         };
     }
@@ -189,26 +189,26 @@ public class DocumentExportService : IDocumentExportService
         return await FormatContentAsync(content.ToString(), format);
     }
 
-    public async Task<DocumentExport> SaveDocumentExportAsync(DocumentExport documentExport)
+    public async Task<DocumentGenere> SaveDocumentGenereAsync(DocumentGenere documentGenere)
     {
-        documentExport.DateCreation = DateTime.Now;
+        documentGenere.DateCreation = DateTime.Now;
 
-        _context.DocumentsExport.Add(documentExport);
+        _context.DocumentsGeneres.Add(documentGenere);
         await _context.SaveChangesAsync();
-        return documentExport;
+        return documentGenere;
     }
 
-    public async Task<IEnumerable<DocumentExport>> GetDocumentExportsByChantierId(int chantierId)
+    public async Task<IEnumerable<DocumentGenere>> GetDocumentsGeneresByChantierId(int chantierId)
     {
-        return await _context.DocumentsExport
+        return await _context.DocumentsGeneres
             .Where(d => d.ChantierId == chantierId)
             .OrderByDescending(d => d.DateCreation)
             .ToListAsync();
     }
 
-    public async Task<bool> DeleteDocumentExportAsync(int documentExportId)
+    public async Task<bool> DeleteDocumentGenereAsync(int documentGenereId)
     {
-        var document = await _context.DocumentsExport.FindAsync(documentExportId);
+        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);
         if (document == null)
             return false;
 
@@ -217,7 +217,7 @@ public class DocumentExportService : IDocumentExportService
             File.Delete(document.CheminFichier);
         }
 
-        _context.DocumentsExport.Remove(document);
+        _context.DocumentsGeneres.Remove(document);
         await _context.SaveChangesAsync();
         return true;
     }

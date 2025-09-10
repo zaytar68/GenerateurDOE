@@ -34,5 +34,5 @@ public class Chantier
     public DateTime DateModification { get; set; } = DateTime.Now;
     
     public virtual ICollection<FicheTechnique> FichesTechniques { get; set; } = new List<FicheTechnique>();
-    public virtual ICollection<DocumentExport> DocumentsExportes { get; set; } = new List<DocumentExport>();
+    public virtual ICollection<DocumentGenere> DocumentsGeneres { get; set; } = new List<DocumentGenere>();
 }

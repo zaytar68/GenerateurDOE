@@ -25,7 +25,7 @@ La gestion des méthodologies doit avoir une interface de création, modificatio
 ### Core Models
 - "Chantier" - Représente un projet avec un Maitre d'œuvre, un maître d'ouvrage, une adresse, un lot (numéro + intitulé)
 - "Fiche Technique" - Représente un produit avec son nom, le nom du fabricant, le type de produit et les documents "ImportPDF" associés.
-- `DocumentExport` - Export operations with format support and parameter configuration
+- `DocumentGenere` - Document generation operations with format support and parameter configuration
 - "ImportPDF" - Représente un fichier pdf avec son emplacement, son type 
 - "Méthode" - Représente une méthodologie avec un titre, une description. Il doit être possible d'y ajouter des images.
 - "SectionLibre" - Représente une section personnalisable dans un document avec titre, contenu HTML et type
@@ -34,7 +34,7 @@ La gestion des méthodologies doit avoir une interface de création, modificatio
 ### Services (Dependency Injected)
 - `IFicheTechniqueService` - Manages technical sheets with PDF file operations
 - `IMemoireTechniqueService` - Manages technical reports
-- `IDocumentExportService` - Handles document generation and export (singleton)
+- `IDocumentGenereService` - Handles document generation and export (singleton)
 - `IConfigurationService` - Manages application configuration and settings
 - `IFileExplorerService` - Handles file system operations and folder management
 - `ITypeProduitService` - Manages product types configuration

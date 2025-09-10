@@ -15,7 +15,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ImportPDF> ImportsPDF { get; set; }
     public DbSet<Methode> Methodes { get; set; }
     public DbSet<ImageMethode> ImagesMethode { get; set; }
-    public DbSet<DocumentExport> DocumentsExport { get; set; }
+    public DbSet<DocumentGenere> DocumentsGeneres { get; set; }
     public DbSet<TypeProduit> TypesProduits { get; set; }
     public DbSet<TypeDocumentImport> TypesDocuments { get; set; }
     public DbSet<TypeSection> TypesSections { get; set; }
@@ -87,7 +87,7 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<DocumentExport>(entity =>
+        modelBuilder.Entity<DocumentGenere>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.TypeDocument).IsRequired();
@@ -98,9 +98,21 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
             
             entity.HasOne(d => d.Chantier)
-                .WithMany(p => p.DocumentsExportes)
+                .WithMany(p => p.DocumentsGeneres)
                 .HasForeignKey(d => d.ChantierId)
                 .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasMany(d => d.FichesTechniques)
+                .WithMany()
+                .UsingEntity<Dictionary<string, object>>(
+                    "DocumentGenereFicheTechnique",
+                    j => j.HasOne<FicheTechnique>().WithMany().HasForeignKey("FicheTechniqueId"),
+                    j => j.HasOne<DocumentGenere>().WithMany().HasForeignKey("DocumentGenereId"),
+                    j =>
+                    {
+                        j.HasKey("DocumentGenereId", "FicheTechniqueId");
+                        j.ToTable("DocumentGenereFicheTechniques");
+                    });
         });
 
         modelBuilder.Entity<TypeProduit>(entity =>
