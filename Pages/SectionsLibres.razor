@@ -1,0 +1,425 @@
+@page "/sections-libres"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject ISectionLibreService SectionLibreService
+@inject ITypeSectionService TypeSectionService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Sections Libres</PageTitle>
+
+<div class="container-fluid">
+    <h1 class="mb-4">
+        <span class="oi oi-text" aria-hidden="true"></span>
+        Gestion des Sections Libres
+    </h1>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+                @statusMessage
+                <button type="button" class="btn-close" aria-label="Close" @onclick="ClearMessage"></button>
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <span class="oi oi-plus" aria-hidden="true"></span>
+                            @(sectionEnEdition != null ? "Modifier Section" : "Nouvelle Section")
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="sectionCourante" OnValidSubmit="SauvegarderSection">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger mb-3" />
+
+                            <div class="mb-3">
+                                <label for="titre" class="form-label">Titre de la section</label>
+                                <InputText @bind-Value="sectionCourante.Titre" 
+                                         class="form-control" id="titre" placeholder="Titre de la section" />
+                                <ValidationMessage For="() => sectionCourante.Titre" class="text-danger" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="typeSection" class="form-label">Type de section</label>
+                                <InputSelect @bind-Value="sectionCourante.TypeSectionId" class="form-select" id="typeSection">
+                                    <option value="0">-- Sélectionner un type --</option>
+                                    @foreach (var type in typesSections.Where(t => t.IsActive))
+                                    {
+                                        <option value="@type.Id">@type.Nom</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => sectionCourante.TypeSectionId" class="text-danger" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="ordre" class="form-label">Ordre d'affichage</label>
+                                <InputNumber @bind-Value="sectionCourante.Ordre" 
+                                           class="form-control" id="ordre" />
+                                <ValidationMessage For="() => sectionCourante.Ordre" class="text-danger" />
+                                <small class="form-text text-muted">Laisser à 0 pour placer automatiquement à la fin</small>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                @if (sectionEnEdition != null)
+                                {
+                                    <button type="button" class="btn btn-secondary" @onclick="AnnulerEdition">
+                                        <span class="oi oi-x" aria-hidden="true"></span>
+                                        Annuler
+                                    </button>
+                                }
+                                else
+                                {
+                                    <div></div>
+                                }
+
+                                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    <span class="oi oi-@(sectionEnEdition != null ? "check" : "plus")" aria-hidden="true"></span>
+                                    @(sectionEnEdition != null ? "Modifier" : "Créer")
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+
+                @if (sectionEnEdition != null)
+                {
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <span class="oi oi-wrench" aria-hidden="true"></span>
+                                Actions
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-danger" @onclick="SupprimerSectionCourante">
+                                    <span class="oi oi-trash" aria-hidden="true"></span>
+                                    Supprimer cette section
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <span class="oi oi-document" aria-hidden="true"></span>
+                            Contenu de la section
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div>
+                            <label for="contenu" class="form-label">Contenu de la section</label>
+                            <RichTextEditor @bind-Value="sectionCourante.ContenuHtml"
+                                          Placeholder="Saisissez le contenu de votre section..."
+                                          Height="400px"
+                                          CssClass="border" />
+                            <small class="form-text text-muted mt-2">
+                                Utilisez la barre d'outils pour formater votre texte, insérer des images et des liens.
+                            </small>
+                            
+                            @if (!string.IsNullOrEmpty(sectionCourante.ContenuHtml))
+                            {
+                                <div class="mt-3">
+                                    <strong>Aperçu :</strong>
+                                    <div class="border p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                                        @((MarkupString)sectionCourante.ContenuHtml)
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <span class="oi oi-list" aria-hidden="true"></span>
+                            Liste des Sections (@sections.Count)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (chargementSections)
+                        {
+                            <div class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                            </div>
+                        }
+                        else if (!sections.Any())
+                        {
+                            <div class="text-center text-muted py-4">
+                                <span class="oi oi-info" aria-hidden="true"></span>
+                                <p class="mb-0">Aucune section créée pour le moment.</p>
+                                <small>Créez votre première section avec le formulaire ci-contre.</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Ordre</th>
+                                            <th>Titre</th>
+                                            <th>Type</th>
+                                            <th>Modifié le</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var section in sections.OrderBy(s => s.Ordre))
+                                        {
+                                            <tr class="@(sectionEnEdition?.Id == section.Id ? "table-warning" : "")">
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="badge bg-primary me-2">@(section.Ordre)</span>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                                                    @onclick="() => DeplacerSection(section, true)" 
+                                                                    disabled="@(section.Ordre == 1)"
+                                                                    title="Monter">
+                                                                <span class="oi oi-arrow-top"></span>
+                                                            </button>
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                                                    @onclick="() => DeplacerSection(section, false)" 
+                                                                    disabled="@(section.Ordre == sections.Count)"
+                                                                    title="Descendre">
+                                                                <span class="oi oi-arrow-bottom"></span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td><strong>@(section.Titre)</strong></td>
+                                                <td>
+                                                    <span class="badge bg-info">@(section.TypeSection.Nom)</span>
+                                                </td>
+                                                <td>@(section.DateModification.ToString("dd/MM/yyyy HH:mm"))</td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button type="button" class="btn btn-outline-primary" 
+                                                                @onclick="() => ModifierSection(section)" title="Modifier">
+                                                            <span class="oi oi-pencil"></span>
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-danger" 
+                                                                @onclick="() => SupprimerSection(section)" title="Supprimer">
+                                                            <span class="oi oi-trash"></span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<SectionLibre> sections = new();
+    private List<TypeSection> typesSections = new();
+    private SectionLibre sectionCourante = new();
+    private SectionLibre? sectionEnEdition = null;
+
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool chargementSections = false;
+    private string statusMessage = string.Empty;
+    private bool isSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ChargerDonnees();
+    }
+
+    private async Task ChargerDonnees()
+    {
+        try
+        {
+            isLoading = true;
+            chargementSections = true;
+            
+            // Load sequentially to avoid DbContext threading issues
+            sections = (await SectionLibreService.GetAllAsync()).ToList();
+            typesSections = (await TypeSectionService.GetActiveAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors du chargement : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+            chargementSections = false;
+        }
+    }
+
+    private async Task SauvegarderSection()
+    {
+        try
+        {
+            isSaving = true;
+            ClearMessage();
+
+            // Le contenu HTML est déjà dans sectionCourante.ContenuHtml grâce au @bind-Value
+            var htmlContent = sectionCourante.ContenuHtml ?? "";
+            var jsonContent = ""; // Pas besoin de JSON pour l'approche HTML simple
+
+            sectionCourante.ContenuHtml = htmlContent;
+            sectionCourante.ContenuJson = jsonContent;
+
+            if (sectionEnEdition != null)
+            {
+                // Mise à jour
+                sectionCourante.Id = sectionEnEdition.Id;
+                await SectionLibreService.UpdateAsync(sectionCourante);
+                statusMessage = "Section modifiée avec succès !";
+                sectionEnEdition = null;
+            }
+            else
+            {
+                // Création
+                await SectionLibreService.CreateAsync(sectionCourante);
+                statusMessage = "Section créée avec succès !";
+            }
+
+            isSuccess = true;
+            sectionCourante = new SectionLibre();
+            await ChargerDonnees();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de la sauvegarde : {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ModifierSection(SectionLibre section)
+    {
+        sectionEnEdition = section;
+        sectionCourante = new SectionLibre
+        {
+            Id = section.Id,
+            Titre = section.Titre,
+            Ordre = section.Ordre,
+            TypeSectionId = section.TypeSectionId,
+            ContenuHtml = section.ContenuHtml,
+            ContenuJson = section.ContenuJson
+        };
+        
+        // Le contenu sera automatiquement chargé dans l'éditeur grâce au @bind-Value
+    }
+
+    private void AnnulerEdition()
+    {
+        sectionEnEdition = null;
+        sectionCourante = new SectionLibre();
+        // L'éditeur sera automatiquement vidé grâce au @bind-Value
+    }
+
+    private async Task SupprimerSection(SectionLibre section)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"Êtes-vous sûr de vouloir supprimer la section '{section.Titre}' ?");
+        
+        if (confirmed)
+        {
+            try
+            {
+                var success = await SectionLibreService.DeleteAsync(section.Id);
+                if (success)
+                {
+                    await ChargerDonnees();
+                    statusMessage = "Section supprimée avec succès !";
+                    isSuccess = true;
+                    
+                    // Si on était en train d'éditer cette section, annuler l'édition
+                    if (sectionEnEdition?.Id == section.Id)
+                    {
+                        AnnulerEdition();
+                    }
+                }
+                else
+                {
+                    statusMessage = "Erreur lors de la suppression.";
+                    isSuccess = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                statusMessage = $"Erreur lors de la suppression : {ex.Message}";
+                isSuccess = false;
+            }
+        }
+    }
+
+    private async Task SupprimerSectionCourante()
+    {
+        if (sectionEnEdition != null)
+        {
+            await SupprimerSection(sectionEnEdition);
+        }
+    }
+
+    private async Task DeplacerSection(SectionLibre section, bool monter)
+    {
+        try
+        {
+            var nouvelOrdre = monter ? section.Ordre - 1 : section.Ordre + 1;
+            var success = await SectionLibreService.ReorderAsync(section.Id, nouvelOrdre);
+            
+            if (success)
+            {
+                await ChargerDonnees();
+                statusMessage = $"Section {(monter ? "montée" : "descendue")} avec succès !";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = "Erreur lors du déplacement.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors du déplacement : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private void ClearMessage()
+    {
+        statusMessage = string.Empty;
+    }
+}

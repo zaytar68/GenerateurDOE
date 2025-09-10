@@ -20,6 +20,12 @@ builder.Services.Configure<AppSettings>(
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
+// Add Radzen services
+builder.Services.AddScoped<Radzen.DialogService>();
+builder.Services.AddScoped<Radzen.NotificationService>();
+builder.Services.AddScoped<Radzen.TooltipService>();
+builder.Services.AddScoped<Radzen.ContextMenuService>();
+
 // Injection des services métier
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 builder.Services.AddScoped<IFileExplorerService, FileExplorerService>();
@@ -28,6 +34,8 @@ builder.Services.AddScoped<ITypeDocumentImportService, TypeDocumentImportService
 builder.Services.AddScoped<IFicheTechniqueService, FicheTechniqueService>();
 builder.Services.AddScoped<IMemoireTechniqueService, MemoireTechniqueService>();
 builder.Services.AddScoped<IDocumentExportService, DocumentExportService>();
+builder.Services.AddScoped<ITypeSectionService, TypeSectionService>();
+builder.Services.AddScoped<ISectionLibreService, SectionLibreService>();
 
 var app = builder.Build();
 
@@ -39,6 +47,9 @@ using (var scope = app.Services.CreateScope())
     
     var typeDocumentService = scope.ServiceProvider.GetRequiredService<ITypeDocumentImportService>();
     await typeDocumentService.InitializeDefaultTypesAsync();
+    
+    var typeSectionService = scope.ServiceProvider.GetRequiredService<ITypeSectionService>();
+    await typeSectionService.InitializeDefaultTypesAsync();
 }
 
 // Configure the HTTP request pipeline.

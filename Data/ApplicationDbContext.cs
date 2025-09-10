@@ -18,6 +18,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<DocumentExport> DocumentsExport { get; set; }
     public DbSet<TypeProduit> TypesProduits { get; set; }
     public DbSet<TypeDocumentImport> TypesDocuments { get; set; }
+    public DbSet<TypeSection> TypesSections { get; set; }
+    public DbSet<SectionLibre> SectionsLibres { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -119,6 +121,32 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+        });
+
+        modelBuilder.Entity<TypeSection>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+        });
+
+        modelBuilder.Entity<SectionLibre>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Titre).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Ordre).IsRequired();
+            entity.Property(e => e.ContenuHtml).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ContenuJson).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            
+            entity.HasOne(d => d.TypeSection)
+                .WithMany(p => p.SectionsLibres)
+                .HasForeignKey(d => d.TypeSectionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -1,0 +1,104 @@
+@using Radzen.Blazor
+
+<div class="rich-text-editor-container">
+    <RadzenHtmlEditor @bind-Value="@CurrentValue"
+                     Placeholder="@Placeholder"
+                     Style="@($"height: {Height}; min-height: {Height};")"
+                     class="@CssClass" />
+    
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger mt-2" role="alert">
+            <span class="oi oi-warning" aria-hidden="true"></span>
+            @ErrorMessage
+            <button type="button" class="btn-close ms-auto" @onclick="ClearError" aria-label="Fermer"></button>
+        </div>
+    }
+    
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success mt-2" role="alert">
+            <span class="oi oi-check" aria-hidden="true"></span>
+            @SuccessMessage
+            <button type="button" class="btn-close ms-auto" @onclick="ClearSuccess" aria-label="Fermer"></button>
+        </div>
+    }
+</div>
+
+@code {
+    private string currentValue = string.Empty;
+
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Saisissez votre contenu...";
+    [Parameter] public string Height { get; set; } = "400px";
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+    
+    public string ErrorMessage { get; private set; } = string.Empty;
+    public string SuccessMessage { get; private set; } = string.Empty;
+
+    private string CurrentValue
+    {
+        get => currentValue;
+        set
+        {
+            if (currentValue != value)
+            {
+                currentValue = value;
+                _ = ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Value != currentValue)
+        {
+            currentValue = Value ?? string.Empty;
+        }
+    }
+
+    public void SetValue(string value)
+    {
+        CurrentValue = value ?? string.Empty;
+        StateHasChanged();
+    }
+
+    public void Clear()
+    {
+        SetValue(string.Empty);
+    }
+
+    public void ShowError(string message)
+    {
+        ErrorMessage = message;
+        SuccessMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    public void ShowSuccess(string message)
+    {
+        SuccessMessage = message;
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void ClearError()
+    {
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void ClearSuccess()
+    {
+        SuccessMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    public void ClearMessages()
+    {
+        ErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+        StateHasChanged();
+    }
+}
