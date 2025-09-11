@@ -148,10 +148,18 @@
             return;
         }
 
-        filteredItems = Items
-            .Where(item => GetDisplayText(item).Contains(searchText, StringComparison.OrdinalIgnoreCase))
-            .Take(10)
-            .ToList();
+        // Si MinSearchLength = 0, on désactive le filtrage local (recherche serveur pure)
+        if (MinSearchLength == 0)
+        {
+            filteredItems = Items.Take(10).ToList();
+        }
+        else
+        {
+            filteredItems = Items
+                .Where(item => GetDisplayText(item).Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                .Take(10)
+                .ToList();
+        }
         
         showDropdown = isInputFocused && filteredItems.Any();
         selectedIndex = filteredItems.Any() ? 0 : -1;

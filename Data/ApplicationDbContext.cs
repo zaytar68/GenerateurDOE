@@ -36,6 +36,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.IntituleLot).HasMaxLength(300).IsRequired();
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.EstArchive).HasDefaultValue(false);
         });
 
         modelBuilder.Entity<FicheTechnique>(entity =>

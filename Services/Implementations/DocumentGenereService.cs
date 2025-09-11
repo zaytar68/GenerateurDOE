@@ -273,6 +273,8 @@ public class DocumentGenereService : IDocumentGenereService
             .Build();
 
         var html = Markdown.ToHtml(markdown, pipeline);
+        
+        await Task.CompletedTask;
 
         var htmlDocument = new StringBuilder();
         htmlDocument.AppendLine("<!DOCTYPE html>");

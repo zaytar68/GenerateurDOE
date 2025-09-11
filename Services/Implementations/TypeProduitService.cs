@@ -105,13 +105,13 @@ public class TypeProduitService : ITypeProduitService
         }
     }
 
-    public async Task<bool> CanDeleteAsync(int id)
+    public Task<bool> CanDeleteAsync(int id)
     {
         // TODO: Pour le moment, on ne peut pas vérifier l'usage car on utilise encore le champ string TypeProduit
         // Cette méthode sera mise à jour après la migration vers TypeProduitId
         var usageCount = 0;
             
-        return usageCount == 0;
+        return Task.FromResult(usageCount == 0);
     }
 
     public async Task<bool> ExistsAsync(string nom)

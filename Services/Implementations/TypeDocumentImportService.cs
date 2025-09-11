@@ -104,12 +104,12 @@ public class TypeDocumentImportService : ITypeDocumentImportService
         }
     }
 
-    public async Task<bool> CanDeleteAsync(int id)
+    public Task<bool> CanDeleteAsync(int id)
     {
         // TODO: Pour l'instant, on ne peut pas vérifier l'usage car on utilise encore l'enum TypeDocument
         var usageCount = 0;
             
-        return usageCount == 0;
+        return Task.FromResult(usageCount == 0);
     }
 
     public async Task<bool> ExistsAsync(string nom)

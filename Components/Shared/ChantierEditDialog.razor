@@ -1,0 +1,129 @@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IChantierService chantierService
+@inject Radzen.DialogService DialogService
+
+<div class="container-fluid">
+    <EditForm Model="Chantier" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <label for="nomProjet" class="form-label">Nom du Projet *</label>
+                <InputText @bind-Value="Chantier.NomProjet" class="form-control" id="nomProjet" />
+                <ValidationMessage For="() => Chantier.NomProjet" class="text-danger" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="maitreOeuvre" class="form-label">Maître d'Œuvre (Architecte) *</label>
+                <InputText @bind-Value="Chantier.MaitreOeuvre" class="form-control" id="maitreOeuvre" />
+                <ValidationMessage For="() => Chantier.MaitreOeuvre" class="text-danger" />
+            </div>
+            <div class="col-md-6">
+                <label for="maitreOuvrage" class="form-label">Maître d'Ouvrage (Client) *</label>
+                <InputText @bind-Value="Chantier.MaitreOuvrage" class="form-control" id="maitreOuvrage" />
+                <ValidationMessage For="() => Chantier.MaitreOuvrage" class="text-danger" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <label for="adresse" class="form-label">Adresse *</label>
+                <InputTextArea @bind-Value="Chantier.Adresse" class="form-control" id="adresse" rows="2" />
+                <ValidationMessage For="() => Chantier.Adresse" class="text-danger" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label for="numeroLot" class="form-label">Numéro de Lot *</label>
+                <InputText @bind-Value="Chantier.NumeroLot" class="form-control" id="numeroLot" />
+                <ValidationMessage For="() => Chantier.NumeroLot" class="text-danger" />
+            </div>
+            <div class="col-md-8">
+                <label for="intituleLot" class="form-label">Intitulé du Lot *</label>
+                <InputText @bind-Value="Chantier.IntituleLot" class="form-control" id="intituleLot" />
+                <ValidationMessage For="() => Chantier.IntituleLot" class="text-danger" />
+            </div>
+        </div>
+
+        @if (Chantier.Id > 0)
+        {
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <InputCheckbox @bind-Value="Chantier.EstArchive" class="form-check-input" id="estArchive" />
+                        <label class="form-check-label" for="estArchive">
+                            Chantier archivé
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <small class="text-muted">
+                        Créé le: @Chantier.DateCreation.ToString("dd/MM/yyyy HH:mm")<br>
+                        Modifié le: @Chantier.DateModification.ToString("dd/MM/yyyy HH:mm")
+                    </small>
+                </div>
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-md-12 text-end">
+                <button type="button" class="btn btn-secondary me-2" @onclick="Cancel">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    @(Chantier.Id == 0 ? "Créer" : "Modifier")
+                </button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter] public Chantier Chantier { get; set; } = new();
+    
+    private bool isSubmitting = false;
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            isSubmitting = true;
+            StateHasChanged();
+
+            if (Chantier.Id == 0)
+            {
+                await chantierService.CreateAsync(Chantier);
+            }
+            else
+            {
+                await chantierService.UpdateAsync(Chantier);
+            }
+
+            DialogService.Close(true);
+        }
+        catch (Exception)
+        {
+            // En cas d'erreur, on reste dans le dialogue et on affiche l'erreur
+            // L'erreur sera gérée par la page parent
+            DialogService.Close(false);
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+}

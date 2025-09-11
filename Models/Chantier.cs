@@ -33,6 +33,8 @@ public class Chantier
     public DateTime DateCreation { get; set; } = DateTime.Now;
     public DateTime DateModification { get; set; } = DateTime.Now;
     
+    public bool EstArchive { get; set; } = false;
+    
     public virtual ICollection<FicheTechnique> FichesTechniques { get; set; } = new List<FicheTechnique>();
     public virtual ICollection<DocumentGenere> DocumentsGeneres { get; set; } = new List<DocumentGenere>();
 }

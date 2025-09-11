@@ -1,0 +1,405 @@
+@page "/chantiers"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Components.Shared
+@inject IChantierService chantierService
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+
+<PageTitle>Gestion des Chantiers</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>Gestion des Chantiers</h2>
+        </div>
+    </div>
+
+    <!-- Barre de recherche et actions -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <AutoComplete T="Chantier"
+                         Items="chantiers"
+                         DisplaySelector="@(c => $"{c.NomProjet} - {c.Adresse} ({c.MaitreOuvrage})")"
+                         Placeholder="Rechercher dans tous les champs..."
+                         OnTextChanged="OnChantierSearchChanged"
+                         OnItemSelected="OnChantierSelected"
+                         MinSearchLength="0">
+                <ItemTemplate>
+                    <div class="p-2">
+                        <div class="fw-bold text-primary">@context.NomProjet</div>
+                        <div class="text-muted small">@context.MaitreOuvrage - @context.Adresse</div>
+                        <div class="text-info small">Lot @context.NumeroLot: @context.IntituleLot</div>
+                    </div>
+                </ItemTemplate>
+            </AutoComplete>
+        </div>
+        <div class="col-md-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" 
+                       @bind="includeArchived" @bind:after="RefreshChantiers" 
+                       id="includeArchivedCheck"
+                       vertical-align="middle" />
+                <label class="form-check-label" for="includeArchivedCheck">
+                    Afficher les chantiers archivés
+                </label>
+            </div>
+        </div>
+        <div class="col-md-3 text-end">
+            <button class="btn btn-primary" @onclick="ShowCreateDialog">
+                <i class="fa fa-plus"></i> Nouveau Chantier
+            </button>
+        </div>
+    </div>
+
+    <!-- Chantier sélectionné -->
+    @if (selectedChantier != null)
+    {
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">@selectedChantier.NomProjet</h5>
+                        <div>
+                            @if (selectedChantier.EstArchive)
+                            {
+                                <span class="badge bg-warning me-2">Archivé</span>
+                                <button class="btn btn-sm btn-outline-light me-1" @onclick="() => UnarchiveChantier(selectedChantier.Id)">
+                                    <i class="fa fa-archive"></i> Désarchiver
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-light me-1" @onclick="() => ArchiveChantier(selectedChantier.Id)">
+                                    <i class="fa fa-archive"></i> Archiver
+                                </button>
+                            }
+                            <button class="btn btn-sm btn-outline-light me-1" @onclick="() => ShowEditDialog(selectedChantier)">
+                                <i class="fa fa-edit"></i> Modifier
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteChantier(selectedChantier.Id)">
+                                <i class="fa fa-trash"></i> Supprimer
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Maître d'œuvre:</strong> @selectedChantier.MaitreOeuvre</p>
+                                <p><strong>Maître d'ouvrage:</strong> @selectedChantier.MaitreOuvrage</p>
+                                <p><strong>Adresse:</strong> @selectedChantier.Adresse</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Lot:</strong> @selectedChantier.NumeroLot - @selectedChantier.IntituleLot</p>
+                                <p><strong>Créé le:</strong> @selectedChantier.DateCreation.ToString("dd/MM/yyyy")</p>
+                                <p><strong>Modifié le:</strong> @selectedChantier.DateModification.ToString("dd/MM/yyyy")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents générés pour ce chantier -->
+        @if (selectedChantierWithDocuments?.DocumentsGeneres?.Any() == true)
+        {
+            <div class="row">
+                <div class="col-md-12">
+                    <h4>Documents Générés</h4>
+                    <div class="row">
+                        @foreach (var doc in selectedChantierWithDocuments.DocumentsGeneres)
+                        {
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title">@doc.TypeDocument</h5>
+                                        <p class="card-text">
+                                            <strong>Format:</strong> @doc.FormatExport<br>
+                                            <strong>Fichier:</strong> @doc.NomFichier<br>
+                                            <strong>Créé le:</strong> @doc.DateCreation.ToString("dd/MM/yyyy HH:mm")
+                                        </p>
+                                        @if (doc.IncludePageDeGarde)
+                                        {
+                                            <span class="badge bg-info me-1">Page de garde</span>
+                                        }
+                                        @if (doc.IncludeTableMatieres)
+                                        {
+                                            <span class="badge bg-info">Table des matières</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- Liste des chantiers -->
+    @if (chantiers?.Any() == true && selectedChantier == null)
+    {
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Liste des Chantiers (@chantiers.Count)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nom du Projet</th>
+                                        <th>Maître d'Ouvrage</th>
+                                        <th>Adresse</th>
+                                        <th>Lot</th>
+                                        <th>Modifié le</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var chantier in chantiers.Take(20))
+                                    {
+                                        <tr class="@(chantier.EstArchive ? "text-muted" : "")" 
+                                            style="cursor: pointer;" 
+                                            @onclick="() => SelectChantier(chantier)">
+                                            <td>@chantier.NomProjet</td>
+                                            <td>@chantier.MaitreOuvrage</td>
+                                            <td>@chantier.Adresse</td>
+                                            <td>@chantier.NumeroLot</td>
+                                            <td>@chantier.DateModification.ToString("dd/MM/yyyy")</td>
+                                            <td>
+                                                @if (chantier.EstArchive)
+                                                {
+                                                    <span class="badge bg-warning">Archivé</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">Actif</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary me-1" 
+                                                        @onclick:stopPropagation="true"
+                                                        @onclick="() => SelectChantier(chantier)">
+                                                    <i class="fa fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary me-1" 
+                                                        @onclick:stopPropagation="true"
+                                                        @onclick="() => ShowEditDialog(chantier)">
+                                                    <i class="fa fa-edit"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+
+    @if (chantiers?.Any() != true && !isLoading)
+    {
+        <div class="text-center text-muted">
+            <p>Aucun chantier trouvé.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Chantier> chantiers = new();
+    private Chantier? selectedChantier = null;
+    private Chantier? selectedChantierWithDocuments = null;
+    private bool includeArchived = false;
+    private bool isLoading = false;
+    private string currentSearchText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshChantiers();
+    }
+
+    private async Task RefreshChantiers()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            if (string.IsNullOrWhiteSpace(currentSearchText))
+            {
+                chantiers = await chantierService.GetAllAsync(includeArchived);
+            }
+            else
+            {
+                chantiers = await chantierService.SearchAsync(currentSearchText, includeArchived);
+            }
+
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnChantierSearchChanged(string searchText)
+    {
+        try
+        {
+            currentSearchText = searchText;
+            
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                chantiers = await chantierService.GetAllAsync(includeArchived);
+            }
+            else
+            {
+                chantiers = await chantierService.SearchAsync(searchText.Trim(), includeArchived);
+            }
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la recherche: {ex.Message}");
+            chantiers = new List<Chantier>();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnChantierSelected(Chantier chantier)
+    {
+        await SelectChantier(chantier);
+    }
+
+    private async Task SelectChantier(Chantier chantier)
+    {
+        try
+        {
+            selectedChantier = chantier;
+            selectedChantierWithDocuments = await chantierService.GetByIdWithDocumentsAsync(chantier.Id);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement des détails: {ex.Message}");
+        }
+    }
+
+    private async Task ShowCreateDialog()
+    {
+        var chantier = new Chantier();
+
+        var result = await DialogService.OpenAsync<ChantierEditDialog>("Nouveau Chantier", 
+            new Dictionary<string, object> { { "Chantier", chantier } },
+            new Radzen.DialogOptions { Width = "700px", Height = "500px" });
+
+        if (result == true)
+        {
+            await RefreshChantiers();
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier créé avec succès");
+        }
+    }
+
+    private async Task ShowEditDialog(Chantier chantier)
+    {
+        var result = await DialogService.OpenAsync<ChantierEditDialog>("Modifier Chantier", 
+            new Dictionary<string, object> { { "Chantier", chantier } },
+            new Radzen.DialogOptions { Width = "700px", Height = "500px" });
+
+        if (result == true)
+        {
+            await RefreshChantiers();
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier modifié avec succès");
+        }
+    }
+
+    private async Task ArchiveChantier(int chantierId)
+    {
+        try
+        {
+            await chantierService.ArchiveAsync(chantierId);
+            await RefreshChantiers();
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier archivé avec succès");
+            
+            // Rafraîchir les détails si c'est le chantier sélectionné
+            if (selectedChantier?.Id == chantierId)
+            {
+                selectedChantier.EstArchive = true;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de l'archivage: {ex.Message}");
+        }
+    }
+
+    private async Task UnarchiveChantier(int chantierId)
+    {
+        try
+        {
+            await chantierService.UnarchiveAsync(chantierId);
+            await RefreshChantiers();
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier désarchivé avec succès");
+            
+            // Rafraîchir les détails si c'est le chantier sélectionné
+            if (selectedChantier?.Id == chantierId)
+            {
+                selectedChantier.EstArchive = false;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du désarchivage: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteChantier(int chantierId)
+    {
+        var confirmResult = await DialogService.Confirm("Êtes-vous sûr de vouloir supprimer ce chantier ?", 
+            "Confirmation de suppression", new Radzen.ConfirmOptions { OkButtonText = "Oui", CancelButtonText = "Non" });
+
+        if (confirmResult == true)
+        {
+            try
+            {
+                await chantierService.DeleteAsync(chantierId);
+                await RefreshChantiers();
+                
+                // Désélectionner si c'était le chantier sélectionné
+                if (selectedChantier?.Id == chantierId)
+                {
+                    selectedChantier = null;
+                    selectedChantierWithDocuments = null;
+                }
+                
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier supprimé avec succès");
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la suppression: {ex.Message}");
+            }
+        }
+    }
+}
