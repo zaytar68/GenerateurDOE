@@ -20,6 +20,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<TypeDocumentImport> TypesDocuments { get; set; }
     public DbSet<TypeSection> TypesSections { get; set; }
     public DbSet<SectionLibre> SectionsLibres { get; set; }
+    public DbSet<SectionConteneur> SectionsConteneurs { get; set; }
+    public DbSet<SectionConteneurItem> SectionConteneurItems { get; set; }
+    public DbSet<FTConteneur> FTConteneurs { get; set; }
+    public DbSet<FTElement> FTElements { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +101,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CheminFichier).HasMaxLength(500);
             entity.Property(e => e.Parametres).HasMaxLength(2000);
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.EnCours).HasDefaultValue(true);
             
             entity.HasOne(d => d.Chantier)
                 .WithMany(p => p.DocumentsGeneres)
@@ -160,6 +165,101 @@ public class ApplicationDbContext : DbContext
                 .WithMany(p => p.SectionsLibres)
                 .HasForeignKey(d => d.TypeSectionId)
                 .OnDelete(DeleteBehavior.Cascade);
+                
+            // Configuration temporaire many-to-many pour compatibilité durant la migration  
+            entity.HasMany<SectionConteneur>()
+                .WithMany()
+                .UsingEntity<Dictionary<string, object>>(
+                    "SectionLibreSectionConteneur",
+                    j => j.HasOne<SectionConteneur>().WithMany().HasForeignKey("SectionConteneursId"),
+                    j => j.HasOne<SectionLibre>().WithMany().HasForeignKey("SectionLibresId"),
+                    j =>
+                    {
+                        j.HasKey("SectionLibresId", "SectionConteneursId");
+                        j.ToTable("SectionLibreSectionConteneurs");
+                    });
+        });
+
+        modelBuilder.Entity<SectionConteneur>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Ordre).IsRequired();
+            entity.Property(e => e.Titre).HasMaxLength(200);
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            
+            entity.HasOne(d => d.DocumentGenere)
+                .WithMany(p => p.SectionsConteneurs)
+                .HasForeignKey(d => d.DocumentGenereId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(d => d.TypeSection)
+                .WithMany()
+                .HasForeignKey(d => d.TypeSectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasIndex(e => new { e.DocumentGenereId, e.TypeSectionId })
+                .IsUnique()
+                .HasDatabaseName("IX_SectionConteneur_DocumentGenere_TypeSection");
+        });
+
+        modelBuilder.Entity<FTConteneur>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Titre).HasMaxLength(200);
+            entity.Property(e => e.Ordre).IsRequired();
+            entity.Property(e => e.AfficherTableauRecapitulatif).HasDefaultValue(true);
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            
+            entity.HasOne(d => d.DocumentGenere)
+                .WithOne(p => p.FTConteneur)
+                .HasForeignKey<FTConteneur>(d => d.DocumentGenereId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FTElement>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PositionMarche).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Ordre).IsRequired();
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            
+            entity.HasOne(d => d.FTConteneur)
+                .WithMany(p => p.Elements)
+                .HasForeignKey(d => d.FTConteneursId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(d => d.FicheTechnique)
+                .WithMany()
+                .HasForeignKey(d => d.FicheTechniqueId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasOne(d => d.ImportPDF)
+                .WithMany()
+                .HasForeignKey(d => d.ImportPDFId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SectionConteneurItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Ordre).IsRequired();
+            entity.Property(e => e.DateAjout).HasDefaultValueSql("GETDATE()");
+            
+            entity.HasOne(d => d.SectionConteneur)
+                .WithMany(p => p.Items)
+                .HasForeignKey(d => d.SectionConteneursId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(d => d.SectionLibre)
+                .WithMany(p => p.ConteneurItems)
+                .HasForeignKey(d => d.SectionLibreId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            // Index unique pour éviter les doublons section/conteneur
+            entity.HasIndex(e => new { e.SectionConteneursId, e.SectionLibreId })
+                .IsUnique();
         });
     }
 }

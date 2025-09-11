@@ -1,0 +1,629 @@
+@page "/document/edit"
+@page "/document/edit/{documentId:int}"
+@page "/document/edit/nouveau/{chantierId:int}"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IDocumentGenereService documentGenereService
+@inject IChantierService chantierService
+@inject ISectionConteneurService sectionConteneurService
+@inject IFTConteneurService ftConteneurService
+@inject ITypeSectionService typeSectionService
+@inject NavigationManager Navigation
+@inject Radzen.NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<PageTitle>@(IsEditMode ? $"Modifier {document?.NomFichier}" : "Nouveau Document")</PageTitle>
+
+<div class="container-fluid">
+    <!-- En-tête avec navigation -->
+    <div class="d-flex align-items-center mb-4">
+        <button class="btn btn-outline-secondary me-3" @onclick="RetourChantier">
+            <span class="oi oi-arrow-left" aria-hidden="true"></span> 
+            Retour @(chantier?.NomProjet ?? "au chantier")
+        </button>
+        <h1 class="mb-0">
+            <span class="oi oi-document" aria-hidden="true"></span>
+            @(IsEditMode ? $"Modifier : {document?.NomFichier}" : "Nouveau Document")
+        </h1>
+        
+        @if (document?.EnCours == false)
+        {
+            <span class="badge bg-success ms-3 fs-6">Finalisé</span>
+        }
+        else if (hasUnsavedChanges)
+        {
+            <span class="badge bg-warning ms-3 fs-6">Modifications en cours</span>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (document == null && IsEditMode)
+    {
+        <div class="alert alert-warning">
+            <span class="oi oi-warning" aria-hidden="true"></span>
+            Document introuvable
+        </div>
+    }
+    else
+    {
+        <!-- Barre d'actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" @onclick="SauvegarderDocument" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    <span class="oi oi-check" aria-hidden="true"></span>
+                                    Sauvegarder
+                                </button>
+                                
+                                @if (IsEditMode && document?.EnCours == true)
+                                {
+                                    <button class="btn btn-success" @onclick="FinaliserDocument" disabled="@isSaving">
+                                        <span class="oi oi-task" aria-hidden="true"></span>
+                                        Finaliser
+                                    </button>
+                                }
+                                
+                                @if (IsEditMode)
+                                {
+                                    <button class="btn btn-outline-info" @onclick="AperçuDocument">
+                                        <span class="oi oi-eye" aria-hidden="true"></span>
+                                        Aperçu
+                                    </button>
+                                }
+                            </div>
+                            
+                            <div class="text-muted small">
+                                @if (document?.DateCreation != null)
+                                {
+                                    <span>Créé le @document.DateCreation.ToString("dd/MM/yyyy à HH:mm")</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interface à onglets -->
+        <div class="row">
+            <div class="col-12">
+                <ul class="nav nav-tabs" id="documentTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeTab == "general" ? "active" : "")" 
+                                @onclick="@(() => SetActiveTab("general"))" type="button">
+                            <span class="oi oi-cog" aria-hidden="true"></span>
+                            Informations Générales
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeTab == "sections" ? "active" : "")" 
+                                @onclick="@(() => SetActiveTab("sections"))" type="button">
+                            <span class="oi oi-list" aria-hidden="true"></span>
+                            Sections Libres
+                            @if (sectionsConteneurs.Any())
+                            {
+                                <span class="badge bg-secondary ms-1">@sectionsConteneurs.Count</span>
+                            }
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeTab == "fiches" ? "active" : "")" 
+                                @onclick="@(() => SetActiveTab("fiches"))" type="button">
+                            <span class="oi oi-document" aria-hidden="true"></span>
+                            Fiches Techniques
+                            @if (ftConteneur?.Elements.Any() == true)
+                            {
+                                <span class="badge bg-secondary ms-1">@ftConteneur.Elements.Count</span>
+                            }
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeTab == "preview" ? "active" : "")" 
+                                @onclick="@(() => SetActiveTab("preview"))" type="button" 
+                                disabled="@(!IsEditMode)">
+                            <span class="oi oi-eye" aria-hidden="true"></span>
+                            Aperçu
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content border border-top-0 p-4" id="documentTabsContent">
+                    <!-- Onglet Informations Générales -->
+                    <div class="tab-pane fade @(activeTab == "general" ? "show active" : "")" 
+                         id="general" role="tabpanel">
+                        @if (document != null)
+                        {
+                            <EditForm Model="@document" OnValidSubmit="@SauvegarderDocument">
+                                <DataAnnotationsValidator />
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="typeDocument" class="form-label">Type de Document *</label>
+                                        <select class="form-select" id="typeDocument" @bind="selectedTypeDocumentString" 
+                                                @bind:after="OnTypeDocumentChanged">
+                                            <option value="">-- Sélectionner un type --</option>
+                                            @foreach (var type in Enum.GetValues<TypeDocumentGenere>())
+                                            {
+                                                <option value="@type.ToString()">@GetTypeDisplayName(type)</option>
+                                            }
+                                        </select>
+                                        @if (typeDocumentError)
+                                        {
+                                            <div class="text-danger small">Le type de document est requis</div>
+                                        }
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="formatExport" class="form-label">Format d'Export *</label>
+                                        <select class="form-select" id="formatExport" @bind="selectedFormatExportString" 
+                                                @bind:after="OnFormatExportChanged">
+                                            <option value="">-- Sélectionner un format --</option>
+                                            @foreach (var format in Enum.GetValues<FormatExport>())
+                                            {
+                                                <option value="@format.ToString()">@format</option>
+                                            }
+                                        </select>
+                                        @if (formatExportError)
+                                        {
+                                            <div class="text-danger small">Le format d'export est requis</div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <label for="nomFichier" class="form-label">Nom du Fichier *</label>
+                                        <InputText @bind-Value="document.NomFichier" class="form-control" id="nomFichier" 
+                                                 placeholder="ex: DOE_Tour_Europe_2025" maxlength="255" />
+                                        <ValidationMessage For="() => document.NomFichier" class="text-danger" />
+                                        <small class="form-text text-muted">Le nom du fichier sera automatiquement complété avec l'extension selon le format choisi</small>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <InputCheckbox @bind-Value="document.IncludePageDeGarde" class="form-check-input" id="includePageDeGarde" />
+                                            <label class="form-check-label" for="includePageDeGarde">
+                                                Inclure une page de garde
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <InputCheckbox @bind-Value="document.IncludeTableMatieres" class="form-check-input" id="includeTableMatieres" />
+                                            <label class="form-check-label" for="includeTableMatieres">
+                                                Inclure une table des matières
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <label for="parametres" class="form-label">Paramètres Avancés (optionnel)</label>
+                                        <InputTextArea @bind-Value="document.Parametres" class="form-control" id="parametres" 
+                                                      rows="3" maxlength="2000" 
+                                                      placeholder="Paramètres JSON ou configuration spécifique..." />
+                                        <ValidationMessage For="() => document.Parametres" class="text-danger" />
+                                        <small class="form-text text-muted">Configuration JSON pour des options avancées de génération</small>
+                                    </div>
+                                </div>
+                            </EditForm>
+                        }
+                    </div>
+
+                    <!-- Onglet Sections Libres -->
+                    <div class="tab-pane fade @(activeTab == "sections" ? "show active" : "")" 
+                         id="sections" role="tabpanel">
+                        @if (document?.Id > 0)
+                        {
+                            <SectionConteneurEditor SectionsConteneurs="@sectionsConteneurs" 
+                                                  DocumentId="@document.Id" 
+                                                  OnSectionsChanged="@OnSectionsChanged" />
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                <span class="oi oi-warning" aria-hidden="true"></span>
+                                Veuillez d'abord sauvegarder le document pour pouvoir gérer les sections
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Onglet Fiches Techniques -->
+                    <div class="tab-pane fade @(activeTab == "fiches" ? "show active" : "")" 
+                         id="fiches" role="tabpanel">
+                        @if (document?.Id > 0)
+                        {
+                            @if (ftConteneur == null)
+                            {
+                                <div class="text-center text-muted py-4">
+                                    <span class="oi oi-document" style="font-size: 3rem; opacity: 0.3;"></span>
+                                    <p class="mt-2">Aucun conteneur de fiches techniques</p>
+                                    <button class="btn btn-primary" @onclick="CreerFTConteneur">
+                                        <span class="oi oi-plus" aria-hidden="true"></span>
+                                        Créer Conteneur FT
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <FTConteneurEditor FTConteneur="@ftConteneur" 
+                                                 OnConteneurChanged="@OnFTConteneurChanged" />
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                <span class="oi oi-warning" aria-hidden="true"></span>
+                                Veuillez d'abord sauvegarder le document pour pouvoir gérer les fiches techniques
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Onglet Aperçu -->
+                    <div class="tab-pane fade @(activeTab == "preview" ? "show active" : "")" 
+                         id="preview" role="tabpanel">
+                        <div class="alert alert-info">
+                            <span class="oi oi-info" aria-hidden="true"></span>
+                            Aperçu du document en cours de développement
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int? DocumentId { get; set; }
+    [Parameter] public int? ChantierId { get; set; }
+    
+    private DocumentGenere? document;
+    private Chantier? chantier;
+    private List<SectionConteneur> sectionsConteneurs = new();
+    private FTConteneur? ftConteneur;
+    private List<TypeSection> typesSection = new();
+    
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool hasUnsavedChanges = false;
+    private string activeTab = "general";
+    private bool isLoadingData = false;
+    
+    private string selectedTypeDocumentString = string.Empty;
+    private string selectedFormatExportString = string.Empty;
+    private bool typeDocumentError = false;
+    private bool formatExportError = false;
+    
+    private bool IsEditMode => DocumentId.HasValue && DocumentId.Value > 0;
+    private int CurrentChantierId => IsEditMode ? document?.ChantierId ?? 0 : ChantierId ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ChargerDonnees();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if ((DocumentId.HasValue || ChantierId.HasValue) && !isLoadingData)
+        {
+            await ChargerDonnees();
+        }
+    }
+
+    private async Task ChargerDonnees()
+    {
+        // Éviter les appels concurrents
+        if (isLoadingData) return;
+        
+        try
+        {
+            isLoadingData = true;
+            isLoading = true;
+            StateHasChanged();
+
+            // Charger les types de section
+            typesSection = (await typeSectionService.GetAllAsync()).ToList();
+
+            if (IsEditMode && DocumentId.HasValue)
+            {
+                // Mode édition - charger le document existant
+                document = await documentGenereService.GetByIdAsync(DocumentId.Value);
+                if (document != null)
+                {
+                    chantier = await chantierService.GetByIdAsync(document.ChantierId);
+                    await ChargerConteneurs();
+                    
+                    // Initialiser les valeurs des select
+                    selectedTypeDocumentString = document.TypeDocument.ToString();
+                    selectedFormatExportString = document.FormatExport.ToString();
+                }
+            }
+            else if (ChantierId.HasValue)
+            {
+                // Mode création - nouveau document
+                chantier = await chantierService.GetByIdAsync(ChantierId.Value);
+                document = new DocumentGenere
+                {
+                    ChantierId = ChantierId.Value,
+                    IncludePageDeGarde = true,
+                    IncludeTableMatieres = true,
+                    EnCours = true
+                };
+                GenerateDefaultFileName();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", 
+                $"Erreur lors du chargement: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingData = false;
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChargerConteneurs()
+    {
+        if (document?.Id > 0)
+        {
+            sectionsConteneurs = (await documentGenereService.GetSectionsConteneursByDocumentAsync(document.Id)).ToList();
+            ftConteneur = await documentGenereService.GetFTConteneurByDocumentAsync(document.Id);
+        }
+    }
+
+    private void SetActiveTab(string tabName)
+    {
+        activeTab = tabName;
+        StateHasChanged();
+    }
+
+    private void OnTypeDocumentChanged()
+    {
+        typeDocumentError = string.IsNullOrEmpty(selectedTypeDocumentString);
+        
+        if (!typeDocumentError && document != null)
+        {
+            if (Enum.TryParse<TypeDocumentGenere>(selectedTypeDocumentString, out var typeDocument))
+            {
+                document.TypeDocument = typeDocument;
+                GenerateDefaultFileName();
+            }
+        }
+        
+        hasUnsavedChanges = true;
+        StateHasChanged();
+    }
+
+    private void OnFormatExportChanged()
+    {
+        formatExportError = string.IsNullOrEmpty(selectedFormatExportString);
+        
+        if (!formatExportError && document != null)
+        {
+            if (Enum.TryParse<FormatExport>(selectedFormatExportString, out var formatExport))
+            {
+                document.FormatExport = formatExport;
+            }
+        }
+        
+        hasUnsavedChanges = true;
+        StateHasChanged();
+    }
+
+    private void GenerateDefaultFileName()
+    {
+        if (document != null && string.IsNullOrWhiteSpace(document.NomFichier))
+        {
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd");
+            document.NomFichier = document.TypeDocument switch
+            {
+                TypeDocumentGenere.DOE => $"DOE_{chantier?.NomProjet?.Replace(" ", "_") ?? "Document"}_{timestamp}",
+                TypeDocumentGenere.DossierTechnique => $"DossierTechnique_{chantier?.NomProjet?.Replace(" ", "_") ?? "Document"}_{timestamp}",
+                TypeDocumentGenere.MemoireTechnique => $"MemoireTechnique_{chantier?.NomProjet?.Replace(" ", "_") ?? "Document"}_{timestamp}",
+                _ => $"Document_{timestamp}"
+            };
+        }
+    }
+
+    private async Task SauvegarderDocument()
+    {
+        if (document == null) return;
+
+        try
+        {
+            isSaving = true;
+            StateHasChanged();
+
+            if (!ValidateDocument()) return;
+
+            if (IsEditMode)
+            {
+                document = await documentGenereService.UpdateAsync(document);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document mis à jour avec succès");
+            }
+            else
+            {
+                document = await documentGenereService.SaveDocumentGenereAsync(document);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document créé avec succès");
+                
+                // Redirection vers le mode édition
+                Navigation.NavigateTo($"/document/edit/{document.Id}");
+                return;
+            }
+
+            hasUnsavedChanges = false;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", 
+                $"Erreur lors de la sauvegarde: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool ValidateDocument()
+    {
+        if (document == null) return false;
+        
+        // Validation des champs obligatoires avec mise à jour des erreurs visuelles
+        typeDocumentError = string.IsNullOrEmpty(selectedTypeDocumentString);
+        formatExportError = string.IsNullOrEmpty(selectedFormatExportString);
+        
+        var errors = new List<string>();
+
+        if (typeDocumentError)
+            errors.Add("Le type de document est requis");
+
+        if (formatExportError)
+            errors.Add("Le format d'export est requis");
+
+        if (string.IsNullOrWhiteSpace(document.NomFichier))
+            errors.Add("Le nom du fichier est requis");
+
+        if (errors.Any())
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Validation", 
+                string.Join(", ", errors));
+            SetActiveTab("general"); // Retour à l'onglet général pour corriger
+            StateHasChanged(); // Mettre à jour l'affichage des erreurs
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task FinaliserDocument()
+    {
+        if (document?.Id == null) return;
+
+        var result = await DialogService.Confirm(
+            "Êtes-vous sûr de vouloir finaliser ce document ? Cette action ne pourra pas être annulée.",
+            "Finalisation du document",
+            new Radzen.ConfirmOptions { OkButtonText = "Finaliser", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                await documentGenereService.FinalizeDocumentAsync(document.Id);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document finalisé");
+                await ChargerDonnees(); // Recharger pour mettre à jour l'état
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+            }
+        }
+    }
+
+    private void AperçuDocument()
+    {
+        if (document?.Id == null) return;
+        
+        try
+        {
+            // Pour l'instant, juste afficher un message
+            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Aperçu", "Génération de l'aperçu en cours...");
+            SetActiveTab("preview");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private void OnSectionsChanged(List<SectionConteneur> sections)
+    {
+        sectionsConteneurs = sections;
+        hasUnsavedChanges = true;
+        StateHasChanged();
+    }
+
+    private void OnFTConteneurChanged(FTConteneur conteneur)
+    {
+        ftConteneur = conteneur;
+        hasUnsavedChanges = true;
+        StateHasChanged();
+    }
+
+    private async Task CreerFTConteneur()
+    {
+        if (document?.Id == null) return;
+
+        try
+        {
+            ftConteneur = await documentGenereService.CreateFTConteneurAsync(document.Id);
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Conteneur de fiches techniques créé");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private void RetourChantier()
+    {
+        if (hasUnsavedChanges)
+        {
+            // TODO: Ajouter confirmation pour les modifications non sauvées
+        }
+        Navigation.NavigateTo($"/chantier/{CurrentChantierId}");
+    }
+
+    private string GetTypeDisplayName(TypeDocumentGenere type)
+    {
+        return type switch
+        {
+            TypeDocumentGenere.DOE => "DOE (Dossier d'Ouvrages Exécutés)",
+            TypeDocumentGenere.DossierTechnique => "Dossier Technique",
+            TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
+            _ => type.ToString()
+        };
+    }
+}
+
+<style>
+    .nav-tabs .nav-link {
+        border-bottom: 2px solid transparent;
+        color: #6c757d;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background-color: transparent;
+        border-bottom-color: #007bff;
+        color: #007bff;
+        font-weight: 500;
+    }
+    
+    .tab-content {
+        min-height: 400px;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+    }
+</style>

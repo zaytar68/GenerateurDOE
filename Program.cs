@@ -49,6 +49,8 @@ builder.Services.AddScoped<ISectionLibreService, SectionLibreService>();
 builder.Services.AddScoped<IImageService, ImageService>();
 builder.Services.AddScoped<ILoggingService, LoggingService>();
 builder.Services.AddScoped<IChantierService, ChantierService>();
+builder.Services.AddScoped<ISectionConteneurService, SectionConteneurService>();
+builder.Services.AddScoped<IFTConteneurService, FTConteneurService>();
 
 var app = builder.Build();
 

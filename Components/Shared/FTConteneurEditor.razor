@@ -1,0 +1,452 @@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IFTConteneurService ftConteneurService
+@inject IFicheTechniqueService ficheTechniqueService
+@inject Radzen.NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<div class="ft-conteneur-editor">
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (FTConteneur == null)
+    {
+        <div class="text-center text-muted py-4">
+            <span class="oi oi-document" style="font-size: 3rem; opacity: 0.3;"></span>
+            <p class="mt-2">Aucun conteneur de fiches techniques</p>
+            <p class="small">Le conteneur doit être créé depuis l'onglet principal</p>
+        </div>
+    }
+    else
+    {
+        <!-- Paramètres du conteneur -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <span class="oi oi-cog" aria-hidden="true"></span>
+                    Configuration du Conteneur
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Titre du conteneur</label>
+                        <input type="text" class="form-control" @bind="FTConteneur.Titre" 
+                               @bind:after="SauvegarderConteneur" />
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   @bind="FTConteneur.AfficherTableauRecapitulatif"
+                                   @bind:after="SauvegarderConteneur" id="afficherTableau">
+                            <label class="form-check-label" for="afficherTableau">
+                                Afficher le tableau récapitulatif
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section d'ajout de nouvelle fiche technique -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <span class="oi oi-plus" aria-hidden="true"></span>
+                    Ajouter une Fiche Technique
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Fiche Technique</label>
+                        <select class="form-select" @bind="selectedFicheTechniqueId" 
+                                @bind:after="OnFicheTechniqueChanged">
+                            <option value="">-- Sélectionner une fiche --</option>
+                            @foreach (var fiche in fichesDisponibles)
+                            {
+                                <option value="@fiche.Id">
+                                    @fiche.NomFabricant - @fiche.NomProduit
+                                </option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Position Marché</label>
+                        <input type="text" class="form-control" @bind="nouvellePositionMarche" 
+                               placeholder="ex: 1.1" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Document PDF (optionnel)</label>
+                        <select class="form-select" @bind="selectedImportPDFId">
+                            <option value="">-- Tous les documents --</option>
+                            @if (importsDisponibles.Any())
+                            {
+                                @foreach (var import in importsDisponibles)
+                                {
+                                    <option value="@import.Id">
+                                        @import.NomFichierOriginal (@import.TypeDocument)
+                                    </option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" @onclick="AjouterFicheTechnique" 
+                                disabled="@(selectedFicheTechniqueId == 0 || string.IsNullOrWhiteSpace(nouvellePositionMarche) || isAdding)">
+                            @if (isAdding)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Ajouter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des éléments du conteneur -->
+        @if (FTConteneur.Elements.Any())
+        {
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        Fiches Techniques (@FTConteneur.Elements.Count)
+                    </h6>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-info btn-sm" @onclick="CalculerNumeroPages">
+                            <span class="oi oi-calculator"></span>
+                            Calculer Pages
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm" @onclick="AfficherTableauRecap">
+                            <span class="oi oi-spreadsheet"></span>
+                            Tableau Récap
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">Ordre</th>
+                                    <th>Position Marché</th>
+                                    <th>Fabricant</th>
+                                    <th>Produit</th>
+                                    <th>Type</th>
+                                    <th>Document</th>
+                                    <th>Page</th>
+                                    <th style="width: 120px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var element in FTConteneur.Elements.OrderBy(e => e.Ordre))
+                                {
+                                    <tr>
+                                        <td class="text-center">
+                                            <span class="drag-handle" style="cursor: move;">⋮⋮</span>
+                                            @element.Ordre
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm" 
+                                                   @bind="element.PositionMarche" 
+                                                   @bind:after="() => MettreAJourElement(element)" />
+                                        </td>
+                                        <td>@element.FicheTechnique.NomFabricant</td>
+                                        <td>@element.FicheTechnique.NomProduit</td>
+                                        <td>@element.FicheTechnique.TypeProduit</td>
+                                        <td>
+                                            @if (element.ImportPDF != null)
+                                            {
+                                                <span class="badge bg-info">@element.ImportPDF.TypeDocument</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Tous documents</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (element.NumeroPage.HasValue)
+                                            {
+                                                <span class="badge bg-secondary">@element.NumeroPage</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-outline-secondary btn-sm" 
+                                                        @onclick="() => EditerElement(element)">
+                                                    <span class="oi oi-pencil"></span>
+                                                </button>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        @onclick="() => SupprimerElement(element)">
+                                                    <span class="oi oi-trash"></span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center text-muted py-4">
+                <span class="oi oi-document" style="font-size: 3rem; opacity: 0.3;"></span>
+                <p class="mt-2">Aucune fiche technique ajoutée</p>
+                <p class="small">Sélectionnez une fiche technique ci-dessus pour commencer</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public FTConteneur? FTConteneur { get; set; }
+    [Parameter] public EventCallback<FTConteneur> OnConteneurChanged { get; set; }
+
+    private List<FicheTechnique> fichesDisponibles = new();
+    private List<ImportPDF> importsDisponibles = new();
+    
+    private bool isLoading = false;
+    private bool isAdding = false;
+    private int selectedFicheTechniqueId = 0;
+    private int selectedImportPDFId = 0;
+    private string nouvellePositionMarche = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ChargerDonnees();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (FTConteneur != null)
+        {
+            await ChargerDonnees();
+        }
+    }
+
+    private async Task ChargerDonnees()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Charger les fiches techniques disponibles
+            fichesDisponibles = (await ftConteneurService.GetAvailableFichesTechniquesAsync(FTConteneur?.DocumentGenereId ?? 0)).ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", 
+                $"Erreur lors du chargement: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnFicheTechniqueChanged()
+    {
+        importsDisponibles.Clear();
+        selectedImportPDFId = 0;
+        
+        if (selectedFicheTechniqueId > 0)
+        {
+            var ficheSelectionnee = fichesDisponibles.FirstOrDefault(f => f.Id == selectedFicheTechniqueId);
+            if (ficheSelectionnee != null)
+            {
+                importsDisponibles = ficheSelectionnee.ImportsPDF.ToList();
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task AjouterFicheTechnique()
+    {
+        if (FTConteneur == null || selectedFicheTechniqueId == 0 || string.IsNullOrWhiteSpace(nouvellePositionMarche))
+            return;
+
+        try
+        {
+            isAdding = true;
+            
+            var element = await ftConteneurService.AddFTElementAsync(
+                FTConteneur.Id,
+                selectedFicheTechniqueId,
+                nouvellePositionMarche,
+                selectedImportPDFId > 0 ? selectedImportPDFId : null);
+
+            // Recharger le conteneur pour avoir les données complètes
+            FTConteneur = await ftConteneurService.GetByIdAsync(FTConteneur.Id);
+            
+            // Reset du formulaire
+            selectedFicheTechniqueId = 0;
+            selectedImportPDFId = 0;
+            nouvellePositionMarche = string.Empty;
+            importsDisponibles.Clear();
+            
+            await OnConteneurChanged.InvokeAsync(FTConteneur);
+            
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                $"Fiche technique ajoutée à la position {element.PositionMarche}");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+        finally
+        {
+            isAdding = false;
+        }
+    }
+
+    private async Task SupprimerElement(FTElement element)
+    {
+        var result = await DialogService.Confirm(
+            $"Êtes-vous sûr de vouloir supprimer la fiche technique à la position '{element.PositionMarche}' ?",
+            "Confirmation de suppression",
+            new Radzen.ConfirmOptions { OkButtonText = "Supprimer", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                await ftConteneurService.RemoveFTElementAsync(element.Id);
+                
+                // Recharger le conteneur
+                if (FTConteneur != null)
+                {
+                    FTConteneur = await ftConteneurService.GetByIdAsync(FTConteneur.Id);
+                }
+                
+                await OnConteneurChanged.InvokeAsync(FTConteneur);
+                
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                    "Élément supprimé avec succès");
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+            }
+        }
+    }
+
+    private async Task MettreAJourElement(FTElement element)
+    {
+        try
+        {
+            await ftConteneurService.UpdateFTElementAsync(element);
+            await OnConteneurChanged.InvokeAsync(FTConteneur);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private void EditerElement(FTElement element)
+    {
+        // TODO: Implémenter l'édition avancée des éléments
+        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", 
+            "Édition avancée des éléments en cours de développement");
+    }
+
+    private async Task CalculerNumeroPages()
+    {
+        if (FTConteneur == null) return;
+
+        try
+        {
+            FTConteneur = await ftConteneurService.CalculatePageNumbersAsync(FTConteneur.Id);
+            await OnConteneurChanged.InvokeAsync(FTConteneur);
+            
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                "Numéros de pages calculés avec succès");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private async Task AfficherTableauRecap()
+    {
+        if (FTConteneur == null) return;
+
+        try
+        {
+            var htmlTableau = await ftConteneurService.GenerateTableauRecapitulatifHtmlAsync(FTConteneur.Id);
+            
+            await DialogService.OpenAsync("Tableau Récapitulatif", ds =>
+                @<div>
+                    @((MarkupString)htmlTableau)
+                    <div class="text-end mt-3">
+                        <button class="btn btn-secondary" @onclick="() => ds.Close()">Fermer</button>
+                    </div>
+                </div>,
+                new Radzen.DialogOptions { Width = "90%", Height = "70%", Resizable = true });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private async Task SauvegarderConteneur()
+    {
+        if (FTConteneur == null) return;
+
+        try
+        {
+            FTConteneur = await ftConteneurService.UpdateAsync(FTConteneur);
+            await OnConteneurChanged.InvokeAsync(FTConteneur);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+}
+
+<style>
+    .ft-conteneur-editor {
+        min-height: 200px;
+    }
+    
+    .drag-handle {
+        color: #6c757d;
+        font-size: 1.1em;
+    }
+    
+    .drag-handle:hover {
+        color: #495057;
+    }
+    
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+    
+    .form-control-sm {
+        border: 1px solid transparent;
+    }
+    
+    .form-control-sm:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>

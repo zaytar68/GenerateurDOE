@@ -155,38 +155,37 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Nom du Fabricant *</label>
-                                <AutoComplete T="string"
-                                              Items="fabricantsDisponibles"
-                                              DisplaySelector="f => f"
-                                              Placeholder="Sélectionner ou saisir un fabricant..."
-                                              OnItemSelected="OnFabricantSelected"
-                                              OnTextChanged="OnFabricantTextChanged"
-                                              ValidationMessage="@GetValidationMessage(() => ficheEnCours.NomFabricant)"
-                                              MinSearchLength="1" />
+                                <div class="input-group">
+                                    <select class="form-select" @bind="ficheEnCours.NomFabricant">
+                                        <option value="">-- Sélectionner un fabricant --</option>
+                                        @foreach (var fabricant in fabricantsDisponibles)
+                                        {
+                                            <option value="@fabricant">@fabricant</option>
+                                        }
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary" @onclick="OuvrirModalNouveauFabricant">
+                                        <i class="oi oi-plus"></i>
+                                    </button>
+                                </div>
+                                <ValidationMessage For="@(() => ficheEnCours.NomFabricant)" />
                             </div>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Type de Produit *</label>
-                        <AutoComplete T="TypeProduit"
-                                      Items="typesProduits"
-                                      DisplaySelector="t => t.Nom"
-                                      Placeholder="Sélectionner ou saisir un type de produit..."
-                                      OnItemSelected="OnTypeProduitSelected"
-                                      OnTextChanged="OnTypeProduitTextChanged"
-                                      ValidationMessage="@GetValidationMessage(() => ficheEnCours.TypeProduit)"
-                                      MinSearchLength="1">
-                            <ItemTemplate Context="typeProduit">
-                                <div>
-                                    <strong>@typeProduit.Nom</strong>
-                                    @if (!string.IsNullOrEmpty(typeProduit.Description))
-                                    {
-                                        <br />
-                                        <small class="text-muted">@typeProduit.Description</small>
-                                    }
-                                </div>
-                            </ItemTemplate>
-                        </AutoComplete>
+                        <div class="input-group">
+                            <select class="form-select" @bind="ficheEnCours.TypeProduit">
+                                <option value="">-- Sélectionner un type de produit --</option>
+                                @foreach (var typeProduit in typesProduits)
+                                {
+                                    <option value="@typeProduit.Nom">@typeProduit.Nom</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-outline-primary" @onclick="OuvrirModalNouveauTypeProduit">
+                                <i class="oi oi-plus"></i>
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => ficheEnCours.TypeProduit)" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description</label>
@@ -370,6 +369,62 @@
     </div>
 </div>
 
+<!-- Modal Nouveau Fabricant -->
+<div class="modal fade @(afficherModalNouveauFabricant ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauFabricant ? "background: rgba(0,0,0,0.5);" : "")">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau Fabricant</h5>
+                <button type="button" class="btn-close" @onclick="FermerModalNouveauFabricant"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nom du fabricant *</label>
+                    <input type="text" class="form-control" @bind="nouveauFabricantNom" placeholder="Saisir le nom du fabricant" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauFabricant">Annuler</button>
+                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauFabricant" disabled="@(string.IsNullOrWhiteSpace(nouveauFabricantNom))">
+                    Ajouter
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nouveau Type de Produit -->
+<div class="modal fade @(afficherModalNouveauTypeProduit ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauTypeProduit ? "background: rgba(0,0,0,0.5);" : "")">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau Type de Produit</h5>
+                <button type="button" class="btn-close" @onclick="FermerModalNouveauTypeProduit"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nom du type de produit *</label>
+                    <input type="text" class="form-control" @bind="nouveauTypeProduitNom" placeholder="Saisir le nom du type" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" @bind="nouveauTypeProduitDescription" placeholder="Description optionnelle"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauTypeProduit">Annuler</button>
+                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduitNom) || creationTypeProduitEnCours)">
+                    @if (creationTypeProduitEnCours)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Créer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
     private List<FicheTechnique> fiches = new();
     private List<FicheTechnique> fichesFiltrees = new();
@@ -387,10 +442,18 @@
     private bool afficherModalEdition = false;
     private bool afficherModalSuppression = false;
     private bool afficherModalPDF = false;
+    private bool afficherModalNouveauFabricant = false;
+    private bool afficherModalNouveauTypeProduit = false;
     
     private string filtreRecherche = string.Empty;
     private string rechercheText = string.Empty;
     private FicheTechnique? ficheSelectionnee;
+    
+    // Variables pour les nouvelles modales
+    private string nouveauFabricantNom = string.Empty;
+    private string nouveauTypeProduitNom = string.Empty;
+    private string nouveauTypeProduitDescription = string.Empty;
+    private bool creationTypeProduitEnCours = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -654,24 +717,99 @@
 
     // Méthodes pour l'autocomplétion (conservées pour les formulaires de création/édition)
 
-    private void OnFabricantSelected(string fabricant)
+    // Nouvelles méthodes pour les modales d'ajout
+
+    private void OuvrirModalNouveauFabricant()
     {
-        ficheEnCours.NomFabricant = fabricant;
+        nouveauFabricantNom = string.Empty;
+        afficherModalNouveauFabricant = true;
     }
 
-    private void OnFabricantTextChanged(string text)
+    private void FermerModalNouveauFabricant()
     {
-        ficheEnCours.NomFabricant = text;
+        afficherModalNouveauFabricant = false;
+        nouveauFabricantNom = string.Empty;
     }
 
-    private void OnTypeProduitSelected(TypeProduit typeProduit)
+    private void AjouterNouveauFabricant()
     {
-        ficheEnCours.TypeProduit = typeProduit.Nom;
+        if (string.IsNullOrWhiteSpace(nouveauFabricantNom))
+            return;
+
+        if (!fabricantsDisponibles.Contains(nouveauFabricantNom))
+        {
+            fabricantsDisponibles.Add(nouveauFabricantNom);
+            fabricantsDisponibles.Sort();
+        }
+
+        ficheEnCours.NomFabricant = nouveauFabricantNom;
+        FermerModalNouveauFabricant();
+        StateHasChanged();
     }
 
-    private void OnTypeProduitTextChanged(string text)
+    private void OuvrirModalNouveauTypeProduit()
     {
-        ficheEnCours.TypeProduit = text;
+        nouveauTypeProduitNom = string.Empty;
+        nouveauTypeProduitDescription = string.Empty;
+        afficherModalNouveauTypeProduit = true;
+    }
+
+    private void FermerModalNouveauTypeProduit()
+    {
+        afficherModalNouveauTypeProduit = false;
+        nouveauTypeProduitNom = string.Empty;
+        nouveauTypeProduitDescription = string.Empty;
+        creationTypeProduitEnCours = false;
+    }
+
+    private async Task AjouterNouveauTypeProduit()
+    {
+        if (string.IsNullOrWhiteSpace(nouveauTypeProduitNom))
+            return;
+
+        creationTypeProduitEnCours = true;
+        try
+        {
+            // Vérifier si le type existe déjà
+            if (typesProduits.Any(t => t.Nom.Equals(nouveauTypeProduitNom, StringComparison.OrdinalIgnoreCase)))
+            {
+                ficheEnCours.TypeProduit = nouveauTypeProduitNom;
+                FermerModalNouveauTypeProduit();
+                return;
+            }
+
+            // Créer un nouveau type de produit
+            var nouveauTypeProduit = new TypeProduit
+            {
+                Nom = nouveauTypeProduitNom,
+                Description = string.IsNullOrWhiteSpace(nouveauTypeProduitDescription) ? 
+                    $"Type créé automatiquement" : nouveauTypeProduitDescription,
+                IsActive = true
+            };
+
+            var typeCree = await TypeProduitService.CreateAsync(nouveauTypeProduit);
+            
+            // Ajouter à la liste locale
+            typesProduits.Add(typeCree);
+            typesProduits.Sort((a, b) => a.Nom.CompareTo(b.Nom));
+            
+            // Assigner à la fiche en cours
+            ficheEnCours.TypeProduit = typeCree.Nom;
+            
+            FermerModalNouveauTypeProduit();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Erreur lors de la création du type de produit: {ex.Message}");
+            // En cas d'erreur, utiliser quand même le texte saisi
+            ficheEnCours.TypeProduit = nouveauTypeProduitNom;
+            FermerModalNouveauTypeProduit();
+        }
+        finally
+        {
+            creationTypeProduitEnCours = false;
+        }
     }
 
     private string? GetValidationMessage(System.Linq.Expressions.Expression<Func<string>> accessor)

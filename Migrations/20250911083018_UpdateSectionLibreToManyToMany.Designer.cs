@@ -4,6 +4,7 @@ using GenerateurDOE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GenerateurDOE.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250911083018_UpdateSectionLibreToManyToMany")]
+    partial class UpdateSectionLibreToManyToMany
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -448,38 +451,6 @@ namespace GenerateurDOE.Migrations
                     b.ToTable("SectionsConteneurs");
                 });
 
-            modelBuilder.Entity("GenerateurDOE.Models.SectionConteneurItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("DateAjout")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETDATE()");
-
-                    b.Property<int>("Ordre")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SectionConteneursId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SectionLibreId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SectionLibreId");
-
-                    b.HasIndex("SectionConteneursId", "SectionLibreId")
-                        .IsUnique();
-
-                    b.ToTable("SectionConteneurItems");
-                });
-
             modelBuilder.Entity("GenerateurDOE.Models.SectionLibre", b =>
                 {
                     b.Property<int>("Id")
@@ -511,12 +482,6 @@ namespace GenerateurDOE.Migrations
                     b.Property<int>("Ordre")
                         .HasColumnType("int");
 
-                    b.Property<int?>("SectionConteneurId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SectionConteneurId1")
-                        .HasColumnType("int");
-
                     b.Property<string>("Titre")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -526,10 +491,6 @@ namespace GenerateurDOE.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("SectionConteneurId");
-
-                    b.HasIndex("SectionConteneurId1");
 
                     b.HasIndex("TypeSectionId");
 
@@ -780,35 +741,8 @@ namespace GenerateurDOE.Migrations
                     b.Navigation("TypeSection");
                 });
 
-            modelBuilder.Entity("GenerateurDOE.Models.SectionConteneurItem", b =>
-                {
-                    b.HasOne("GenerateurDOE.Models.SectionConteneur", "SectionConteneur")
-                        .WithMany("Items")
-                        .HasForeignKey("SectionConteneursId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GenerateurDOE.Models.SectionLibre", "SectionLibre")
-                        .WithMany("ConteneurItems")
-                        .HasForeignKey("SectionLibreId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SectionConteneur");
-
-                    b.Navigation("SectionLibre");
-                });
-
             modelBuilder.Entity("GenerateurDOE.Models.SectionLibre", b =>
                 {
-                    b.HasOne("GenerateurDOE.Models.SectionConteneur", null)
-                        .WithMany("SectionsLibres")
-                        .HasForeignKey("SectionConteneurId");
-
-                    b.HasOne("GenerateurDOE.Models.SectionConteneur", null)
-                        .WithMany("SectionsLibresOrdered")
-                        .HasForeignKey("SectionConteneurId1");
-
                     b.HasOne("GenerateurDOE.Models.TypeSection", "TypeSection")
                         .WithMany("SectionsLibres")
                         .HasForeignKey("TypeSectionId")
@@ -860,20 +794,6 @@ namespace GenerateurDOE.Migrations
             modelBuilder.Entity("GenerateurDOE.Models.Methode", b =>
                 {
                     b.Navigation("Images");
-                });
-
-            modelBuilder.Entity("GenerateurDOE.Models.SectionConteneur", b =>
-                {
-                    b.Navigation("Items");
-
-                    b.Navigation("SectionsLibres");
-
-                    b.Navigation("SectionsLibresOrdered");
-                });
-
-            modelBuilder.Entity("GenerateurDOE.Models.SectionLibre", b =>
-                {
-                    b.Navigation("ConteneurItems");
                 });
 
             modelBuilder.Entity("GenerateurDOE.Models.TypeProduit", b =>

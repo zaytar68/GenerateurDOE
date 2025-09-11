@@ -49,7 +49,7 @@
                         </div>
                         <div class="card-body">
                             <div class="row mb-3">
-                                <div class="col-md-6">
+                                
                                     <label for="repertoirePDF" class="form-label">Répertoire des fichiers PDF</label>
                                     <div class="input-group">
                                         <InputText @bind-Value="appSettings.RepertoireStockagePDF" 
@@ -75,36 +75,37 @@
                                     {
                                         <DirectoryStatusDisplay DirectoryInfo="pdfDirectoryInfo" />
                                     }
-                                </div>
-
-                                <div class="col-md-6">
-                                    <label for="repertoireImages" class="form-label">Répertoire des images</label>
-                                    <div class="input-group">
-                                        <InputText @bind-Value="appSettings.RepertoireStockageImages" 
-                                                 class="form-control" id="repertoireImages" placeholder="C:\GenerateurDOE\Documents\Images" />
-                                        <button type="button" class="btn btn-outline-info" 
-                                                @onclick="() => OpenFolderExplorer(FolderType.Images)">
-                                            <span class="oi oi-folder" aria-hidden="true"></span>
-                                            Parcourir
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary" 
-                                                @onclick="() => TestDirectoryImages()">
-                                            <span class="oi oi-magnifying-glass" aria-hidden="true"></span>
-                                            Tester
-                                        </button>
-                                        <button type="button" class="btn btn-outline-primary" 
-                                                @onclick="() => CreateDirectoryImages()">
-                                            <span class="oi oi-plus" aria-hidden="true"></span>
-                                            Créer
-                                        </button>
-                                    </div>
-                                    <ValidationMessage For="() => appSettings.RepertoireStockageImages" class="text-danger" />
-                                    @if (imagesDirectoryInfo != null)
-                                    {
-                                        <DirectoryStatusDisplay DirectoryInfo="imagesDirectoryInfo" />
-                                    }
-                                </div>
                             </div>
+
+                            <div class="row mb-3">
+                                <label for="repertoireImages" class="form-label">Répertoire des images</label>
+                                <div class="input-group">
+                                    <InputText @bind-Value="appSettings.RepertoireStockageImages" 
+                                                class="form-control" id="repertoireImages" placeholder="C:\GenerateurDOE\Documents\Images" />
+                                    <button type="button" class="btn btn-outline-info" 
+                                            @onclick="() => OpenFolderExplorer(FolderType.Images)">
+                                        <span class="oi oi-folder" aria-hidden="true"></span>
+                                        Parcourir
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" 
+                                            @onclick="() => TestDirectoryImages()">
+                                        <span class="oi oi-magnifying-glass" aria-hidden="true"></span>
+                                        Tester
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary" 
+                                            @onclick="() => CreateDirectoryImages()">
+                                        <span class="oi oi-plus" aria-hidden="true"></span>
+                                        Créer
+                                    </button>
+                                </div>
+                                <ValidationMessage For="() => appSettings.RepertoireStockageImages" class="text-danger" />
+                                @if (imagesDirectoryInfo != null)
+                                {
+                                    <DirectoryStatusDisplay DirectoryInfo="imagesDirectoryInfo" />
+                                }
+                            </div>
+
+                            
                         </div>
                     </div>
 
@@ -133,6 +134,31 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="row mb-3">
+                                <!-- Boutons validation dossiers -->
+                                <div class="d-flex justify-content-between mt-4">
+                                    <button type="button" class="btn btn-secondary" @onclick="ResetToDefaults">
+                                        <span class="oi oi-reload" aria-hidden="true"></span>
+                                        Valeurs par défaut
+                                    </button>
+                                    
+                                    <div>
+                                        <button type="button" class="btn btn-outline-primary me-2" @onclick="TestAllDirectories">
+                                            <span class="oi oi-check" aria-hidden="true"></span>
+                                            Tester tout
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                                            @if (isSaving)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            <span class="oi oi-check" aria-hidden="true"></span>
+                                            Enregistrer
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
                     <div class="card mt-4">
                         <div class="card-header">
@@ -394,27 +420,7 @@
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between mt-4">
-                        <button type="button" class="btn btn-secondary" @onclick="ResetToDefaults">
-                            <span class="oi oi-reload" aria-hidden="true"></span>
-                            Valeurs par défaut
-                        </button>
-                        
-                        <div>
-                            <button type="button" class="btn btn-outline-primary me-2" @onclick="TestAllDirectories">
-                                <span class="oi oi-check" aria-hidden="true"></span>
-                                Tester tout
-                            </button>
-                            <button type="submit" class="btn btn-primary" disabled="@isSaving">
-                                @if (isSaving)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                }
-                                <span class="oi oi-check" aria-hidden="true"></span>
-                                Enregistrer
-                            </button>
-                        </div>
-                    </div>
+
                 </div>
 
                 <div class="col-lg-4">

@@ -361,4 +361,172 @@ public class DocumentGenereService : IDocumentGenereService
         await Task.Delay(10);
         return $"[WORD] Simulation - Le contenu sera converti en Word :\n{content}";
     }
+
+    public async Task<SectionConteneur> CreateSectionConteneurAsync(int documentGenereId, int typeSectionId, string? titre = null)
+    {
+        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);
+        if (document == null)
+            throw new ArgumentException("Document généré non trouvé", nameof(documentGenereId));
+
+        var typeSection = await _context.TypesSections.FindAsync(typeSectionId);
+        if (typeSection == null)
+            throw new ArgumentException("Type de section non trouvé", nameof(typeSectionId));
+
+        var existingConteneur = await _context.SectionsConteneurs
+            .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId);
+        
+        if (existingConteneur != null)
+            throw new InvalidOperationException($"Un conteneur pour le type de section '{typeSection.Nom}' existe déjà pour ce document");
+
+        var sectionConteneur = new SectionConteneur
+        {
+            DocumentGenereId = documentGenereId,
+            TypeSectionId = typeSectionId,
+            Titre = titre ?? typeSection.Nom,
+            Ordre = await GetNextOrderForSectionConteneur(documentGenereId)
+        };
+
+        _context.SectionsConteneurs.Add(sectionConteneur);
+        await _context.SaveChangesAsync();
+        return sectionConteneur;
+    }
+
+    public async Task<SectionConteneur> GetSectionConteneurAsync(int documentGenereId, int typeSectionId)
+    {
+        var sectionConteneur = await _context.SectionsConteneurs
+            .Include(sc => sc.SectionsLibres)
+            .Include(sc => sc.TypeSection)
+            .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId);
+
+        if (sectionConteneur == null)
+            throw new ArgumentException("Conteneur de section non trouvé");
+
+        return sectionConteneur;
+    }
+
+    public async Task<IEnumerable<SectionConteneur>> GetSectionsConteneursByDocumentAsync(int documentGenereId)
+    {
+        return await _context.SectionsConteneurs
+            .Where(sc => sc.DocumentGenereId == documentGenereId)
+            .Include(sc => sc.SectionsLibres)
+            .Include(sc => sc.TypeSection)
+            .OrderBy(sc => sc.Ordre)
+            .ToListAsync();
+    }
+
+    public async Task<bool> DeleteSectionConteneurAsync(int sectionConteneurId)
+    {
+        var sectionConteneur = await _context.SectionsConteneurs.FindAsync(sectionConteneurId);
+        if (sectionConteneur == null)
+            return false;
+
+        _context.SectionsConteneurs.Remove(sectionConteneur);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<FTConteneur> CreateFTConteneurAsync(int documentGenereId, string? titre = null)
+    {
+        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);
+        if (document == null)
+            throw new ArgumentException("Document généré non trouvé", nameof(documentGenereId));
+
+        var existingFTConteneur = await _context.FTConteneurs
+            .FirstOrDefaultAsync(ftc => ftc.DocumentGenereId == documentGenereId);
+        
+        if (existingFTConteneur != null)
+            throw new InvalidOperationException("Un conteneur de fiches techniques existe déjà pour ce document");
+
+        var ftConteneur = new FTConteneur
+        {
+            DocumentGenereId = documentGenereId,
+            Titre = titre ?? "Fiches Techniques",
+            Ordre = await GetNextOrderForDocument(documentGenereId)
+        };
+
+        _context.FTConteneurs.Add(ftConteneur);
+        await _context.SaveChangesAsync();
+        return ftConteneur;
+    }
+
+    public async Task<FTConteneur?> GetFTConteneurByDocumentAsync(int documentGenereId)
+    {
+        return await _context.FTConteneurs
+            .Include(ftc => ftc.Elements)
+                .ThenInclude(fte => fte.FicheTechnique)
+            .Include(ftc => ftc.Elements)
+                .ThenInclude(fte => fte.ImportPDF)
+            .FirstOrDefaultAsync(ftc => ftc.DocumentGenereId == documentGenereId);
+    }
+
+    public async Task<FTConteneur> UpdateFTConteneurAsync(FTConteneur ftConteneur)
+    {
+        _context.FTConteneurs.Update(ftConteneur);
+        await _context.SaveChangesAsync();
+        return ftConteneur;
+    }
+
+    public async Task<bool> DeleteFTConteneurAsync(int ftConteneursId)
+    {
+        var ftConteneur = await _context.FTConteneurs.FindAsync(ftConteneursId);
+        if (ftConteneur == null)
+            return false;
+
+        _context.FTConteneurs.Remove(ftConteneur);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<DocumentGenere> FinalizeDocumentAsync(int documentGenereId)
+    {
+        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);
+        if (document == null)
+            throw new ArgumentException("Document non trouvé", nameof(documentGenereId));
+
+        if (!await CanFinalizeDocumentAsync(documentGenereId))
+            throw new InvalidOperationException("Le document ne peut pas être finalisé dans son état actuel");
+
+        document.EnCours = false;
+        await _context.SaveChangesAsync();
+        return document;
+    }
+
+    public async Task<bool> CanFinalizeDocumentAsync(int documentGenereId)
+    {
+        var document = await _context.DocumentsGeneres
+            .Include(d => d.SectionsConteneurs)
+                .ThenInclude(sc => sc.SectionsLibres)
+            .Include(d => d.FTConteneur)
+                .ThenInclude(ftc => ftc!.Elements)
+            .FirstOrDefaultAsync(d => d.Id == documentGenereId);
+
+        if (document == null)
+            return false;
+
+        bool hasContent = document.SectionsConteneurs.Any(sc => sc.SectionsLibres.Any()) ||
+                         (document.FTConteneur?.Elements.Any() == true);
+
+        return hasContent;
+    }
+
+    private async Task<int> GetNextOrderForSectionConteneur(int documentGenereId)
+    {
+        var maxOrder = await _context.SectionsConteneurs
+            .Where(sc => sc.DocumentGenereId == documentGenereId)
+            .MaxAsync(sc => (int?)sc.Ordre) ?? 0;
+        return maxOrder + 1;
+    }
+
+    private async Task<int> GetNextOrderForDocument(int documentGenereId)
+    {
+        var maxSectionOrder = await _context.SectionsConteneurs
+            .Where(sc => sc.DocumentGenereId == documentGenereId)
+            .MaxAsync(sc => (int?)sc.Ordre) ?? 0;
+
+        var ftOrder = await _context.FTConteneurs
+            .Where(ftc => ftc.DocumentGenereId == documentGenereId)
+            .MaxAsync(ftc => (int?)ftc.Ordre) ?? 0;
+
+        return Math.Max(maxSectionOrder, ftOrder) + 1;
+    }
 }

@@ -143,6 +143,11 @@
                                                             title="Télécharger">
                                                         📥
                                                     </button>
+                                                    <button class="btn btn-outline-info btn-sm me-1" 
+                                                            @onclick="() => EditerContenuDocument(document)"
+                                                            title="Éditer le contenu">
+                                                        📝
+                                                    </button>
                                                     <button class="btn btn-outline-success btn-sm me-1" 
                                                             @onclick="() => DupliquerDocument(document)"
                                                             title="Dupliquer">
@@ -150,8 +155,8 @@
                                                     </button>
                                                     <button class="btn btn-outline-secondary btn-sm me-1" 
                                                             @onclick="() => ModifierDocument(document)"
-                                                            title="Modifier">
-                                                        ✏️
+                                                            title="Modifier les paramètres">
+                                                        ⚙️
                                                     </button>
                                                     <button class="btn btn-outline-danger btn-sm" 
                                                             @onclick="() => SupprimerDocument(document)"
@@ -278,39 +283,9 @@
     }
 
     // Méthodes pour la gestion des documents
-    private async Task NouveauDocument()
+    private void NouveauDocument()
     {
-        var nouveauDocument = new DocumentGenere
-        {
-            ChantierId = ChantierId,
-            IncludePageDeGarde = true,
-            IncludeTableMatieres = true
-        };
-
-        var result = await DialogService.OpenAsync<DocumentGenereEditDialog>("Nouveau Document", 
-            new Dictionary<string, object> 
-            { 
-                { "DocumentGenere", nouveauDocument },
-                { "IsEditMode", false },
-                { "OnSave", EventCallback.Factory.Create(this, async () => await SauvegarderNouveauDocument(nouveauDocument)) },
-                { "OnCancel", EventCallback.Factory.Create(this, () => DialogService.Close(false)) }
-            },
-            new Radzen.DialogOptions { Width = "800px", Height = "600px", Resizable = true });
-    }
-
-    private async Task SauvegarderNouveauDocument(DocumentGenere document)
-    {
-        try
-        {
-            await documentGenereService.SaveDocumentGenereAsync(document);
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document créé avec succès");
-            DialogService.Close(true);
-            await ChargerChantier(); // Recharger la liste
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la création: {ex.Message}");
-        }
+        Navigation.NavigateTo($"/document/edit/nouveau/{ChantierId}");
     }
 
     private async Task TelechargerDocument(DocumentGenere document)
@@ -362,34 +337,15 @@
         }
     }
 
-    private async Task ModifierDocument(DocumentGenere document)
+    private void ModifierDocument(DocumentGenere document)
     {
-        var documentAModifier = await documentGenereService.GetByIdAsync(document.Id);
-
-        var result = await DialogService.OpenAsync<DocumentGenereEditDialog>("Modifier Document", 
-            new Dictionary<string, object> 
-            { 
-                { "DocumentGenere", documentAModifier },
-                { "IsEditMode", true },
-                { "OnSave", EventCallback.Factory.Create(this, async () => await SauvegarderModificationDocument(documentAModifier)) },
-                { "OnCancel", EventCallback.Factory.Create(this, () => DialogService.Close(false)) }
-            },
-            new Radzen.DialogOptions { Width = "800px", Height = "600px", Resizable = true });
+        Navigation.NavigateTo($"/document/edit/{document.Id}");
     }
 
-    private async Task SauvegarderModificationDocument(DocumentGenere document)
+    private void EditerContenuDocument(DocumentGenere document)
     {
-        try
-        {
-            await documentGenereService.UpdateAsync(document);
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document modifié avec succès");
-            DialogService.Close(true);
-            await ChargerChantier(); // Recharger la liste
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la modification: {ex.Message}");
-        }
+        // Navigation vers l'onglet sections pour éditer le contenu
+        Navigation.NavigateTo($"/document/edit/{document.Id}#sections");
     }
 
     private async Task SupprimerDocument(DocumentGenere document)

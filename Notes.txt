@@ -1,5 +1,0 @@
- Il me faut un module pour créer une section libre dans le document. Cette section doit pourvoir contenir un titre, une position     │
-│   dans le document, du texte enrichi, que l'on peut mettre en forme avec un editeur, avec la possibilité d'intégrer des images.       │
-│   J'ai trouvé ce package : https://www.nuget.org/packages/Blazored.TextEditor
-Regarde et dis moi ce que tu en pense.
-

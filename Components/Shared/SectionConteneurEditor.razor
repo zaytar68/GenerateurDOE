@@ -1,0 +1,531 @@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject ISectionConteneurService sectionConteneurService
+@inject ITypeSectionService typeSectionService
+@inject ISectionLibreService sectionLibreService
+@inject Radzen.NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<div class="section-conteneur-editor">
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Section pour créer un nouveau conteneur -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <span class="oi oi-plus" aria-hidden="true"></span>
+                    Ajouter un Conteneur de Sections
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Type de Section</label>
+                        <select class="form-select" @bind="selectedTypeSection" @bind:after="OnTypeSelectionChanged">
+                            <option value="">-- Sélectionner un type --</option>
+                            @foreach (var type in typesDisponibles)
+                            {
+                                <option value="@type.Id">@type.Nom</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Titre (optionnel)</label>
+                        <input type="text" class="form-control" @bind="nouveauTitre" 
+                               placeholder="Laisser vide pour utiliser le nom du type" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" @onclick="CreerNouveauConteneur" 
+                                disabled="@(selectedTypeSection == 0 || isCreating)">
+                            @if (isCreating)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Créer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des conteneurs existants -->
+        @if (SectionsConteneurs.Any())
+        {
+            <div class="row">
+                @foreach (var conteneur in SectionsConteneurs.OrderBy(sc => sc.Ordre))
+                {
+                    <div class="col-12 mb-3">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">
+                                        <span class="badge bg-primary me-2">@conteneur.TypeSection.Nom</span>
+                                        @conteneur.Titre
+                                    </h6>
+                                    <small class="text-muted">@conteneur.Items.Count section(s)</small>
+                                </div>
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-info btn-sm" 
+                                            @onclick="() => EditerConteneur(conteneur)">
+                                        <span class="oi oi-cog"></span>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" 
+                                            @onclick="() => SupprimerConteneur(conteneur)">
+                                        <span class="oi oi-trash"></span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                @if (!conteneur.Items.Any())
+                                {
+                                    <div class="text-center text-muted py-3">
+                                        <span class="oi oi-document" style="font-size: 2rem; opacity: 0.3;"></span>
+                                        <p class="mt-2">Aucune section ajoutée</p>
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                @onclick="() => AjouterSection(conteneur)">
+                                            Ajouter la première section
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="sections-list">
+                                        @foreach (var item in conteneur.Items.OrderBy(i => i.Ordre))
+                                        {
+                                            var section = item.SectionLibre;
+                                            var isFirst = item.Ordre == conteneur.Items.Min(i => i.Ordre);
+                                            var isLast = item.Ordre == conteneur.Items.Max(i => i.Ordre);
+                                            
+                                            <div class="section-item d-flex justify-content-between align-items-center p-2 border rounded mb-2" data-item-id="@item.Id">
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="drag-handle me-2" style="cursor: move;" title="Glisser pour réorganiser">⋮⋮</span>
+                                                        <div class="flex-grow-1">
+                                                            <div class="d-flex justify-content-between align-items-start">
+                                                                <div>
+                                                                    <strong>@(section.Titre)</strong>
+                                                                    <span class="badge bg-secondary ms-2 small">@item.Ordre</span>
+                                                                    <br>
+                                                                    <small class="text-muted">
+                                                                        @if (!string.IsNullOrWhiteSpace(section.ContenuHtml))
+                                                                        {
+                                                                            @(section.ContenuHtml.Length > 100 ?
+                                                                              section.ContenuHtml.Substring(0, 100) + "..." :
+                                                                              section.ContenuHtml)
+                                                                        }
+                                                                    </small>
+                                                                </div>
+                                                                <div class="d-flex flex-column">
+                                                                    <button class="btn btn-outline-secondary btn-sm mb-1" 
+                                                                            @onclick="() => DeplacerSectionVersLeHaut(conteneur, item)"
+                                                                            disabled="@isFirst" title="Déplacer vers le haut">
+                                                                        <span class="oi oi-chevron-top"></span>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-secondary btn-sm" 
+                                                                            @onclick="() => DeplacerSectionVersLeBas(conteneur, item)"
+                                                                            disabled="@isLast" title="Déplacer vers le bas">
+                                                                        <span class="oi oi-chevron-bottom"></span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="btn-group ms-2">
+                                                    <button class="btn btn-outline-secondary btn-sm" 
+                                                            @onclick="() => EditerSection(section)">
+                                                        <span class="oi oi-pencil"></span>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm" 
+                                                            @onclick="() => RetirerSectionItem(conteneur, item)">
+                                                        <span class="oi oi-minus"></span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                @onclick="() => AjouterSection(conteneur)">
+                                            <span class="oi oi-plus"></span>
+                                            Ajouter une section
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center text-muted py-4">
+                <span class="oi oi-layers" style="font-size: 3rem; opacity: 0.3;"></span>
+                <p class="mt-2">Aucun conteneur de sections créé</p>
+                <p class="small">Sélectionnez un type de section ci-dessus pour commencer</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public List<SectionConteneur> SectionsConteneurs { get; set; } = new();
+    [Parameter] public int DocumentId { get; set; }
+    [Parameter] public EventCallback<List<SectionConteneur>> OnSectionsChanged { get; set; }
+
+    private List<TypeSection> typesSection = new();
+    private List<TypeSection> typesDisponibles = new();
+    private List<SectionLibre> sectionsLibresDisponibles = new();
+    
+    private bool isLoading = false;
+    private bool isCreating = false;
+    private int selectedTypeSection = 0;
+    private string nouveauTitre = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ChargerDonnees();
+    }
+
+    private async Task ChargerDonnees()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Charger tous les types de sections
+            typesSection = (await typeSectionService.GetAllAsync()).ToList();
+            
+            // Charger les sections libres disponibles
+            sectionsLibresDisponibles = (await sectionLibreService.GetAllAsync()).ToList();
+            
+            // Calculer les types disponibles (ceux qui n'ont pas encore de conteneur)
+            MettreAJourTypesDisponibles();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", 
+                $"Erreur lors du chargement: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void MettreAJourTypesDisponibles()
+    {
+        var typesUtilises = SectionsConteneurs.Select(sc => sc.TypeSectionId).ToList();
+        typesDisponibles = typesSection.Where(ts => !typesUtilises.Contains(ts.Id)).ToList();
+    }
+
+    private void OnTypeSelectionChanged()
+    {
+        if (selectedTypeSection > 0)
+        {
+            var typeSelectionne = typesSection.FirstOrDefault(ts => ts.Id == selectedTypeSection);
+            if (typeSelectionne != null && string.IsNullOrWhiteSpace(nouveauTitre))
+            {
+                nouveauTitre = typeSelectionne.Nom;
+            }
+        }
+    }
+
+    private async Task CreerNouveauConteneur()
+    {
+        if (selectedTypeSection == 0) return;
+
+        try
+        {
+            isCreating = true;
+            
+            var conteneur = await sectionConteneurService.CreateAsync(
+                DocumentId, 
+                selectedTypeSection, 
+                string.IsNullOrWhiteSpace(nouveauTitre) ? null : nouveauTitre);
+
+            SectionsConteneurs.Add(conteneur);
+            MettreAJourTypesDisponibles();
+            
+            // Reset du formulaire
+            selectedTypeSection = 0;
+            nouveauTitre = string.Empty;
+            
+            await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+            
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                $"Conteneur '{conteneur.Titre}' créé avec succès");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private async Task SupprimerConteneur(SectionConteneur conteneur)
+    {
+        var result = await DialogService.Confirm(
+            $"Êtes-vous sûr de vouloir supprimer le conteneur '{conteneur.Titre}' ?",
+            "Confirmation de suppression",
+            new Radzen.ConfirmOptions { OkButtonText = "Supprimer", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                await sectionConteneurService.DeleteAsync(conteneur.Id);
+                SectionsConteneurs.Remove(conteneur);
+                MettreAJourTypesDisponibles();
+                
+                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+                
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                    "Conteneur supprimé avec succès");
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+            }
+        }
+    }
+
+    private void EditerConteneur(SectionConteneur conteneur)
+    {
+        // TODO: Implémenter l'édition du conteneur (titre, ordre, etc.)
+        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", 
+            "Édition des propriétés du conteneur en cours de développement");
+    }
+
+    private async Task AjouterSection(SectionConteneur conteneur)
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<SectionSelectionDialog>("Ajouter des sections",
+                new Dictionary<string, object>
+                {
+                    { "SectionConteneursId", conteneur.Id },
+                    { "TypeSectionId", conteneur.TypeSectionId },
+                    { "TypeSectionNom", conteneur.TypeSection.Nom }
+                },
+new Radzen.DialogOptions
+                {
+                    Width = "800px",
+                    Height = "600px",
+                    Resizable = true,
+                    Draggable = true,
+                    CloseDialogOnOverlayClick = false
+                });
+
+            if (result != null && result is List<int>)
+            {
+                var sectionsSelectionneesList = (List<int>)result;
+                if (sectionsSelectionneesList.Any())
+                {
+                    // Ajouter les sections sélectionnées au conteneur
+                    var itemsAjoutes = await sectionConteneurService.AddMultipleSectionsLibresAsync(
+                        conteneur.Id, sectionsSelectionneesList);
+
+                // Recharger le conteneur pour avoir les nouvelles données
+                var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
+                var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
+                if (index >= 0)
+                {
+                    SectionsConteneurs[index] = conteneurMisAJour;
+                }
+
+                    await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        $"{itemsAjoutes.Count} section(s) ajoutée(s) au conteneur");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private async Task RetirerSection(SectionConteneur conteneur, SectionLibre section)
+    {
+        try
+        {
+            await sectionConteneurService.RemoveSectionLibreAsync(conteneur.Id, section.Id);
+            conteneur.SectionsLibres.Remove(section);
+            
+            await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+            
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                $"Section '{section.Titre}' retirée du conteneur");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private void EditerSection(SectionLibre section)
+    {
+        // Navigation vers la page d'édition des sections libres
+        // TODO: Implémenter selon les besoins
+        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", 
+            "Édition directe des sections en cours de développement");
+    }
+
+    // Nouvelles méthodes pour gérer les SectionConteneurItem
+    private async Task RetirerSectionItem(SectionConteneur conteneur, SectionConteneurItem item)
+    {
+        var result = await DialogService.Confirm(
+            $"Êtes-vous sûr de vouloir retirer la section '{item.SectionLibre.Titre}' du conteneur ?",
+            "Confirmation de suppression",
+            new Radzen.ConfirmOptions { OkButtonText = "Retirer", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                await sectionConteneurService.RemoveSectionLibreItemAsync(item.Id);
+                
+                // Recharger le conteneur
+                var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
+                var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
+                if (index >= 0)
+                {
+                    SectionsConteneurs[index] = conteneurMisAJour;
+                }
+
+                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+                
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                    $"Section '{item.SectionLibre.Titre}' retirée du conteneur");
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+            }
+        }
+    }
+
+    private async Task DeplacerSectionVersLeHaut(SectionConteneur conteneur, SectionConteneurItem item)
+    {
+        try
+        {
+            var items = conteneur.Items.OrderBy(i => i.Ordre).ToList();
+            var currentIndex = items.FindIndex(i => i.Id == item.Id);
+            
+            if (currentIndex > 0)
+            {
+                // Échanger avec l'item précédent
+                var previousItem = items[currentIndex - 1];
+                var tempOrdre = item.Ordre;
+                item.Ordre = previousItem.Ordre;
+                previousItem.Ordre = tempOrdre;
+
+                // Mettre à jour l'ordre dans la base de données
+                var itemIds = items.Select(i => i.Id).ToList();
+                itemIds.RemoveAt(currentIndex);
+                itemIds.Insert(currentIndex - 1, item.Id);
+                
+                await sectionConteneurService.ReorderItemsAsync(conteneur.Id, itemIds);
+
+                // Recharger pour avoir les bonnes données
+                await RechargerConteneur(conteneur);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                    "Section déplacée vers le haut");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private async Task DeplacerSectionVersLeBas(SectionConteneur conteneur, SectionConteneurItem item)
+    {
+        try
+        {
+            var items = conteneur.Items.OrderBy(i => i.Ordre).ToList();
+            var currentIndex = items.FindIndex(i => i.Id == item.Id);
+            
+            if (currentIndex < items.Count - 1)
+            {
+                // Échanger avec l'item suivant
+                var nextItem = items[currentIndex + 1];
+                var tempOrdre = item.Ordre;
+                item.Ordre = nextItem.Ordre;
+                nextItem.Ordre = tempOrdre;
+
+                // Mettre à jour l'ordre dans la base de données
+                var itemIds = items.Select(i => i.Id).ToList();
+                itemIds.RemoveAt(currentIndex);
+                itemIds.Insert(currentIndex + 1, item.Id);
+                
+                await sectionConteneurService.ReorderItemsAsync(conteneur.Id, itemIds);
+
+                // Recharger pour avoir les bonnes données
+                await RechargerConteneur(conteneur);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
+                    "Section déplacée vers le bas");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private async Task RechargerConteneur(SectionConteneur conteneur)
+    {
+        var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
+        var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
+        if (index >= 0)
+        {
+            SectionsConteneurs[index] = conteneurMisAJour;
+        }
+        await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+        StateHasChanged();
+    }
+}
+
+<style>
+    .section-conteneur-editor {
+        min-height: 200px;
+    }
+    
+    .section-item {
+        transition: all 0.2s ease;
+    }
+    
+    .section-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .drag-handle {
+        color: #6c757d;
+        font-size: 1.2em;
+    }
+    
+    .drag-handle:hover {
+        color: #495057;
+    }
+    
+    .sections-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>

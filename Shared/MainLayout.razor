@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@using GenerateurDOE.Models
+
 
 <PageTitle>GenerateurDOE</PageTitle>
 
@@ -9,7 +11,7 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+            <span class="app-title">GenerateurDOE pour @appSettings.NomSociete - @appSettings.ApplicationVersion</span>            
         </div>
 
         <article class="content px-4">
@@ -17,3 +19,7 @@
         </article>
     </main>
 </div>
+
+@code {
+    private AppSettings appSettings = new();
+}

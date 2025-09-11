@@ -41,9 +41,20 @@
         @if (showDropdown && !filteredItems.Any() && !string.IsNullOrWhiteSpace(searchText))
         {
             <div class="autocomplete-dropdown">
-                <div class="autocomplete-item no-results">
-                    @NoResultsText
-                </div>
+                @if (AllowAddNew && !string.IsNullOrWhiteSpace(searchText))
+                {
+                    <div class="autocomplete-item add-new"
+                         @onclick="() => AddNewItem(searchText)">
+                        <i class="oi oi-plus me-2"></i>
+                        Ajouter "@searchText"
+                    </div>
+                }
+                else
+                {
+                    <div class="autocomplete-item no-results">
+                        @NoResultsText
+                    </div>
+                }
             </div>
         }
     </div>
@@ -102,6 +113,18 @@
     .autocomplete-item.no-results:hover {
         background-color: transparent;
     }
+
+    .autocomplete-item.add-new {
+        color: #0066cc;
+        font-weight: 500;
+        border-left: 3px solid #0066cc;
+        background-color: #f8f9ff;
+    }
+
+    .autocomplete-item.add-new:hover {
+        background-color: #e6f2ff;
+        color: #004499;
+    }
 </style>
 
 @code {
@@ -118,6 +141,8 @@
     [Parameter] public EventCallback<string> OnTextChanged { get; set; }
     [Parameter] public string? ValidationMessage { get; set; }
     [Parameter] public string Value { get; set; } = "";
+    [Parameter] public bool AllowAddNew { get; set; } = false;
+    [Parameter] public EventCallback<string> OnAddNew { get; set; }
     
     private string searchText = "";
     private List<T> filteredItems = new List<T>();
@@ -230,5 +255,12 @@
         FilterItems();
         await OnTextChanged.InvokeAsync(searchText);
         StateHasChanged(); // Force le rafraîchissement immédiat
+    }
+
+    private async Task AddNewItem(string value)
+    {
+        showDropdown = false;
+        selectedIndex = -1;
+        await OnAddNew.InvokeAsync(value);
     }
 }

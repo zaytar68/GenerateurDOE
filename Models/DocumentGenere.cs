@@ -27,11 +27,17 @@ public class DocumentGenere
     public bool IncludePageDeGarde { get; set; } = true;
     public bool IncludeTableMatieres { get; set; } = true;
     
+    public bool EnCours { get; set; } = true;
+    
     [Required]
     public int ChantierId { get; set; }
     public virtual Chantier Chantier { get; set; } = null!;
     
     public virtual ICollection<FicheTechnique> FichesTechniques { get; set; } = new List<FicheTechnique>();
+    
+    public virtual ICollection<SectionConteneur> SectionsConteneurs { get; set; } = new List<SectionConteneur>();
+    
+    public virtual FTConteneur? FTConteneur { get; set; }
 }
 
 public enum TypeDocumentGenere
