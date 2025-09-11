@@ -206,6 +206,56 @@ public class DocumentGenereService : IDocumentGenereService
             .ToListAsync();
     }
 
+    public async Task<DocumentGenere> GetByIdAsync(int documentGenereId)
+    {
+        var document = await _context.DocumentsGeneres
+            .Include(d => d.Chantier)
+            .Include(d => d.FichesTechniques)
+            .FirstOrDefaultAsync(d => d.Id == documentGenereId);
+        
+        if (document == null)
+            throw new InvalidOperationException($"Document avec l'ID {documentGenereId} introuvable");
+            
+        return document;
+    }
+
+    public async Task<DocumentGenere> UpdateAsync(DocumentGenere documentGenere)
+    {
+        var existingDocument = await _context.DocumentsGeneres.FindAsync(documentGenere.Id);
+        if (existingDocument == null)
+            throw new InvalidOperationException($"Document avec l'ID {documentGenere.Id} introuvable");
+
+        // Mise à jour des propriétés
+        existingDocument.TypeDocument = documentGenere.TypeDocument;
+        existingDocument.FormatExport = documentGenere.FormatExport;
+        existingDocument.NomFichier = documentGenere.NomFichier;
+        existingDocument.IncludePageDeGarde = documentGenere.IncludePageDeGarde;
+        existingDocument.IncludeTableMatieres = documentGenere.IncludeTableMatieres;
+        existingDocument.Parametres = documentGenere.Parametres;
+
+        await _context.SaveChangesAsync();
+        return existingDocument;
+    }
+
+    public async Task<DocumentGenere> DuplicateAsync(int documentId, string newName)
+    {
+        var originalDocument = await GetByIdAsync(documentId);
+        
+        var duplicatedDocument = new DocumentGenere
+        {
+            TypeDocument = originalDocument.TypeDocument,
+            FormatExport = originalDocument.FormatExport,
+            NomFichier = newName,
+            ChantierId = originalDocument.ChantierId,
+            IncludePageDeGarde = originalDocument.IncludePageDeGarde,
+            IncludeTableMatieres = originalDocument.IncludeTableMatieres,
+            Parametres = originalDocument.Parametres,
+            DateCreation = DateTime.Now
+        };
+
+        return await SaveDocumentGenereAsync(duplicatedDocument);
+    }
+
     public async Task<bool> DeleteDocumentGenereAsync(int documentGenereId)
     {
         var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);

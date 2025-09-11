@@ -1,0 +1,439 @@
+@page "/chantier/{ChantierId:int}"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IChantierService chantierService
+@inject IDocumentGenereService documentGenereService
+@inject NavigationManager Navigation
+@inject Radzen.NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<PageTitle>Détail du Chantier</PageTitle>
+
+<div class="container-fluid">
+    <!-- En-tête avec bouton retour -->
+    <div class="d-flex align-items-center mb-4">
+        <button class="btn btn-outline-secondary me-3" @onclick="RetourListeChantiers">
+            <span class="oi oi-arrow-left" aria-hidden="true"></span> Retour à la liste
+        </button>
+        <h1 class="mb-0">
+            <span class="oi oi-wrench" aria-hidden="true"></span>
+            Détail du Chantier
+        </h1>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (chantier == null)
+    {
+        <div class="alert alert-warning">
+            <span class="oi oi-warning" aria-hidden="true"></span>
+            Chantier introuvable
+        </div>
+    }
+    else
+    {
+        <!-- Cadre bleu avec les informations du chantier -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">@chantier.NomProjet</h4>
+                        <div>
+                            <button class="btn btn-light btn-sm me-2" @onclick="() => ArchiverChantier()">
+                                @(chantier.EstArchive ? "Désarchiver" : "Archiver")
+                            </button>
+                            <button class="btn btn-warning btn-sm me-2" @onclick="() => ModifierChantier()">
+                                Modifier
+                            </button>
+                            <button class="btn btn-danger btn-sm" @onclick="() => SupprimerChantier()">
+                                Supprimer
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Maître d'œuvre:</strong> @chantier.MaitreOeuvre</p>
+                                <p><strong>Maître d'ouvrage:</strong> @chantier.MaitreOuvrage</p>
+                                <p><strong>Adresse:</strong> @chantier.Adresse</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Lot:</strong> @chantier.NumeroLot - @chantier.IntituleLot</p>
+                                <p><strong>Créé le:</strong> @chantier.DateCreation.ToString("dd/MM/yyyy")</p>
+                                <p><strong>Modifié le:</strong> @chantier.DateModification.ToString("dd/MM/yyyy")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Documents Générés -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <span class="oi oi-document" aria-hidden="true"></span>
+                                Documents Générés (@documentsGeneres.Count)
+                            </h5>
+                            <button class="btn btn-primary" @onclick="NouveauDocument">
+                                <span class="oi oi-plus" aria-hidden="true"></span>
+                                Nouveau Document
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        @if (!documentsGeneres.Any())
+                        {
+                            <div class="text-center text-muted py-4">
+                                <span class="oi oi-document" aria-hidden="true" style="font-size: 3rem; opacity: 0.3;"></span>
+                                <p class="mt-2">Aucun document généré pour ce chantier</p>
+                                <button class="btn btn-primary" @onclick="NouveauDocument">
+                                    Créer le premier document
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Type de Document</th>
+                                            <th>Format</th>
+                                            <th>Nom du Fichier</th>
+                                            <th>Date de Création</th>
+                                            <th>Options</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var document in documentsGeneres)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <span class="badge bg-@GetTypeBadgeColor(document.TypeDocument)">
+                                                        @GetTypeDisplayName(document.TypeDocument)
+                                                    </span>
+                                                </td>
+                                                <td>@document.FormatExport</td>
+                                                <td>@document.NomFichier</td>
+                                                <td>@document.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
+                                                <td>
+                                                    @if (document.IncludePageDeGarde)
+                                                    {
+                                                        <span class="badge bg-info me-1">Page de garde</span>
+                                                    }
+                                                    @if (document.IncludeTableMatieres)
+                                                    {
+                                                        <span class="badge bg-info">Table des matières</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-outline-primary btn-sm me-1" 
+                                                            @onclick="() => TelechargerDocument(document)"
+                                                            title="Télécharger">
+                                                        📥
+                                                    </button>
+                                                    <button class="btn btn-outline-success btn-sm me-1" 
+                                                            @onclick="() => DupliquerDocument(document)"
+                                                            title="Dupliquer">
+                                                        📄
+                                                    </button>
+                                                    <button class="btn btn-outline-secondary btn-sm me-1" 
+                                                            @onclick="() => ModifierDocument(document)"
+                                                            title="Modifier">
+                                                        ✏️
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm" 
+                                                            @onclick="() => SupprimerDocument(document)"
+                                                            title="Supprimer">
+                                                        🗑️
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int ChantierId { get; set; }
+    
+    private Chantier? chantier;
+    private List<DocumentGenere> documentsGeneres = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ChargerChantier();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ChantierId > 0)
+        {
+            await ChargerChantier();
+        }
+    }
+
+    private async Task ChargerChantier()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            chantier = await chantierService.GetByIdAsync(ChantierId);
+            if (chantier != null)
+            {
+                documentsGeneres = (await documentGenereService.GetDocumentsGeneresByChantierId(ChantierId)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", 
+                $"Erreur lors du chargement du chantier: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RetourListeChantiers()
+    {
+        Navigation.NavigateTo("/chantiers");
+    }
+
+    private async Task ArchiverChantier()
+    {
+        if (chantier == null) return;
+
+        try
+        {
+            if (chantier.EstArchive)
+            {
+                await chantierService.UnarchiveAsync(chantier.Id);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier désarchivé");
+            }
+            else
+            {
+                await chantierService.ArchiveAsync(chantier.Id);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier archivé");
+            }
+            
+            await ChargerChantier(); // Recharger pour mettre à jour l'état
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+        }
+    }
+
+    private void ModifierChantier()
+    {
+        // TODO: Implémenter la modification du chantier (dialogue modal)
+        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", "Fonctionnalité en cours de développement");
+    }
+
+    private async Task SupprimerChantier()
+    {
+        if (chantier == null) return;
+
+        var result = await DialogService.Confirm(
+            $"Êtes-vous sûr de vouloir supprimer le chantier '{chantier.NomProjet}' ?",
+            "Confirmation de suppression",
+            new Radzen.ConfirmOptions { OkButtonText = "Supprimer", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                await chantierService.DeleteAsync(chantier.Id);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier supprimé");
+                Navigation.NavigateTo("/chantiers");
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+            }
+        }
+    }
+
+    // Méthodes pour la gestion des documents
+    private async Task NouveauDocument()
+    {
+        var nouveauDocument = new DocumentGenere
+        {
+            ChantierId = ChantierId,
+            IncludePageDeGarde = true,
+            IncludeTableMatieres = true
+        };
+
+        var result = await DialogService.OpenAsync<DocumentGenereEditDialog>("Nouveau Document", 
+            new Dictionary<string, object> 
+            { 
+                { "DocumentGenere", nouveauDocument },
+                { "IsEditMode", false },
+                { "OnSave", EventCallback.Factory.Create(this, async () => await SauvegarderNouveauDocument(nouveauDocument)) },
+                { "OnCancel", EventCallback.Factory.Create(this, () => DialogService.Close(false)) }
+            },
+            new Radzen.DialogOptions { Width = "800px", Height = "600px", Resizable = true });
+    }
+
+    private async Task SauvegarderNouveauDocument(DocumentGenere document)
+    {
+        try
+        {
+            await documentGenereService.SaveDocumentGenereAsync(document);
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document créé avec succès");
+            DialogService.Close(true);
+            await ChargerChantier(); // Recharger la liste
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la création: {ex.Message}");
+        }
+    }
+
+    private async Task TelechargerDocument(DocumentGenere document)
+    {
+        try
+        {
+            // Générer le document s'il n'existe pas encore
+            if (string.IsNullOrEmpty(document.CheminFichier) || !File.Exists(document.CheminFichier))
+            {
+                var contenu = await documentGenereService.ExportDocumentAsync(
+                    document.ChantierId, 
+                    document.TypeDocument, 
+                    document.FormatExport,
+                    document.IncludePageDeGarde,
+                    document.IncludeTableMatieres);
+                
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", "Document généré avec succès");
+            }
+            
+            // Pour l'instant, on simule le téléchargement
+            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Téléchargement", $"Téléchargement de {document.NomFichier} simulé");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la génération: {ex.Message}");
+        }
+    }
+
+    private async Task DupliquerDocument(DocumentGenere document)
+    {
+        var result = await DialogService.Confirm(
+            $"Voulez-vous dupliquer le document '{document.NomFichier}' ?",
+            "Confirmation de duplication",
+            new Radzen.ConfirmOptions { OkButtonText = "Dupliquer", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                var nouveauNom = $"{document.NomFichier}_Copie_{DateTime.Now:yyyyMMdd_HHmm}";
+                await documentGenereService.DuplicateAsync(document.Id, nouveauNom);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document dupliqué avec succès");
+                await ChargerChantier(); // Recharger la liste
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la duplication: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task ModifierDocument(DocumentGenere document)
+    {
+        var documentAModifier = await documentGenereService.GetByIdAsync(document.Id);
+
+        var result = await DialogService.OpenAsync<DocumentGenereEditDialog>("Modifier Document", 
+            new Dictionary<string, object> 
+            { 
+                { "DocumentGenere", documentAModifier },
+                { "IsEditMode", true },
+                { "OnSave", EventCallback.Factory.Create(this, async () => await SauvegarderModificationDocument(documentAModifier)) },
+                { "OnCancel", EventCallback.Factory.Create(this, () => DialogService.Close(false)) }
+            },
+            new Radzen.DialogOptions { Width = "800px", Height = "600px", Resizable = true });
+    }
+
+    private async Task SauvegarderModificationDocument(DocumentGenere document)
+    {
+        try
+        {
+            await documentGenereService.UpdateAsync(document);
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document modifié avec succès");
+            DialogService.Close(true);
+            await ChargerChantier(); // Recharger la liste
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la modification: {ex.Message}");
+        }
+    }
+
+    private async Task SupprimerDocument(DocumentGenere document)
+    {
+        var result = await DialogService.Confirm(
+            $"Êtes-vous sûr de vouloir supprimer le document '{document.NomFichier}' ?",
+            "Confirmation de suppression",
+            new Radzen.ConfirmOptions { OkButtonText = "Supprimer", CancelButtonText = "Annuler" });
+
+        if (result == true)
+        {
+            try
+            {
+                await documentGenereService.DeleteDocumentGenereAsync(document.Id);
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document supprimé");
+                await ChargerChantier(); // Recharger la liste
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+            }
+        }
+    }
+
+    // Méthodes utilitaires pour l'affichage
+    private string GetTypeBadgeColor(TypeDocumentGenere type)
+    {
+        return type switch
+        {
+            TypeDocumentGenere.DOE => "primary",
+            TypeDocumentGenere.DossierTechnique => "info",
+            TypeDocumentGenere.MemoireTechnique => "warning",
+            _ => "secondary"
+        };
+    }
+
+    private string GetTypeDisplayName(TypeDocumentGenere type)
+    {
+        return type switch
+        {
+            TypeDocumentGenere.DOE => "DOE",
+            TypeDocumentGenere.DossierTechnique => "Dossier Technique",
+            TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
+            _ => type.ToString()
+        };
+    }
+}

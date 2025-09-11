@@ -5,6 +5,7 @@
 @inject IChantierService chantierService
 @inject Radzen.DialogService DialogService
 @inject Radzen.NotificationService NotificationService
+@inject NavigationManager Navigation
 
 <PageTitle>Gestion des Chantiers</PageTitle>
 
@@ -181,15 +182,17 @@
                                                 }
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary me-1" 
+                                                <button class="btn btn-outline-primary me-1 px-3" 
                                                         @onclick:stopPropagation="true"
-                                                        @onclick="() => SelectChantier(chantier)">
-                                                    <i class="fa fa-eye"></i>
+                                                        @onclick="() => SelectChantier(chantier)"
+                                                        title="Consulter le chantier">
+                                                    👁️
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-secondary me-1" 
+                                                <button class="btn btn-outline-secondary me-1 px-3" 
                                                         @onclick:stopPropagation="true"
-                                                        @onclick="() => ShowEditDialog(chantier)">
-                                                    <i class="fa fa-edit"></i>
+                                                        @onclick="() => ShowEditDialog(chantier)"
+                                                        title="Modifier le chantier">
+                                                    ✏️
                                                 </button>
                                             </td>
                                         </tr>
@@ -286,23 +289,14 @@
         }
     }
 
-    private async Task OnChantierSelected(Chantier chantier)
+    private void OnChantierSelected(Chantier chantier)
     {
-        await SelectChantier(chantier);
+        SelectChantier(chantier);
     }
 
-    private async Task SelectChantier(Chantier chantier)
+    private void SelectChantier(Chantier chantier)
     {
-        try
-        {
-            selectedChantier = chantier;
-            selectedChantierWithDocuments = await chantierService.GetByIdWithDocumentsAsync(chantier.Id);
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement des détails: {ex.Message}");
-        }
+        Navigation.NavigateTo($"/chantier/{chantier.Id}");
     }
 
     private async Task ShowCreateDialog()

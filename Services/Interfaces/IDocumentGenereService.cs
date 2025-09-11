@@ -9,6 +9,9 @@ public interface IDocumentGenereService
     Task<string> GenerateDossierTechniqueAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true);
     Task<string> GenerateMemoireTechniqueAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true);
     Task<DocumentGenere> SaveDocumentGenereAsync(DocumentGenere documentGenere);
+    Task<DocumentGenere> GetByIdAsync(int documentGenereId);
+    Task<DocumentGenere> UpdateAsync(DocumentGenere documentGenere);
+    Task<DocumentGenere> DuplicateAsync(int documentId, string newName);
     Task<IEnumerable<DocumentGenere>> GetDocumentsGeneresByChantierId(int chantierId);
     Task<bool> DeleteDocumentGenereAsync(int documentGenereId);
 }

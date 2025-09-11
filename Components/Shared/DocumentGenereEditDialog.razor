@@ -1,0 +1,196 @@
+@using GenerateurDOE.Models
+@using System.ComponentModel.DataAnnotations
+@inject Radzen.NotificationService NotificationService
+
+<EditForm Model="@DocumentGenere" OnValidSubmit="@OnValidSubmit">
+    <DataAnnotationsValidator />
+    
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label for="typeDocument" class="form-label">Type de Document *</label>
+            <InputSelect @bind-Value="DocumentGenere.TypeDocument" class="form-select" id="typeDocument">
+                <option value="">-- Sélectionner un type --</option>
+                @foreach (var type in Enum.GetValues<TypeDocumentGenere>())
+                {
+                    <option value="@type">@GetTypeDisplayName(type)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => DocumentGenere.TypeDocument" class="text-danger" />
+        </div>
+        <div class="col-md-6">
+            <label for="formatExport" class="form-label">Format d'Export *</label>
+            <InputSelect @bind-Value="DocumentGenere.FormatExport" class="form-select" id="formatExport">
+                <option value="">-- Sélectionner un format --</option>
+                @foreach (var format in Enum.GetValues<FormatExport>())
+                {
+                    <option value="@format">@format</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => DocumentGenere.FormatExport" class="text-danger" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <label for="nomFichier" class="form-label">Nom du Fichier *</label>
+            <InputText @bind-Value="DocumentGenere.NomFichier" class="form-control" id="nomFichier" 
+                       placeholder="ex: DOE_Tour_Europe_2025" maxlength="255" />
+            <ValidationMessage For="() => DocumentGenere.NomFichier" class="text-danger" />
+            <small class="form-text text-muted">Le nom du fichier sera automatiquement complété avec l'extension selon le format choisi</small>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="form-check">
+                <InputCheckbox @bind-Value="DocumentGenere.IncludePageDeGarde" class="form-check-input" id="includePageDeGarde" />
+                <label class="form-check-label" for="includePageDeGarde">
+                    Inclure une page de garde
+                </label>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-check">
+                <InputCheckbox @bind-Value="DocumentGenere.IncludeTableMatieres" class="form-check-input" id="includeTableMatieres" />
+                <label class="form-check-label" for="includeTableMatieres">
+                    Inclure une table des matières
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <label for="parametres" class="form-label">Paramètres Avancés (optionnel)</label>
+            <InputTextArea @bind-Value="DocumentGenere.Parametres" class="form-control" id="parametres" 
+                          rows="3" maxlength="2000" 
+                          placeholder="Paramètres JSON ou configuration spécifique..." />
+            <ValidationMessage For="() => DocumentGenere.Parametres" class="text-danger" />
+            <small class="form-text text-muted">Configuration JSON pour des options avancées de génération</small>
+        </div>
+    </div>
+
+    @if (IsEditMode)
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <span class="oi oi-info" aria-hidden="true"></span>
+                    <strong>Document créé le :</strong> @DocumentGenere.DateCreation.ToString("dd/MM/yyyy à HH:mm")
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-secondary" @onclick="OnCancel">
+            Annuler
+        </button>
+        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            }
+            @(IsEditMode ? "Modifier" : "Créer") le Document
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public DocumentGenere DocumentGenere { get; set; } = new();
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public bool IsEditMode { get; set; } = false;
+
+    private bool isSaving = false;
+
+    protected override void OnParametersSet()
+    {
+        // Générer un nom de fichier par défaut si nouveau document
+        if (!IsEditMode && string.IsNullOrWhiteSpace(DocumentGenere.NomFichier))
+        {
+            GenerateDefaultFileName();
+        }
+    }
+
+    private async Task OnValidSubmit()
+    {
+        try
+        {
+            isSaving = true;
+            StateHasChanged();
+
+            // Validation personnalisée
+            if (!ValidateDocument())
+                return;
+
+            await OnSave.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", 
+                $"Erreur lors de la sauvegarde: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool ValidateDocument()
+    {
+        var errors = new List<string>();
+
+        if (DocumentGenere.TypeDocument == default)
+            errors.Add("Le type de document est requis");
+
+        if (DocumentGenere.FormatExport == default)
+            errors.Add("Le format d'export est requis");
+
+        if (string.IsNullOrWhiteSpace(DocumentGenere.NomFichier))
+            errors.Add("Le nom du fichier est requis");
+
+        if (errors.Any())
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Validation", 
+                string.Join(", ", errors));
+            return false;
+        }
+
+        return true;
+    }
+
+    private void GenerateDefaultFileName()
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd");
+        DocumentGenere.NomFichier = DocumentGenere.TypeDocument switch
+        {
+            TypeDocumentGenere.DOE => $"DOE_{timestamp}",
+            TypeDocumentGenere.DossierTechnique => $"DossierTechnique_{timestamp}",
+            TypeDocumentGenere.MemoireTechnique => $"MemoireTechnique_{timestamp}",
+            _ => $"Document_{timestamp}"
+        };
+    }
+
+    private string GetTypeDisplayName(TypeDocumentGenere type)
+    {
+        return type switch
+        {
+            TypeDocumentGenere.DOE => "DOE (Dossier d'Ouvrages Exécutés)",
+            TypeDocumentGenere.DossierTechnique => "Dossier Technique",
+            TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
+            _ => type.ToString()
+        };
+    }
+}
+
+<style>
+    .form-check {
+        margin-bottom: 0.5rem;
+    }
+    
+    .alert {
+        margin-bottom: 0;
+    }
+</style>
