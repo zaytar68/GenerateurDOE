@@ -1,6 +1,7 @@
 @page "/sections-libres"
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Components.Shared
 @inject ISectionLibreService SectionLibreService
 @inject ITypeSectionService TypeSectionService
 @inject IJSRuntime JSRuntime
@@ -31,131 +32,55 @@
             </div>
         }
 
-        <div class="row">
-            <div class="col-lg-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <span class="oi oi-plus" aria-hidden="true"></span>
-                            @(sectionEnEdition != null ? "Modifier Section" : "Nouvelle Section")
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <EditForm Model="sectionCourante" OnValidSubmit="SauvegarderSection">
-                            <DataAnnotationsValidator />
-                            <ValidationSummary class="text-danger mb-3" />
-
-                            <div class="mb-3">
-                                <label for="titre" class="form-label">Titre de la section</label>
-                                <InputText @bind-Value="sectionCourante.Titre" 
-                                         class="form-control" id="titre" placeholder="Titre de la section" />
-                                <ValidationMessage For="() => sectionCourante.Titre" class="text-danger" />
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="typeSection" class="form-label">Type de section</label>
-                                <InputSelect @bind-Value="sectionCourante.TypeSectionId" class="form-select" id="typeSection">
-                                    <option value="0">-- Sélectionner un type --</option>
-                                    @foreach (var type in typesSections.Where(t => t.IsActive))
-                                    {
-                                        <option value="@type.Id">@type.Nom</option>
-                                    }
-                                </InputSelect>
-                                <ValidationMessage For="() => sectionCourante.TypeSectionId" class="text-danger" />
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="ordre" class="form-label">Ordre d'affichage</label>
-                                <InputNumber @bind-Value="sectionCourante.Ordre" 
-                                           class="form-control" id="ordre" />
-                                <ValidationMessage For="() => sectionCourante.Ordre" class="text-danger" />
-                                <small class="form-text text-muted">Laisser à 0 pour placer automatiquement à la fin</small>
-                            </div>
-
-                            <div class="d-flex justify-content-between">
-                                @if (sectionEnEdition != null)
-                                {
-                                    <button type="button" class="btn btn-secondary" @onclick="AnnulerEdition">
-                                        <span class="oi oi-x" aria-hidden="true"></span>
-                                        Annuler
-                                    </button>
-                                }
-                                else
-                                {
-                                    <div></div>
-                                }
-
-                                <button type="submit" class="btn btn-primary" disabled="@isSaving">
-                                    @if (isSaving)
-                                    {
-                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                    }
-                                    <span class="oi oi-@(sectionEnEdition != null ? "check" : "plus")" aria-hidden="true"></span>
-                                    @(sectionEnEdition != null ? "Modifier" : "Créer")
-                                </button>
-                            </div>
-                        </EditForm>
-                    </div>
-                </div>
-
-                @if (sectionEnEdition != null)
-                {
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <span class="oi oi-wrench" aria-hidden="true"></span>
-                                Actions
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <button type="button" class="btn btn-danger" @onclick="SupprimerSectionCourante">
-                                    <span class="oi oi-trash" aria-hidden="true"></span>
-                                    Supprimer cette section
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <span class="oi oi-document" aria-hidden="true"></span>
-                            Contenu de la section
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div>
-                            <label for="contenu" class="form-label">Contenu de la section</label>
-                            <RichTextEditor @bind-Value="sectionCourante.ContenuHtml"
-                                          Placeholder="Saisissez le contenu de votre section..."
-                                          Height="400px"
-                                          CssClass="border" />
-                            <small class="form-text text-muted mt-2">
-                                Utilisez la barre d'outils pour formater votre texte, insérer des images et des liens.
-                            </small>
-                            
-                            @if (!string.IsNullOrEmpty(sectionCourante.ContenuHtml))
+        <!-- Filtres -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="filtreType" class="form-label">Filtrer par type</label>
+                        <select @bind="filtreTypeSelectionne" @bind:after="AppliquerFiltres" class="form-select" id="filtreType">
+                            <option value="0">-- Tous les types --</option>
+                            @foreach (var type in typesSections.Where(t => t.IsActive))
                             {
-                                <div class="mt-3">
-                                    <strong>Aperçu :</strong>
-                                    <div class="border p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
-                                        @((MarkupString)sectionCourante.ContenuHtml)
-                                    </div>
-                                </div>
+                                <option value="@type.Id">@type.Nom</option>
                             }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="rechercheGlobale" class="form-label">Recherche globale</label>
+                        <AutoComplete T="SectionLibre" 
+                                    Items="sectionsRecherche"
+                                    DisplaySelector="s => s.Titre"
+                                    Value="@rechercheTexte"
+                                    OnTextChanged="OnRechercheTextChanged"
+                                    OnItemSelected="OnSectionSelectionnee"
+                                    Placeholder="Rechercher dans le titre ou contenu..."
+                                    MinSearchLength="2"
+                                    CssClass="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">&nbsp;</label>
+                        <div class="d-grid gap-2 d-md-block">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="ReinitialiserFiltres">
+                                <span class="oi oi-reload" aria-hidden="true"></span>
+                                Reset
+                            </button>
+                            <button type="button" class="btn btn-primary" @onclick="OuvrirModalNouvelleSection">
+                                <span class="oi oi-plus" aria-hidden="true"></span>
+                                Nouvelle Section
+                            </button>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="card mt-4">
+        <!-- Liste des sections -->
+        <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">
                             <span class="oi oi-list" aria-hidden="true"></span>
-                            Liste des Sections (@sections.Count)
+                            Liste des Sections (@sectionsFiltrees.Count)
                         </h5>
                     </div>
                     <div class="card-body">
@@ -167,7 +92,7 @@
                                 </div>
                             </div>
                         }
-                        else if (!sections.Any())
+                        else if (!sectionsFiltrees.Any())
                         {
                             <div class="text-center text-muted py-4">
                                 <span class="oi oi-info" aria-hidden="true"></span>
@@ -189,7 +114,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (var section in sections.OrderBy(s => s.Ordre))
+                                        @foreach (var section in sectionsFiltrees.OrderBy(s => s.Ordre))
                                         {
                                             <tr class="@(sectionEnEdition?.Id == section.Id ? "table-warning" : "")">
                                                 <td>
@@ -219,7 +144,7 @@
                                                 <td>
                                                     <div class="btn-group btn-group-sm">
                                                         <button type="button" class="btn btn-outline-primary" 
-                                                                @onclick="() => ModifierSection(section)" title="Modifier">
+                                                                @onclick="() => OuvrirModalModifierSection(section)" title="Modifier">
                                                             <span class="oi oi-pencil"></span>
                                                         </button>
                                                         <button type="button" class="btn btn-outline-danger" 
@@ -236,9 +161,110 @@
                         }
                     </div>
                 </div>
+        }
+    
+</div>
+
+<!-- Modal pour l'édition -->
+<div class="modal fade @(afficherModal ? "show d-block" : "")" tabindex="-1" role="dialog" style="@(afficherModal ? "background-color: rgba(0,0,0,0.5);" : "display: none;")">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <span class="oi oi-@(sectionEnEdition != null ? "pencil" : "plus")" aria-hidden="true"></span>
+                    @(sectionEnEdition != null ? "Modifier Section" : "Nouvelle Section")
+                </h5>
+                <button type="button" class="btn-close" @onclick="FermerModal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="sectionCourante" OnValidSubmit="SauvegarderSection">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger mb-3" />
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="titre" class="form-label">Titre de la section</label>
+                                <InputText @bind-Value="sectionCourante.Titre" 
+                                         class="form-control" id="titre" placeholder="Titre de la section" />
+                                <ValidationMessage For="() => sectionCourante.Titre" class="text-danger" />
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="typeSection" class="form-label">Type de section</label>
+                                <InputSelect @bind-Value="sectionCourante.TypeSectionId" class="form-select" id="typeSection">
+                                    <option value="0">-- Sélectionner un type --</option>
+                                    @foreach (var type in typesSections.Where(t => t.IsActive))
+                                    {
+                                        <option value="@type.Id">@type.Nom</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => sectionCourante.TypeSectionId" class="text-danger" />
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="ordre" class="form-label">Ordre d'affichage</label>
+                                <InputNumber @bind-Value="sectionCourante.Ordre" 
+                                           class="form-control" id="ordre" />
+                                <ValidationMessage For="() => sectionCourante.Ordre" class="text-danger" />
+                                <small class="form-text text-muted">Laisser à 0 pour placer automatiquement à la fin</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="contenu" class="form-label">Contenu de la section</label>
+                        <RichTextEditor @bind-Value="sectionCourante.ContenuHtml"
+                                      Placeholder="Saisissez le contenu de votre section..."
+                                      Height="400px"
+                                      CssClass="border" />
+                        <small class="form-text text-muted mt-2">
+                            Utilisez la barre d'outils pour formater votre texte, insérer des images et des liens.
+                        </small>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(sectionCourante.ContenuHtml))
+                    {
+                        <div class="mb-3">
+                            <strong>Aperçu :</strong>
+                            <div class="border p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                                @((MarkupString)sectionCourante.ContenuHtml)
+                            </div>
+                        </div>
+                    }
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <div class="d-flex justify-content-between w-100">
+                    <div>
+                        @if (sectionEnEdition != null)
+                        {
+                            <button type="button" class="btn btn-danger" @onclick="SupprimerSectionCourante">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                                Supprimer cette section
+                            </button>
+                        }
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary me-2" @onclick="FermerModal">
+                            <span class="oi oi-x" aria-hidden="true"></span>
+                            Annuler
+                        </button>
+                        <button type="button" class="btn btn-primary" @onclick="SauvegarderSection" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            <span class="oi oi-@(sectionEnEdition != null ? "check" : "plus")" aria-hidden="true"></span>
+                            @(sectionEnEdition != null ? "Modifier" : "Créer")
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-    }
+    </div>
 </div>
 
 @code {
@@ -252,6 +278,13 @@
     private bool chargementSections = false;
     private string statusMessage = string.Empty;
     private bool isSuccess = false;
+
+    // Variables pour le filtrage et la modal
+    private List<SectionLibre> sectionsFiltrees = new();
+    private List<SectionLibre> sectionsRecherche = new();
+    private int filtreTypeSelectionne = 0;
+    private string rechercheTexte = string.Empty;
+    private bool afficherModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -268,6 +301,10 @@
             // Load sequentially to avoid DbContext threading issues
             sections = (await SectionLibreService.GetAllAsync()).ToList();
             typesSections = (await TypeSectionService.GetActiveAsync()).ToList();
+            
+            // Initialiser les sections filtrées et de recherche
+            sectionsFiltrees = sections.ToList();
+            sectionsRecherche = sections.ToList();
         }
         catch (Exception ex)
         {
@@ -311,8 +348,8 @@
             }
 
             isSuccess = true;
-            sectionCourante = new SectionLibre();
             await ChargerDonnees();
+            FermerModal();
         }
         catch (Exception ex)
         {
@@ -325,28 +362,6 @@
         }
     }
 
-    private void ModifierSection(SectionLibre section)
-    {
-        sectionEnEdition = section;
-        sectionCourante = new SectionLibre
-        {
-            Id = section.Id,
-            Titre = section.Titre,
-            Ordre = section.Ordre,
-            TypeSectionId = section.TypeSectionId,
-            ContenuHtml = section.ContenuHtml,
-            ContenuJson = section.ContenuJson
-        };
-        
-        // Le contenu sera automatiquement chargé dans l'éditeur grâce au @bind-Value
-    }
-
-    private void AnnulerEdition()
-    {
-        sectionEnEdition = null;
-        sectionCourante = new SectionLibre();
-        // L'éditeur sera automatiquement vidé grâce au @bind-Value
-    }
 
     private async Task SupprimerSection(SectionLibre section)
     {
@@ -364,10 +379,10 @@
                     statusMessage = "Section supprimée avec succès !";
                     isSuccess = true;
                     
-                    // Si on était en train d'éditer cette section, annuler l'édition
+                    // Si on était en train d'éditer cette section, fermer la modal
                     if (sectionEnEdition?.Id == section.Id)
                     {
-                        AnnulerEdition();
+                        FermerModal();
                     }
                 }
                 else
@@ -416,6 +431,94 @@
             statusMessage = $"Erreur lors du déplacement : {ex.Message}";
             isSuccess = false;
         }
+    }
+
+    // Méthodes pour le filtrage
+    private void AppliquerFiltres()
+    {
+        var sectionsTemp = sections.AsEnumerable();
+
+        // Filtre par type
+        if (filtreTypeSelectionne > 0)
+        {
+            sectionsTemp = sectionsTemp.Where(s => s.TypeSectionId == filtreTypeSelectionne);
+        }
+
+        // Filtre par recherche texte
+        if (!string.IsNullOrWhiteSpace(rechercheTexte))
+        {
+            sectionsTemp = sectionsTemp.Where(s => 
+                s.Titre.Contains(rechercheTexte, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(s.ContenuHtml) && s.ContenuHtml.Contains(rechercheTexte, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        sectionsFiltrees = sectionsTemp.ToList();
+        StateHasChanged();
+    }
+
+    private void OnRechercheTextChanged(string texte)
+    {
+        rechercheTexte = texte;
+        
+        // Filtrer les sections pour l'autocomplétion
+        if (!string.IsNullOrWhiteSpace(texte) && texte.Length >= 2)
+        {
+            sectionsRecherche = sections.Where(s => 
+                s.Titre.Contains(texte, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(s.ContenuHtml) && s.ContenuHtml.Contains(texte, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+        else
+        {
+            sectionsRecherche = sections.ToList();
+        }
+        
+        AppliquerFiltres();
+    }
+
+    private void OnSectionSelectionnee(SectionLibre section)
+    {
+        // Optionnel : faire quelque chose quand une section est sélectionnée dans l'autocomplétion
+        // Par exemple, naviguer vers cette section ou la mettre en surbrillance
+    }
+
+    private void ReinitialiserFiltres()
+    {
+        filtreTypeSelectionne = 0;
+        rechercheTexte = string.Empty;
+        sectionsFiltrees = sections.ToList();
+        sectionsRecherche = sections.ToList();
+        StateHasChanged();
+    }
+
+    // Méthodes pour la modal
+    private void OuvrirModalNouvelleSection()
+    {
+        sectionEnEdition = null;
+        sectionCourante = new SectionLibre();
+        afficherModal = true;
+    }
+
+    private void OuvrirModalModifierSection(SectionLibre section)
+    {
+        sectionEnEdition = section;
+        sectionCourante = new SectionLibre
+        {
+            Id = section.Id,
+            Titre = section.Titre,
+            Ordre = section.Ordre,
+            TypeSectionId = section.TypeSectionId,
+            ContenuHtml = section.ContenuHtml,
+            ContenuJson = section.ContenuJson
+        };
+        afficherModal = true;
+    }
+
+    private void FermerModal()
+    {
+        afficherModal = false;
+        sectionEnEdition = null;
+        sectionCourante = new SectionLibre();
     }
 
     private void ClearMessage()
