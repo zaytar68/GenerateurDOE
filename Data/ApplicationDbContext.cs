@@ -165,19 +165,6 @@ public class ApplicationDbContext : DbContext
                 .WithMany(p => p.SectionsLibres)
                 .HasForeignKey(d => d.TypeSectionId)
                 .OnDelete(DeleteBehavior.Cascade);
-                
-            // Configuration temporaire many-to-many pour compatibilité durant la migration  
-            entity.HasMany<SectionConteneur>()
-                .WithMany()
-                .UsingEntity<Dictionary<string, object>>(
-                    "SectionLibreSectionConteneur",
-                    j => j.HasOne<SectionConteneur>().WithMany().HasForeignKey("SectionConteneursId"),
-                    j => j.HasOne<SectionLibre>().WithMany().HasForeignKey("SectionLibresId"),
-                    j =>
-                    {
-                        j.HasKey("SectionLibresId", "SectionConteneursId");
-                        j.ToTable("SectionLibreSectionConteneurs");
-                    });
         });
 
         modelBuilder.Entity<SectionConteneur>(entity =>

@@ -28,3 +28,5 @@ Lorsque l'utilisateur clique sur "Générer le document", nous aurons un module 
 
 # A vérifier
 Une SectionLibre peut appartenir à plusieurs SectionConteneur
+
+# Prompt store (do not use)

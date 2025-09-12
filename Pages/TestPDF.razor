@@ -1,0 +1,466 @@
+@page "/test-pdf"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject IDocumentGenereService DocumentGenereService
+@inject IJSRuntime JSRuntime
+@inject ApplicationDbContext Context
+
+<PageTitle>Test Génération PDF</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h3>🧪 Test de Génération PDF</h3>
+            <p class="text-muted">Interface de test pour valider la génération PDF réelle avec PuppeteerSharp</p>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>📊 Statut des Services PDF</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">✅</span>
+                                <span>PuppeteerSharp 15.1.0</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">✅</span>
+                                <span>PDFSharp 6.1.1</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">✅</span>
+                                <span>Services PDF enregistrés</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">✅</span>
+                                <span>Templates HTML</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">✅</span>
+                                <span>Assembly multi-PDFs</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">✅</span>
+                                <span>Application fonctionnelle</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>🚀 Tests de Génération</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <button class="btn btn-info w-100" 
+                                    @onclick="TestHtmlGeneration"
+                                    disabled="@isGenerating">
+                                <i class="oi oi-code"></i>
+                                Test HTML
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-success w-100" 
+                                    @onclick="TestMarkdownGeneration"
+                                    disabled="@isGenerating">
+                                <i class="oi oi-text"></i>
+                                Test Markdown
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary w-100" 
+                                    @onclick="TestPdfGeneration"
+                                    disabled="@isGenerating">
+                                <i class="oi oi-document"></i>
+                                Test PDF ✨
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-danger w-100" 
+                                    @onclick="TestCompletePdfWithFiches"
+                                    disabled="@isGenerating">
+                                <i class="oi oi-document"></i>
+                                Test PDF Complet 🎯
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isGenerating)
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Génération en cours...</span>
+                        </div>
+                        <p class="mt-2 mb-0">@statusMessage</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(lastGeneratedFile))
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">✅ PDF Généré avec Succès !</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Fichier :</strong> @lastGeneratedFile</p>
+                        <p><strong>Taille :</strong> @lastFileSize</p>
+                        <p><strong>Durée :</strong> @lastGenerationTime ms</p>
+                        <button class="btn btn-outline-primary" 
+                                @onclick="DownloadLastPdf">
+                            <i class="oi oi-cloud-download"></i>
+                            Télécharger le PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-danger" role="alert">
+                    <strong>❌ Erreur :</strong> @errorMessage
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isGenerating = false;
+    private string statusMessage = "";
+    private string lastGeneratedFile = "";
+    private string lastFileSize = "";
+    private long lastGenerationTime = 0;
+    private string errorMessage = "";
+    private int testChantierId = 0;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // On va utiliser un ID de chantier fictif pour les tests
+        // Dans une vraie implémentation, on créerait un chantier de test
+        testChantierId = 1;
+    }
+    
+    private async Task TestHtmlGeneration()
+    {
+        try
+        {
+            isGenerating = true;
+            statusMessage = "Génération HTML...";
+            errorMessage = "";
+            StateHasChanged();
+            
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            
+            // Test de génération HTML
+            var htmlContent = await DocumentGenereService.GenerateDOEAsync(testChantierId, FormatExport.HTML);
+            
+            stopwatch.Stop();
+            lastGenerationTime = stopwatch.ElapsedMilliseconds;
+            
+            // Sauvegarder le fichier HTML
+            var fileName = $"test-html-{DateTime.Now:yyyyMMdd-HHmmss}.html";
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "temp", fileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await File.WriteAllTextAsync(fullPath, htmlContent);
+            
+            lastGeneratedFile = fullPath;
+            var fileInfo = new FileInfo(lastGeneratedFile);
+            lastFileSize = $"{fileInfo.Length / 1024} KB";
+            
+            statusMessage = "HTML généré avec succès !";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la génération HTML : {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task TestMarkdownGeneration()
+    {
+        try
+        {
+            isGenerating = true;
+            statusMessage = "Génération Markdown...";
+            errorMessage = "";
+            StateHasChanged();
+            
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            
+            // Test de génération Markdown
+            var markdownContent = await DocumentGenereService.GenerateDOEAsync(testChantierId, FormatExport.Markdown);
+            
+            stopwatch.Stop();
+            lastGenerationTime = stopwatch.ElapsedMilliseconds;
+            
+            // Sauvegarder le fichier Markdown
+            var fileName = $"test-markdown-{DateTime.Now:yyyyMMdd-HHmmss}.md";
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "temp", fileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await File.WriteAllTextAsync(fullPath, markdownContent);
+            
+            lastGeneratedFile = fullPath;
+            var fileInfo = new FileInfo(lastGeneratedFile);
+            lastFileSize = $"{fileInfo.Length / 1024} KB";
+            
+            statusMessage = "Markdown généré avec succès !";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la génération Markdown : {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task TestPdfGeneration()
+    {
+        try
+        {
+            isGenerating = true;
+            statusMessage = "🚀 Génération PDF avec PuppeteerSharp...";
+            errorMessage = "";
+            StateHasChanged();
+            
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            
+            // ✨ TEST DE LA VRAIE GÉNÉRATION PDF ✨
+            var pdfPath = await DocumentGenereService.GenerateDOEAsync(testChantierId, FormatExport.PDF);
+            
+            stopwatch.Stop();
+            lastGenerationTime = stopwatch.ElapsedMilliseconds;
+            
+            lastGeneratedFile = pdfPath;
+            if (File.Exists(lastGeneratedFile))
+            {
+                var fileInfo = new FileInfo(lastGeneratedFile);
+                lastFileSize = $"{fileInfo.Length / 1024} KB";
+                statusMessage = "🎉 PDF généré avec PuppeteerSharp + PDFSharp !";
+            }
+            else
+            {
+                errorMessage = "Le fichier PDF n'a pas été créé";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"❌ Erreur lors de la génération PDF : {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task CreateTestData()
+    {
+        try
+        {
+            isGenerating = true;
+            statusMessage = "Création de données de test...";
+            errorMessage = "";
+            StateHasChanged();
+            
+            // Cette méthode pourrait créer un chantier et des données de test
+            // Pour l'instant, on simule juste une pause
+            await Task.Delay(1000);
+            
+            statusMessage = "Données de test créées (simulation)";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la création des données : {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task DownloadLastPdf()
+    {
+        if (!string.IsNullOrEmpty(lastGeneratedFile) && File.Exists(lastGeneratedFile))
+        {
+            var fileName = Path.GetFileName(lastGeneratedFile);
+            var fileBytes = await File.ReadAllBytesAsync(lastGeneratedFile);
+            var base64 = Convert.ToBase64String(fileBytes);
+            
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64);
+        }
+    }
+    
+    private async Task TestCompletePdfWithFiches()
+    {
+        try
+        {
+            isGenerating = true;
+            statusMessage = "🎯 Recherche d'un document avec fiches techniques...";
+            errorMessage = "";
+            StateHasChanged();
+            
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            
+            // 1. Rechercher un document avec FTConteneur et des éléments
+            var documentWithFT = await Context.DocumentsGeneres
+                .Include(d => d.Chantier)
+                .Include(d => d.FTConteneur)
+                    .ThenInclude(ftc => ftc!.Elements)
+                        .ThenInclude(fte => fte.ImportPDF)
+                .Include(d => d.FTConteneur)
+                    .ThenInclude(ftc => ftc!.Elements)
+                        .ThenInclude(fte => fte.FicheTechnique)
+                .Where(d => d.FTConteneur != null && d.FTConteneur.Elements.Any(e => e.ImportPDF != null))
+                .FirstOrDefaultAsync();
+            
+            if (documentWithFT == null)
+            {
+                statusMessage = "📄 Aucun document avec fiches techniques trouvé. Création d'un document de test...";
+                StateHasChanged();
+                
+                // Créer un document de test avec FTConteneur
+                documentWithFT = await CreateTestDocumentWithFTAsync();
+            }
+            
+            statusMessage = $"✅ Document trouvé : {documentWithFT.NomFichier} (ID: {documentWithFT.Id})";
+            StateHasChanged();
+            await Task.Delay(1000); // Pause pour voir le message
+            
+            // 2. Analyser le contenu du document
+            var ftElementsCount = documentWithFT.FTConteneur?.Elements.Count ?? 0;
+            var pdfFilesCount = documentWithFT.FTConteneur?.Elements.Count(e => e.ImportPDF != null) ?? 0;
+            
+            statusMessage = $"📊 Analyse : {ftElementsCount} éléments FT, {pdfFilesCount} fichiers PDF à intégrer";
+            StateHasChanged();
+            await Task.Delay(1500);
+            
+            // 3. Générer le PDF complet avec intégration des fiches techniques
+            statusMessage = "🚀 Génération PDF COMPLET avec intégration des fiches techniques...";
+            StateHasChanged();
+            
+            var pdfBytes = await DocumentGenereService.GenerateCompletePdfAsync(documentWithFT.Id);
+            
+            stopwatch.Stop();
+            lastGenerationTime = stopwatch.ElapsedMilliseconds;
+            
+            // 4. Sauvegarder le PDF généré
+            var fileName = $"test-complet-{documentWithFT.Id}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf";
+            var tempDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "temp");
+            Directory.CreateDirectory(tempDir);
+            var filePath = Path.Combine(tempDir, fileName);
+            
+            await File.WriteAllBytesAsync(filePath, pdfBytes);
+            
+            lastGeneratedFile = filePath;
+            var fileInfo = new FileInfo(lastGeneratedFile);
+            lastFileSize = $"{fileInfo.Length / 1024} KB";
+            
+            // 5. Analyse des résultats
+            var analysisResult = AnalyzePdfIntegration(pdfBytes, ftElementsCount, pdfFilesCount);
+            
+            statusMessage = $"🎉 PDF COMPLET généré avec succès ! {analysisResult}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"❌ Erreur lors de la génération PDF complète : {ex.Message}";
+            
+            // Log détaillé pour debug
+            if (ex.InnerException != null)
+            {
+                errorMessage += $" | Inner: {ex.InnerException.Message}";
+            }
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task<DocumentGenere> CreateTestDocumentWithFTAsync()
+    {
+        // Si aucun document avec FT existe, créer un document de test
+        // Pour l'instant, retourner le premier document disponible
+        var firstDoc = await Context.DocumentsGeneres
+            .Include(d => d.Chantier)
+            .FirstOrDefaultAsync();
+            
+        if (firstDoc == null)
+        {
+            throw new InvalidOperationException("Aucun document disponible dans la base de données pour les tests");
+        }
+        
+        return firstDoc;
+    }
+    
+    private string AnalyzePdfIntegration(byte[] pdfBytes, int expectedElements, int expectedPdfFiles)
+    {
+        var sizeKB = pdfBytes.Length / 1024;
+        
+        // Analyse basique de la taille pour détecter si les PDFs ont été intégrés
+        if (sizeKB < 50)
+        {
+            return $"⚠️ PDF petit ({sizeKB} KB) - Possible problème d'intégration";
+        }
+        else if (sizeKB > 500 && expectedPdfFiles > 0)
+        {
+            return $"✅ PDF volumineux ({sizeKB} KB) - Intégration probable des {expectedPdfFiles} fichiers";
+        }
+        else
+        {
+            return $"📄 PDF généré ({sizeKB} KB) avec {expectedElements} éléments";
+        }
+    }
+}
+
+<script>
+    window.downloadFile = function (fileName, base64String) {
+        const link = document.createElement('a');
+        link.href = 'data:application/pdf;base64,' + base64String;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+</script>

@@ -52,6 +52,10 @@ builder.Services.AddScoped<IChantierService, ChantierService>();
 builder.Services.AddScoped<ISectionConteneurService, SectionConteneurService>();
 builder.Services.AddScoped<IFTConteneurService, FTConteneurService>();
 
+// PDF Generation services
+builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();
+builder.Services.AddScoped<IHtmlTemplateService, HtmlTemplateService>();
+
 var app = builder.Build();
 
 // Initialize default types on startup

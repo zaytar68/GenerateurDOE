@@ -118,3 +118,111 @@ Use entity framework.
 - Lazy loading dans Entity Framework pour les relations
 - Pagination et filtrage côté serveur quand nécessaire
 
+## Roadmap Technique
+
+### Phase 1: Implémentation PDF réelle (Semaines 1-2)
+**Objectif**: Remplacer la génération PDF simulée par une solution robuste
+
+**Architecture recommandée** (par Software Architect):
+- **PuppeteerSharp 15.0.1**: Conversion HTML → PDF (sections libres)
+- **PDFSharp-GDI 6.0.0**: Assembly et optimisation PDFs (fiches techniques)
+- **MigraDoc 6.0.0**: Documents structurés complémentaires
+
+**Services à implémenter**:
+- `IPdfGenerationService`: Génération PDF complète avec assembly
+- `IHtmlTemplateService`: Templates HTML professionnels
+- Architecture hybride 3 couches (HTML → PDF → Assembly)
+
+**Livrables**:
+- [ ] Installation et configuration des packages PDF
+- [ ] Implémentation des services de génération
+- [ ] Templates HTML pour pages de garde, sections, fiches techniques
+- [ ] Tests de génération sur documents d'exemple
+- [ ] Migration progressive depuis le système simulé
+
+### Phase 2: Refactoring services (Semaines 3-4)
+**Objectif**: Découper DocumentGenereService monolithique en services spécialisés
+
+**Refactoring recommandé** (par Tech Lead):
+- **Strategy Pattern**: Différents formats d'export
+- **Builder Pattern**: Construction progressive des documents  
+- **Factory Pattern**: Types de documents (DOE, Dossiers, Mémoires)
+
+**Services spécialisés**:
+- `IDocumentBuilderService`: Construction de documents
+- `IExportStrategyService`: Gestion des formats d'export
+- `ITemplateRenderingService`: Rendu des templates
+
+**Livrables**:
+- [ ] Découpage du DocumentGenereService (600+ lignes)
+- [ ] Implémentation des patterns architecturaux
+- [ ] Migration des fonctionnalités existantes
+- [ ] Tests unitaires pour chaque service
+- [ ] Documentation des nouvelles APIs
+
+### Phase 3: Optimisation performances (Semaine 5)
+**Objectif**: Optimiser Entity Framework et performances générales
+
+**Optimisations EF**:
+- Pagination intelligente pour grandes listes
+- Projections pour réduire les transferts de données
+- Cache en mémoire pour données fréquemment accédées
+- Résolution du problème N+1 queries
+
+**Monitoring et observabilité**:
+- Métriques de performance des générations PDF
+- Logs détaillés pour debug et monitoring
+- Health checks pour les services critiques
+
+**Livrables**:
+- [ ] Implémentation de la pagination sur toutes les listes
+- [ ] Cache Redis ou in-memory selon besoins
+- [ ] Optimisation des requêtes EF avec Include/ThenInclude
+- [ ] Métriques et monitoring des performances
+- [ ] Documentation des bonnes pratiques
+
+### Phase 4: Tests et qualité (Transverse)
+**Objectif**: Assurer la qualité et la stabilité du système
+
+**Stratégie de tests** (recommandée par Tech Lead):
+- **Tests unitaires**: Services de génération PDF
+- **Tests d'intégration**: Workflow complet de génération
+- **Tests de performance**: Génération de gros documents
+- **Tests de régression**: Compatibilité avec l'existant
+
+**Quality gates**:
+- [ ] Couverture de tests > 80% sur les nouveaux services
+- [ ] Tests automatisés dans la CI/CD
+- [ ] Validation des PDFs générés (structure, métadonnées)
+- [ ] Tests de charge sur génération de documents
+- [ ] Documentation technique à jour
+
+## État Actuel (Septembre 2024)
+
+### ✅ Fonctionnalités Terminées
+- [x] Refactorisation complète interface SectionsLibres avec modal et filtres
+- [x] Architecture modulaire avec conteneurs (SectionConteneur, FTConteneur)
+- [x] Système d'autocomplétion avancé avec recherche
+- [x] Gestion complète des chantiers et fiches techniques
+- [x] Éditeur HTML riche avec upload d'images
+- [x] Configuration centralisée et paramètres persistants
+
+### 🔄 En Cours de Développement
+- [ ] **Phase 1 PDF**: Implémentation génération PDF réelle
+- [ ] **Phase 2 Services**: Refactoring architecture services
+- [ ] **Phase 3 Performance**: Optimisations EF et cache
+- [ ] **Phase 4 Tests**: Stratégie de tests complète
+
+### 📋 Backlog Priorisé
+1. Migration système PDF (PuppeteerSharp + PDFSharp)
+2. Découpage DocumentGenereService en services métier
+3. Optimisation performances base de données
+4. Tests automatisés et CI/CD
+5. Templates de documents personnalisables
+6. Génération en lot (batch processing)
+7. Support formats additionnels (Word, Excel)
+
+---
+*Dernière mise à jour: Septembre 2024*
+*Roadmap validée par Software Architect et Tech Lead*
+

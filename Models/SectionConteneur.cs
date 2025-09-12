@@ -29,7 +29,7 @@ public class SectionConteneur
     // Propriété de convenance pour accéder aux sections libres ordonnées
     public IEnumerable<SectionLibre> SectionsLibresOrdered => Items.OrderBy(i => i.Ordre).Select(i => i.SectionLibre);
     
-    // Propriété de compatibilité temporaire - DEPRECATED
-    [System.Obsolete("Utilisez Items ou SectionsLibresOrdered à la place")]
+    // TEMPORAIRE : Propriété de compatibilité pour permettre compilation pendant migration
+    [System.Obsolete("Utilisez Items ou SectionsLibresOrdered à la place - sera supprimée en Phase 2")]
     public ICollection<SectionLibre> SectionsLibres => Items.Select(i => i.SectionLibre).ToList();
 }

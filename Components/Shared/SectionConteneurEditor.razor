@@ -364,7 +364,6 @@ new Radzen.DialogOptions
         try
         {
             await sectionConteneurService.RemoveSectionLibreAsync(conteneur.Id, section.Id);
-            conteneur.SectionsLibres.Remove(section);
             
             await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
             

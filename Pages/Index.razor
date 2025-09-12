@@ -1,8 +1,114 @@
 ﻿@page "/"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+
+@inject IDocumentGenereService DocumentGenereService
 
 <PageTitle>Index</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h3>Générateur de Documents Techniques de Chantier</h3>
+        </div>
+    </div>
 
-Welcome to your new app.
+    <div class="row">
+        <div class="col-12">
+            <p style="font-style: italic;">DTC</p>
+        </div>
+    </div>
 
+    <div class="col-md-12">
+        <div class="card"> 
+            <div class="card-header">
+                <h5>Ajouter des éléments</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Bouton Nouvelle Chantier -->
+                    <div class="col-md-4 mx-auto">
+                        <button class="btn btn-primary" > 
+                        <i class="oi oi-plus"></i> Nouveau Chantier
+                        </button> 
+                    </div>
+
+                    <div class="col-md-4 mx-auto">
+                        <button class="btn btn-success" > 
+                        <i class="oi oi-plus"></i> Nouvelle Fiche Technique
+                        </button> 
+                    </div>
+
+                    <div class="col-md-4 mx-auto">
+                        <button class="btn btn-warning" > 
+                        <i class="oi oi-plus"></i> Nouvelle Section
+                        </button> 
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>  
+<br/>
+<!-- Section Documents en cours -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Documents en cours (@DocumentsEnCours.Count)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Type de document</th>
+                                    <th>Nom du chantier</th>
+                                    <th>Adresse</th>
+                                    <th>Lot</th>
+                                    <th>Modifié le</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var document in DocumentsEnCours.Take(20))
+                                {
+                                    <tr style="cursor: pointer;">
+                                        <td>@document.TypeDocument</td>
+                                        <td>@document.Chantier.NomProjet</td>
+                                        
+                                        <td>
+                                            <button class="btn btn-outline-primary me-1 px-3" 
+                                                    @onclick:stopPropagation="true"                                                   
+                                                    title="Consulter le chantier">
+                                                👁️
+                                            </button>
+                                            <button class="btn btn-outline-secondary me-1 px-3" 
+                                                    @onclick:stopPropagation="true"
+                                                    title="Modifier le chantier">
+                                                ✏️
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private List<DocumentGenere> DocumentsEnCours = new();
+    private DocumentGenere? selectedDocument = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DocumentsEnCours = (await DocumentGenereService.GetAllDocumentsEnCoursAsync()).ToList();
+    }
+
+    
+}

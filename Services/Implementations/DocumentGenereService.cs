@@ -14,14 +14,17 @@ public class DocumentGenereService : IDocumentGenereService
     private readonly AppSettings _appSettings;
     private readonly IFicheTechniqueService _ficheTechniqueService;
     private readonly IMemoireTechniqueService _memoireTechniqueService;
+    private readonly IPdfGenerationService _pdfGenerationService;
 
     public DocumentGenereService(ApplicationDbContext context, IOptions<AppSettings> appSettings,
-        IFicheTechniqueService ficheTechniqueService, IMemoireTechniqueService memoireTechniqueService)
+        IFicheTechniqueService ficheTechniqueService, IMemoireTechniqueService memoireTechniqueService,
+        IPdfGenerationService pdfGenerationService)
     {
         _context = context;
         _appSettings = appSettings.Value;
         _ficheTechniqueService = ficheTechniqueService;
         _memoireTechniqueService = memoireTechniqueService;
+        _pdfGenerationService = pdfGenerationService;
     }
 
     public async Task<string> ExportDocumentAsync(int chantierId, TypeDocumentGenere typeDocument, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
@@ -65,7 +68,7 @@ public class DocumentGenereService : IDocumentGenereService
             content.AppendLine($"## {fiche.NomProduit}");
             content.AppendLine($"**Fabricant :** {fiche.NomFabricant}");
             content.AppendLine($"**Type :** {fiche.TypeProduit}");
-            
+
             if (!string.IsNullOrEmpty(fiche.Description))
             {
                 content.AppendLine($"**Description :** {fiche.Description}");
@@ -120,7 +123,7 @@ public class DocumentGenereService : IDocumentGenereService
             {
                 content.AppendLine($"### {produit.NomProduit}");
                 content.AppendLine($"**Fabricant :** {produit.NomFabricant}");
-                
+
                 if (!string.IsNullOrEmpty(produit.Description))
                 {
                     content.AppendLine($"**Description :** {produit.Description}");
@@ -212,10 +215,10 @@ public class DocumentGenereService : IDocumentGenereService
             .Include(d => d.Chantier)
             .Include(d => d.FichesTechniques)
             .FirstOrDefaultAsync(d => d.Id == documentGenereId);
-        
+
         if (document == null)
             throw new InvalidOperationException($"Document avec l'ID {documentGenereId} introuvable");
-            
+
         return document;
     }
 
@@ -240,7 +243,7 @@ public class DocumentGenereService : IDocumentGenereService
     public async Task<DocumentGenere> DuplicateAsync(int documentId, string newName)
     {
         var originalDocument = await GetByIdAsync(documentId);
-        
+
         var duplicatedDocument = new DocumentGenere
         {
             TypeDocument = originalDocument.TypeDocument,
@@ -275,7 +278,7 @@ public class DocumentGenereService : IDocumentGenereService
     private string GeneratePageDeGarde(Chantier chantier, string typeDocument)
     {
         var pageDeGarde = new StringBuilder();
-        
+
         pageDeGarde.AppendLine($"# {typeDocument}");
         pageDeGarde.AppendLine();
         pageDeGarde.AppendLine($"**Projet :** {chantier.NomProjet}");
@@ -323,7 +326,7 @@ public class DocumentGenereService : IDocumentGenereService
             .Build();
 
         var html = Markdown.ToHtml(markdown, pipeline);
-        
+
         await Task.CompletedTask;
 
         var htmlDocument = new StringBuilder();
@@ -352,8 +355,18 @@ public class DocumentGenereService : IDocumentGenereService
 
     private async Task<string> ConvertToPdfAsync(string content)
     {
-        await Task.Delay(10);
-        return $"[PDF] Simulation - Le contenu sera converti en PDF :\n{content}";
+        // Génération HTML complète à partir du markdown
+        var html = await ConvertToHtmlAsync(content);
+
+        // Conversion en PDF via le nouveau service
+        var pdfBytes = await _pdfGenerationService.ConvertHtmlToPdfAsync(html);
+
+        // Retourner le chemin du fichier sauvegardé ou les bytes encodés
+        var fileName = $"document_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+        var filePath = Path.Combine(_appSettings.RepertoireStockagePDF, fileName);
+        await File.WriteAllBytesAsync(filePath, pdfBytes);
+
+        return filePath;
     }
 
     private async Task<string> ConvertToWordAsync(string content)
@@ -374,7 +387,7 @@ public class DocumentGenereService : IDocumentGenereService
 
         var existingConteneur = await _context.SectionsConteneurs
             .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId);
-        
+
         if (existingConteneur != null)
             throw new InvalidOperationException($"Un conteneur pour le type de section '{typeSection.Nom}' existe déjà pour ce document");
 
@@ -394,7 +407,7 @@ public class DocumentGenereService : IDocumentGenereService
     public async Task<SectionConteneur> GetSectionConteneurAsync(int documentGenereId, int typeSectionId)
     {
         var sectionConteneur = await _context.SectionsConteneurs
-            .Include(sc => sc.SectionsLibres)
+            .Include(sc => sc.Items)
             .Include(sc => sc.TypeSection)
             .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId);
 
@@ -408,7 +421,7 @@ public class DocumentGenereService : IDocumentGenereService
     {
         return await _context.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
-            .Include(sc => sc.SectionsLibres)
+            .Include(sc => sc.Items)
             .Include(sc => sc.TypeSection)
             .OrderBy(sc => sc.Ordre)
             .ToListAsync();
@@ -433,7 +446,7 @@ public class DocumentGenereService : IDocumentGenereService
 
         var existingFTConteneur = await _context.FTConteneurs
             .FirstOrDefaultAsync(ftc => ftc.DocumentGenereId == documentGenereId);
-        
+
         if (existingFTConteneur != null)
             throw new InvalidOperationException("Un conteneur de fiches techniques existe déjà pour ce document");
 
@@ -491,11 +504,44 @@ public class DocumentGenereService : IDocumentGenereService
         return document;
     }
 
+    /// <summary>
+    /// Génère un PDF complet avec toutes les sections du document
+    /// </summary>
+    public async Task<byte[]> GenerateCompletePdfAsync(int documentGenereId, PdfGenerationOptions? options = null)
+    {
+        var document = await _context.DocumentsGeneres
+            .Include(d => d.Chantier)
+            .Include(d => d.SectionsConteneurs)
+                .ThenInclude(sc => sc.Items)
+            .Include(d => d.FTConteneur)
+                .ThenInclude(ftc => ftc!.Elements)
+                    .ThenInclude(fte => fte.FicheTechnique)
+            .Include(d => d.FTConteneur)
+                .ThenInclude(ftc => ftc!.Elements)
+                    .ThenInclude(fte => fte.ImportPDF)
+            .FirstOrDefaultAsync(d => d.Id == documentGenereId);
+
+        if (document == null)
+            throw new ArgumentException("Document non trouvé", nameof(documentGenereId));
+
+        return await _pdfGenerationService.GenerateCompletePdfAsync(document, options);
+    }
+
+    /// <summary>
+    /// Sauvegarde un PDF généré sur le système de fichiers
+    /// </summary>
+    public async Task<string> SavePdfAsync(byte[] pdfBytes, string fileName)
+    {
+        var fullPath = Path.Combine(_appSettings.RepertoireStockagePDF, fileName);
+        await File.WriteAllBytesAsync(fullPath, pdfBytes);
+        return fullPath;
+    }
+
     public async Task<bool> CanFinalizeDocumentAsync(int documentGenereId)
     {
         var document = await _context.DocumentsGeneres
             .Include(d => d.SectionsConteneurs)
-                .ThenInclude(sc => sc.SectionsLibres)
+                .ThenInclude(sc => sc.Items)
             .Include(d => d.FTConteneur)
                 .ThenInclude(ftc => ftc!.Elements)
             .FirstOrDefaultAsync(d => d.Id == documentGenereId);
@@ -503,7 +549,7 @@ public class DocumentGenereService : IDocumentGenereService
         if (document == null)
             return false;
 
-        bool hasContent = document.SectionsConteneurs.Any(sc => sc.SectionsLibres.Any()) ||
+        bool hasContent = document.SectionsConteneurs.Any(sc => sc.Items.Any()) ||
                          (document.FTConteneur?.Elements.Any() == true);
 
         return hasContent;
@@ -529,4 +575,13 @@ public class DocumentGenereService : IDocumentGenereService
 
         return Math.Max(maxSectionOrder, ftOrder) + 1;
     }
+    
+    public async Task<List<DocumentGenere>> GetAllDocumentsEnCoursAsync()
+    {
+        return await _context.DocumentsGeneres
+            .Where(d => d.EnCours)
+            .Include(d => d.Chantier)
+            .OrderByDescending(d => d.DateCreation)
+            .ToListAsync();
+    }   
 }

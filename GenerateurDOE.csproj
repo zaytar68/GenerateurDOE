@@ -18,6 +18,9 @@
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
+    <!-- PDF Generation Dependencies -->
+    <PackageReference Include="PuppeteerSharp" Version="15.1.0" />
+    <PackageReference Include="PdfSharp" Version="6.1.1" />
   </ItemGroup>
 
 </Project>
