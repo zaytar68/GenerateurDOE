@@ -26,5 +26,4 @@ public class SectionLibre
     [Required(ErrorMessage = "Le type de section est requis")]
     public int TypeSectionId { get; set; }
     public virtual TypeSection TypeSection { get; set; } = null!;
-    public virtual ICollection<SectionConteneurItem> ConteneurItems { get; set; } = new List<SectionConteneurItem>();
 }

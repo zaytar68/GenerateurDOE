@@ -11,268 +11,116 @@ namespace GenerateurDOE.Services.Implementations;
 public class DocumentGenereService : IDocumentGenereService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IDocumentRepositoryService _documentRepository;
+    private readonly IDocumentExportService _documentExport;
     private readonly AppSettings _appSettings;
     private readonly IFicheTechniqueService _ficheTechniqueService;
     private readonly IMemoireTechniqueService _memoireTechniqueService;
     private readonly IPdfGenerationService _pdfGenerationService;
 
-    public DocumentGenereService(ApplicationDbContext context, IOptions<AppSettings> appSettings,
-        IFicheTechniqueService ficheTechniqueService, IMemoireTechniqueService memoireTechniqueService,
-        IPdfGenerationService pdfGenerationService)
+    public DocumentGenereService(ApplicationDbContext context, IDocumentRepositoryService documentRepository, 
+        IDocumentExportService documentExport, IOptions<AppSettings> appSettings, IFicheTechniqueService ficheTechniqueService, 
+        IMemoireTechniqueService memoireTechniqueService, IPdfGenerationService pdfGenerationService)
     {
         _context = context;
+        _documentRepository = documentRepository;
+        _documentExport = documentExport;
         _appSettings = appSettings.Value;
         _ficheTechniqueService = ficheTechniqueService;
         _memoireTechniqueService = memoireTechniqueService;
         _pdfGenerationService = pdfGenerationService;
     }
 
-    public async Task<string> ExportDocumentAsync(int chantierId, TypeDocumentGenere typeDocument, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
+    public async Task<string> ExportDocumentAsync(int documentGenereId, FormatExport format)
     {
-        return typeDocument switch
-        {
-            TypeDocumentGenere.DOE => await GenerateDOEAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
-            TypeDocumentGenere.DossierTechnique => await GenerateDossierTechniqueAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
-            TypeDocumentGenere.MemoireTechnique => await GenerateMemoireTechniqueAsync(chantierId, format, includePageDeGarde, includeTableMatieres),
-            _ => throw new ArgumentException("Type de document non supporté", nameof(typeDocument))
-        };
+        var documentContent = await GenerateContentAsync(documentGenereId);
+        return await _documentExport.ExportContentAsync(documentContent, format);
     }
 
-    public async Task<string> GenerateDOEAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
+    public async Task<string> GenerateContentAsync(int documentGenereId)
     {
-        var chantier = await _context.Chantiers.FindAsync(chantierId);
-        if (chantier == null)
-            throw new ArgumentException("Chantier non trouvé", nameof(chantierId));
+        var document = await _documentRepository.GetWithCompleteContentAsync(documentGenereId);
 
-        var fichesTechniques = await _ficheTechniqueService.GetAllAsync();
+        if (document == null)
+            throw new ArgumentException("Document généré non trouvé", nameof(documentGenereId));
 
         var content = new StringBuilder();
 
-        if (includePageDeGarde)
+        if (document.IncludePageDeGarde)
         {
-            content.AppendLine(GeneratePageDeGarde(chantier, "Dossier d'Ouvrages Exécutés"));
+            var typeDocumentTitle = GetDocumentTypeTitle(document.TypeDocument);
+            content.AppendLine(GeneratePageDeGarde(document.Chantier!, typeDocumentTitle));
             content.AppendLine();
         }
 
-        if (includeTableMatieres)
+        var allSections = document.SectionsConteneurs
+            .Cast<IDocumentSection>()
+            .Concat(document.FTConteneur != null ? new[] { document.FTConteneur } : Array.Empty<IDocumentSection>())
+            .OrderBy(s => s.Ordre)
+            .ToList();
+
+        if (document.IncludeTableMatieres && allSections.Any())
         {
-            content.AppendLine(GenerateTableMatieres(fichesTechniques));
+            content.AppendLine(GenerateTableMatieres(allSections));
             content.AppendLine();
         }
 
-        content.AppendLine("# Fiches Techniques");
-        content.AppendLine();
-
-        foreach (var fiche in fichesTechniques)
+        foreach (var section in allSections)
         {
-            content.AppendLine($"## {fiche.NomProduit}");
-            content.AppendLine($"**Fabricant :** {fiche.NomFabricant}");
-            content.AppendLine($"**Type :** {fiche.TypeProduit}");
-
-            if (!string.IsNullOrEmpty(fiche.Description))
+            switch (section)
             {
-                content.AppendLine($"**Description :** {fiche.Description}");
-            }
-
-            if (fiche.ImportsPDF.Any())
-            {
-                content.AppendLine("**Documents associés :**");
-                foreach (var pdf in fiche.ImportsPDF)
-                {
-                    content.AppendLine($"- {pdf.NomFichierOriginal} ({pdf.TypeDocument})");
-                }
-            }
-
-            content.AppendLine();
-        }
-
-        return await FormatContentAsync(content.ToString(), format);
-    }
-
-    public async Task<string> GenerateDossierTechniqueAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
-    {
-        var chantier = await _context.Chantiers.FindAsync(chantierId);
-        if (chantier == null)
-            throw new ArgumentException("Chantier non trouvé", nameof(chantierId));
-
-        var fichesTechniques = await _ficheTechniqueService.GetAllAsync();
-
-        var content = new StringBuilder();
-
-        if (includePageDeGarde)
-        {
-            content.AppendLine(GeneratePageDeGarde(chantier, "Dossier Technique"));
-            content.AppendLine();
-        }
-
-        if (includeTableMatieres)
-        {
-            content.AppendLine(GenerateTableMatieres(fichesTechniques));
-            content.AppendLine();
-        }
-
-        content.AppendLine("# Matériaux Prévus");
-        content.AppendLine();
-
-        foreach (var fiche in fichesTechniques.GroupBy(f => f.TypeProduit))
-        {
-            content.AppendLine($"## {fiche.Key}");
-            content.AppendLine();
-
-            foreach (var produit in fiche)
-            {
-                content.AppendLine($"### {produit.NomProduit}");
-                content.AppendLine($"**Fabricant :** {produit.NomFabricant}");
-
-                if (!string.IsNullOrEmpty(produit.Description))
-                {
-                    content.AppendLine($"**Description :** {produit.Description}");
-                }
-
-                content.AppendLine();
-            }
-        }
-
-        return await FormatContentAsync(content.ToString(), format);
-    }
-
-    public async Task<string> GenerateMemoireTechniqueAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true)
-    {
-        var chantier = await _context.Chantiers.FindAsync(chantierId);
-        if (chantier == null)
-            throw new ArgumentException("Chantier non trouvé", nameof(chantierId));
-
-        var methodes = await _memoireTechniqueService.GetMethodesOrderedAsync();
-
-        var content = new StringBuilder();
-
-        if (includePageDeGarde)
-        {
-            content.AppendLine(GeneratePageDeGarde(chantier, "Mémoire Technique"));
-            content.AppendLine();
-        }
-
-        content.AppendLine($"# Présentation de {_appSettings.NomSociete}");
-        content.AppendLine();
-        content.AppendLine("## Notre Expertise");
-        content.AppendLine();
-
-        if (includeTableMatieres && methodes.Any())
-        {
-            content.AppendLine("## Table des Matières - Méthodologies");
-            content.AppendLine();
-            foreach (var methode in methodes)
-            {
-                content.AppendLine($"- {methode.Titre}");
+                case SectionConteneur sectionConteneur:
+                    content.AppendLine(GenerateSectionConteneurContent(sectionConteneur));
+                    break;
+                case FTConteneur ftConteneur:
+                    content.AppendLine(GenerateFTConteneurContent(ftConteneur));
+                    break;
             }
             content.AppendLine();
         }
 
-        content.AppendLine("# Méthodologies");
-        content.AppendLine();
-
-        foreach (var methode in methodes)
-        {
-            content.AppendLine($"## {methode.Titre}");
-            content.AppendLine();
-            content.AppendLine(methode.Description);
-            content.AppendLine();
-
-            if (methode.Images.Any())
-            {
-                content.AppendLine("**Illustrations :**");
-                foreach (var image in methode.Images.OrderBy(i => i.OrdreAffichage))
-                {
-                    content.AppendLine($"![{image.Description ?? image.NomFichierOriginal}]({image.CheminFichier})");
-                }
-                content.AppendLine();
-            }
-        }
-
-        return await FormatContentAsync(content.ToString(), format);
+        return content.ToString();
     }
 
     public async Task<DocumentGenere> SaveDocumentGenereAsync(DocumentGenere documentGenere)
     {
-        documentGenere.DateCreation = DateTime.Now;
-
-        _context.DocumentsGeneres.Add(documentGenere);
-        await _context.SaveChangesAsync();
-        return documentGenere;
+        return await _documentRepository.CreateAsync(documentGenere);
     }
 
     public async Task<IEnumerable<DocumentGenere>> GetDocumentsGeneresByChantierId(int chantierId)
     {
-        return await _context.DocumentsGeneres
-            .Where(d => d.ChantierId == chantierId)
-            .OrderByDescending(d => d.DateCreation)
-            .ToListAsync();
+        var summaries = await _documentRepository.GetDocumentSummariesByChantierId(chantierId);
+        return summaries.Select(s => new DocumentGenere 
+        { 
+            Id = s.Id, 
+            NomFichier = s.NomFichier,
+            TypeDocument = s.TypeDocument,
+            FormatExport = s.FormatExport,
+            DateCreation = s.DateCreation,
+            EnCours = s.EnCours,
+            IncludePageDeGarde = s.IncludePageDeGarde,
+            IncludeTableMatieres = s.IncludeTableMatieres
+        });
     }
 
     public async Task<DocumentGenere> GetByIdAsync(int documentGenereId)
     {
-        var document = await _context.DocumentsGeneres
-            .Include(d => d.Chantier)
-            .Include(d => d.FichesTechniques)
-            .FirstOrDefaultAsync(d => d.Id == documentGenereId);
-
-        if (document == null)
-            throw new InvalidOperationException($"Document avec l'ID {documentGenereId} introuvable");
-
-        return document;
+        return await _documentRepository.GetByIdAsync(documentGenereId);
     }
 
     public async Task<DocumentGenere> UpdateAsync(DocumentGenere documentGenere)
     {
-        var existingDocument = await _context.DocumentsGeneres.FindAsync(documentGenere.Id);
-        if (existingDocument == null)
-            throw new InvalidOperationException($"Document avec l'ID {documentGenere.Id} introuvable");
-
-        // Mise à jour des propriétés
-        existingDocument.TypeDocument = documentGenere.TypeDocument;
-        existingDocument.FormatExport = documentGenere.FormatExport;
-        existingDocument.NomFichier = documentGenere.NomFichier;
-        existingDocument.IncludePageDeGarde = documentGenere.IncludePageDeGarde;
-        existingDocument.IncludeTableMatieres = documentGenere.IncludeTableMatieres;
-        existingDocument.Parametres = documentGenere.Parametres;
-
-        await _context.SaveChangesAsync();
-        return existingDocument;
+        return await _documentRepository.UpdateAsync(documentGenere);
     }
 
     public async Task<DocumentGenere> DuplicateAsync(int documentId, string newName)
     {
-        var originalDocument = await GetByIdAsync(documentId);
-
-        var duplicatedDocument = new DocumentGenere
-        {
-            TypeDocument = originalDocument.TypeDocument,
-            FormatExport = originalDocument.FormatExport,
-            NomFichier = newName,
-            ChantierId = originalDocument.ChantierId,
-            IncludePageDeGarde = originalDocument.IncludePageDeGarde,
-            IncludeTableMatieres = originalDocument.IncludeTableMatieres,
-            Parametres = originalDocument.Parametres,
-            DateCreation = DateTime.Now
-        };
-
-        return await SaveDocumentGenereAsync(duplicatedDocument);
+        return await _documentRepository.DuplicateAsync(documentId, newName);
     }
 
     public async Task<bool> DeleteDocumentGenereAsync(int documentGenereId)
     {
-        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);
-        if (document == null)
-            return false;
-
-        if (!string.IsNullOrEmpty(document.CheminFichier) && File.Exists(document.CheminFichier))
-        {
-            File.Delete(document.CheminFichier);
-        }
-
-        _context.DocumentsGeneres.Remove(document);
-        await _context.SaveChangesAsync();
-        return true;
+        return await _documentRepository.DeleteAsync(documentGenereId);
     }
 
     private string GeneratePageDeGarde(Chantier chantier, string typeDocument)
@@ -293,18 +141,111 @@ public class DocumentGenereService : IDocumentGenereService
         return pageDeGarde.ToString();
     }
 
-    private string GenerateTableMatieres(IEnumerable<FicheTechnique> fichesTechniques)
+    private string GetDocumentTypeTitle(TypeDocumentGenere typeDocument)
+    {
+        return typeDocument switch
+        {
+            TypeDocumentGenere.DOE => "Dossier d'Ouvrages Exécutés",
+            TypeDocumentGenere.DossierTechnique => "Dossier Technique",
+            TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
+            _ => "Document"
+        };
+    }
+
+    private string GenerateTableMatieres(IEnumerable<IDocumentSection> sections)
     {
         var tableDesMatieres = new StringBuilder();
         tableDesMatieres.AppendLine("## Table des Matières");
         tableDesMatieres.AppendLine();
 
-        foreach (var fiche in fichesTechniques)
+        foreach (var section in sections)
         {
-            tableDesMatieres.AppendLine($"- {fiche.NomProduit} ({fiche.NomFabricant})");
+            tableDesMatieres.AppendLine($"- {section.Titre}");
         }
 
         return tableDesMatieres.ToString();
+    }
+
+    private string GenerateSectionConteneurContent(SectionConteneur sectionConteneur)
+    {
+        var content = new StringBuilder();
+        content.AppendLine($"# {sectionConteneur.Titre}");
+        content.AppendLine();
+
+        foreach (var item in sectionConteneur.Items.OrderBy(i => i.Ordre))
+        {
+            var sectionLibre = item.SectionLibre;
+            if (sectionLibre == null) continue;
+
+            if (!string.IsNullOrEmpty(sectionLibre.Titre))
+            {
+                content.AppendLine($"## {sectionLibre.Titre}");
+                content.AppendLine();
+            }
+
+            if (!string.IsNullOrEmpty(sectionLibre.ContenuHtml))
+            {
+                content.AppendLine(ConvertHtmlToMarkdown(sectionLibre.ContenuHtml));
+                content.AppendLine();
+            }
+        }
+
+        return content.ToString();
+    }
+
+    private string GenerateFTConteneurContent(FTConteneur ftConteneur)
+    {
+        var content = new StringBuilder();
+        content.AppendLine($"# {ftConteneur.Titre}");
+        content.AppendLine();
+
+        foreach (var element in ftConteneur.Elements.OrderBy(e => e.Ordre))
+        {
+            if (element.FicheTechnique != null)
+            {
+                var fiche = element.FicheTechnique;
+                content.AppendLine($"## {fiche.NomProduit}");
+                content.AppendLine($"**Fabricant :** {fiche.NomFabricant}");
+                content.AppendLine($"**Type :** {fiche.TypeProduit}");
+
+                if (!string.IsNullOrEmpty(fiche.Description))
+                {
+                    content.AppendLine($"**Description :** {fiche.Description}");
+                }
+            }
+
+            if (element.ImportPDF != null)
+            {
+                var pdf = element.ImportPDF;
+                content.AppendLine($"**Document :** {pdf.NomFichierOriginal} ({pdf.TypeDocumentImport?.Nom ?? "Non défini"})");
+            }
+
+            content.AppendLine();
+        }
+
+        return content.ToString();
+    }
+
+    private string ConvertHtmlToMarkdown(string html)
+    {
+        // TODO: Implémentation basique - à améliorer avec une librairie de conversion HTML->Markdown
+        var text = html
+            .Replace("<p>", "")
+            .Replace("</p>", "\n")
+            .Replace("<br>", "\n")
+            .Replace("<br/>", "\n")
+            .Replace("<strong>", "**")
+            .Replace("</strong>", "**")
+            .Replace("<em>", "*")
+            .Replace("</em>", "*")
+            .Replace("<h1>", "# ")
+            .Replace("</h1>", "")
+            .Replace("<h2>", "## ")
+            .Replace("</h2>", "")
+            .Replace("<h3>", "### ")
+            .Replace("</h3>", "");
+
+        return text.Trim();
     }
 
     private async Task<string> FormatContentAsync(string content, FormatExport format)

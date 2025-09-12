@@ -14,7 +14,7 @@ public class AppSettings
 
     [Required(ErrorMessage = "Le nom de la société est requis")]
     [StringLength(200, ErrorMessage = "Le nom de la société ne peut pas dépasser 200 caractères")]
-    public string NomSociete { get; set; } = "Votre Société";
+    public string NomSociete { get; set; } = "Multisols";
 
     [Required(ErrorMessage = "La taille maximale des fichiers PDF est requise")]
     [RegularExpression(@"^\d+(\.\d+)?(KB|MB|GB)$", ErrorMessage = "Format invalide. Utilisez : 50MB, 100KB, 2GB")]

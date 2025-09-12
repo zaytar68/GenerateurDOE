@@ -4,10 +4,8 @@ namespace GenerateurDOE.Services.Interfaces;
 
 public interface IDocumentGenereService
 {
-    Task<string> ExportDocumentAsync(int chantierId, TypeDocumentGenere typeDocument, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true);
-    Task<string> GenerateDOEAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true);
-    Task<string> GenerateDossierTechniqueAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true);
-    Task<string> GenerateMemoireTechniqueAsync(int chantierId, FormatExport format, bool includePageDeGarde = true, bool includeTableMatieres = true);
+    Task<string> ExportDocumentAsync(int documentGenereId, FormatExport format);
+    Task<string> GenerateContentAsync(int documentGenereId);
     Task<DocumentGenere> SaveDocumentGenereAsync(DocumentGenere documentGenere);
     Task<DocumentGenere> GetByIdAsync(int documentGenereId);
     Task<DocumentGenere> UpdateAsync(DocumentGenere documentGenere);

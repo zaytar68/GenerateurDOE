@@ -28,6 +28,8 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        
+        // ⚡ Configuration QuerySplittingBehavior pour optimiser les requêtes avec multiple collections
 
         modelBuilder.Entity<Chantier>(entity =>
         {
@@ -60,7 +62,10 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.CheminFichier).HasMaxLength(500).IsRequired();
             entity.Property(e => e.NomFichierOriginal).HasMaxLength(255).IsRequired();
-            entity.Property(e => e.TypeDocument).IsRequired();
+            entity.HasOne(d => d.TypeDocumentImport)
+                .WithMany()
+                .HasForeignKey(d => d.TypeDocumentImportId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(e => e.DateImport).HasDefaultValueSql("GETDATE()");
             
             entity.HasOne(d => d.FicheTechnique)
@@ -240,7 +245,7 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
                 
             entity.HasOne(d => d.SectionLibre)
-                .WithMany(p => p.ConteneurItems)
+                .WithMany()
                 .HasForeignKey(d => d.SectionLibreId)
                 .OnDelete(DeleteBehavior.Cascade);
                 

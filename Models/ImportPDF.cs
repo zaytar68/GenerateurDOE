@@ -13,9 +13,9 @@ public class ImportPDF
     [Required(ErrorMessage = "Le nom du fichier original est requis")]
     [StringLength(255, ErrorMessage = "Le nom du fichier ne peut pas dépasser 255 caractères")]
     public string NomFichierOriginal { get; set; } = string.Empty;
-    
-    [Required(ErrorMessage = "Le type de document est requis")]
-    public TypeDocument TypeDocument { get; set; }
+
+    public int TypeDocumentImportId { get; set; }
+    public virtual TypeDocumentImport TypeDocumentImport { get; set; } = null!;
     
     public long TailleFichier { get; set; }
     
@@ -26,12 +26,3 @@ public class ImportPDF
     public virtual FicheTechnique FicheTechnique { get; set; } = null!;
 }
 
-public enum TypeDocument
-{
-    FicheTechnique,
-    Nuancier,
-    Brochure,
-    ClassFeu,
-    ClassUPEC,
-    Autre
-}

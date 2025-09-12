@@ -264,7 +264,8 @@ public class FTConteneurService : IFTConteneurService
     {
         var types = await _context.ImportsPDF
             .Where(ip => ip.FicheTechniqueId == ficheTechniqueId)
-            .Select(ip => ip.TypeDocument.ToString())
+            // TODO(human): Remplacez ip.TypeDocument par ip.TypeDocumentImport?.Nom ?? "Non défini"
+            .Select(ip => ip.TypeDocumentImport != null ? ip.TypeDocumentImport.Nom : "Non défini")
             .Distinct()
             .ToListAsync();
 

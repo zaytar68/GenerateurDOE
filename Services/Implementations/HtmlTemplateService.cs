@@ -503,7 +503,7 @@ namespace GenerateurDOE.Services.Implementations
                                 html.AppendLine($@"
                                             <li class='ft-doc-item'>
                                                 <span>{pdf.NomFichierOriginal}</span>
-                                                <span class='ft-doc-type'>{pdf.TypeDocument}</span>
+                                                <span class='ft-doc-type'>{pdf.TypeDocumentImport?.Nom ?? "Non défini"}</span>
                                             </li>");
                             }
 

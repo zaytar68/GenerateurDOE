@@ -15,9 +15,9 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Services(services)
     .Enrich.FromLogContext());
 
-// Add Entity Framework
+// Add Entity Framework with optimizations
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))); // ⚡ QuerySplittingBehavior configuré dans OnModelCreating
 
 // Configuration des paramètres d'application
 builder.Services.Configure<AppSettings>(
@@ -51,6 +51,13 @@ builder.Services.AddScoped<ILoggingService, LoggingService>();
 builder.Services.AddScoped<IChantierService, ChantierService>();
 builder.Services.AddScoped<ISectionConteneurService, SectionConteneurService>();
 builder.Services.AddScoped<IFTConteneurService, FTConteneurService>();
+
+// Nouveaux services Phase 2 - Architecture optimisée
+builder.Services.AddScoped<IDocumentRepositoryService, DocumentRepositoryService>();
+builder.Services.AddScoped<IDocumentExportService, DocumentExportService>();
+
+// Service MemoryCache pour optimisations performance
+builder.Services.AddMemoryCache();
 
 // PDF Generation services
 builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();

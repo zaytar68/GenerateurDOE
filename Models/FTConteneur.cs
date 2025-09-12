@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GenerateurDOE.Models;
 
-public class FTConteneur
+public class FTConteneur : IDocumentSection
 {
     public int Id { get; set; }
     

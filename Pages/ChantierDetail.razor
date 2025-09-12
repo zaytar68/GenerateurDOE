@@ -296,11 +296,8 @@
             if (string.IsNullOrEmpty(document.CheminFichier) || !File.Exists(document.CheminFichier))
             {
                 var contenu = await documentGenereService.ExportDocumentAsync(
-                    document.ChantierId, 
-                    document.TypeDocument, 
-                    document.FormatExport,
-                    document.IncludePageDeGarde,
-                    document.IncludeTableMatieres);
+                    document.Id, 
+                    document.FormatExport);
                 
                 NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", "Document généré avec succès");
             }

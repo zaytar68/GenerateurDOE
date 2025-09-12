@@ -310,7 +310,7 @@
                         else
                         {
                             <div class="row g-3">
-                                @foreach (var pdf in pdfsFiche.OrderBy(p => p.TypeDocument).ThenBy(p => p.NomFichierOriginal))
+                                @foreach (var pdf in pdfsFiche.OrderBy(p => p.TypeDocumentImport?.Nom ?? "").ThenBy(p => p.NomFichierOriginal))
                                 {
                                     <div class="col-md-6 col-lg-4">
                                         <div class="card h-100 border">
@@ -324,10 +324,10 @@
                                                             @pdf.NomFichierOriginal
                                                         </h6>
                                                         <div class="mb-2">
-                                                            <select class="form-select form-select-sm" @bind="pdf.TypeDocument">
-                                                                @foreach (TypeDocument type in Enum.GetValues<TypeDocument>())
+                                                            <select class="form-select form-select-sm" @bind="pdf.TypeDocumentImportId">
+                                                                @foreach (var typeDocument in typesDocumentsListe)
                                                                 {
-                                                                    <option value="@type">@GetNomTypeDocument(type)</option>
+                                                                    <option value="@typeDocument.Id">@typeDocument.Nom</option>
                                                                 }
                                                             </select>
                                                         </div>
@@ -429,7 +429,7 @@
     private List<FicheTechnique> fiches = new();
     private List<FicheTechnique> fichesFiltrees = new();
     private List<TypeProduit> typesProduits = new();
-    private List<TypeDocumentImport> typesDocuments = new();
+    private List<TypeDocumentImport> typesDocumentsListe = new();
     private List<string> fabricantsDisponibles = new();
     
     private FicheTechnique ficheEnCours = new();
@@ -467,8 +467,8 @@
         {
             fiches = (await FicheTechniqueService.GetAllAsync()).ToList();
             typesProduits = (await TypeProduitService.GetActiveAsync()).ToList();
-            typesDocuments = (await TypeDocumentImportService.GetActiveAsync()).ToList();
-            fichesFiltrees = fiches.ToList();
+            typesDocumentsListe = (await TypeDocumentImportService.GetActiveAsync()).ToList();
+            fichesFiltrees = fiches.OrderBy(f => f.NomFabricant).ThenBy(f => f.NomProduit).ToList();
             
             // Extraire les fabricants uniques pour l'autocomplétion (gardé pour les formulaires)
             fabricantsDisponibles = fiches
@@ -645,11 +645,14 @@
                         using var stream = file.OpenReadStream(10 * 1024 * 1024);
                         var cheminFichier = await FicheTechniqueService.SavePDFFileAsync(stream, file.Name);
                         
+                        // Utiliser le premier type de document disponible par défaut
+                        var typeParDefaut = typesDocumentsListe.FirstOrDefault();
+                        
                         var nouveauPDF = new ImportPDF
                         {
                             CheminFichier = cheminFichier,
                             NomFichierOriginal = file.Name,
-                            TypeDocument = TypeDocument.FicheTechnique,
+                            TypeDocumentImportId = typeParDefaut?.Id ?? 1,
                             TailleFichier = file.Size
                         };
 
@@ -693,19 +696,6 @@
         await JSRuntime.InvokeVoidAsync("open", $"api/files/{pdf.Id}", "_blank");
     }
 
-    private string GetNomTypeDocument(TypeDocument type)
-    {
-        return type switch
-        {
-            TypeDocument.FicheTechnique => "Fiche Technique",
-            TypeDocument.Nuancier => "Nuancier",
-            TypeDocument.Brochure => "Brochure",
-            TypeDocument.ClassFeu => "Classement Feu",
-            TypeDocument.ClassUPEC => "Classement UPEC",
-            TypeDocument.Autre => "Autre",
-            _ => type.ToString()
-        };
-    }
 
     private string FormatTailleFichier(long taille)
     {

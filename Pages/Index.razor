@@ -3,6 +3,7 @@
 @using GenerateurDOE.Services.Interfaces
 
 @inject IDocumentGenereService DocumentGenereService
+@inject NavigationManager Navigation
 
 <PageTitle>Index</PageTitle>
 
@@ -14,10 +15,12 @@
     </div>
 
     <div class="row">
-        <div class="col-12">
-            <p style="font-style: italic;">DTC</p>
+        <div class="col-12" style="text-align: center;">
+        <img src="images/illustration.png" alt="Illustration" class="img-fluid my-4 rounded" width="25%"/>
+            <p style="font-style: italic;">Bienvenue dans l'application de génération de documents techniques de chantier. Cette application vous permet de créer, gérer et organiser facilement vos chantiers, fiches techniques et sections associées.</p>
         </div>
     </div>
+    
 
     <div class="col-md-12">
         <div class="card"> 
@@ -65,8 +68,7 @@
                                     <th>Nom du chantier</th>
                                     <th>Adresse</th>
                                     <th>Lot</th>
-                                    <th>Modifié le</th>
-                                    <th>Statut</th>
+                                    <th>Crée le</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -76,15 +78,12 @@
                                     <tr style="cursor: pointer;">
                                         <td>@document.TypeDocument</td>
                                         <td>@document.Chantier.NomProjet</td>
-                                        
+                                        <td>@document.Chantier.Adresse</td>
+                                        <td>Lot N°@document.Chantier.NumeroLot : @document.Chantier.IntituleLot</td>
+                                        <td>@document.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
                                         <td>
-                                            <button class="btn btn-outline-primary me-1 px-3" 
-                                                    @onclick:stopPropagation="true"                                                   
-                                                    title="Consulter le chantier">
-                                                👁️
-                                            </button>
-                                            <button class="btn btn-outline-secondary me-1 px-3" 
-                                                    @onclick:stopPropagation="true"
+                                            <button class="btn btn-outline-secondary me-1 px-3"
+                                                    @onclick="@(() => EditDocument(document.Id))"
                                                     title="Modifier le chantier">
                                                 ✏️
                                             </button>
@@ -110,5 +109,8 @@
         DocumentsEnCours = (await DocumentGenereService.GetAllDocumentsEnCoursAsync()).ToList();
     }
 
-    
+    private void EditDocument(int id)
+    {
+        Navigation.NavigateTo($"/document/edit/{id}");
+    }
 }

@@ -90,7 +90,8 @@
                                 @foreach (var import in importsDisponibles)
                                 {
                                     <option value="@import.Id">
-                                        @import.NomFichierOriginal (@import.TypeDocument)
+                                        <!-- TODO(human): Remplacez pdf.TypeDocument par pdf.TypeDocumentImport?.Nom ?? "Non défini" -->
+                                        @import.NomFichierOriginal (@(import.TypeDocumentImport?.Nom ?? "Non défini"))
                                     </option>
                                 }
                             }
@@ -163,7 +164,8 @@
                                         <td>
                                             @if (element.ImportPDF != null)
                                             {
-                                                <span class="badge bg-info">@element.ImportPDF.TypeDocument</span>
+                                                <!-- TODO(human): Remplacez pdf.TypeDocument par pdf.TypeDocumentImport?.Nom ?? "Non défini" -->
+                                                <span class="badge bg-info">@(element.ImportPDF.TypeDocumentImport?.Nom ?? "Non défini")</span>
                                             }
                                             else
                                             {

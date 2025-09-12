@@ -184,8 +184,10 @@
             
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
-            // Test de génération HTML
-            var htmlContent = await DocumentGenereService.GenerateDOEAsync(testChantierId, FormatExport.HTML);
+            // TODO(human): Test de génération HTML avec nouvelle API
+            // 1. Créer un DocumentGenere temporaire pour testChantierId
+            // 2. Appeler ExportDocumentAsync(documentId, FormatExport.HTML)
+            var htmlContent = "TODO: Implémenter nouvelle logique HTML";
             
             stopwatch.Stop();
             lastGenerationTime = stopwatch.ElapsedMilliseconds;
@@ -224,8 +226,10 @@
             
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
-            // Test de génération Markdown
-            var markdownContent = await DocumentGenereService.GenerateDOEAsync(testChantierId, FormatExport.Markdown);
+            // TODO(human): Test de génération Markdown avec nouvelle API
+            // 1. Créer un DocumentGenere temporaire pour testChantierId
+            // 2. Appeler ExportDocumentAsync(documentId, FormatExport.Markdown)
+            var markdownContent = "TODO: Implémenter nouvelle logique Markdown";
             
             stopwatch.Stop();
             lastGenerationTime = stopwatch.ElapsedMilliseconds;
@@ -264,8 +268,10 @@
             
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
-            // ✨ TEST DE LA VRAIE GÉNÉRATION PDF ✨
-            var pdfPath = await DocumentGenereService.GenerateDOEAsync(testChantierId, FormatExport.PDF);
+            // TODO(human): TEST DE LA VRAIE GÉNÉRATION PDF avec nouvelle API
+            // 1. Créer un DocumentGenere temporaire pour testChantierId  
+            // 2. Appeler ExportDocumentAsync(documentId, FormatExport.PDF)
+            var pdfPath = "TODO: Implémenter nouvelle logique PDF";
             
             stopwatch.Stop();
             lastGenerationTime = stopwatch.ElapsedMilliseconds;
