@@ -41,6 +41,21 @@
     </div>
 
     <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="numeroLot" class="form-label">Numéro de Lot *</label>
+            <InputText @bind-Value="DocumentGenere.NumeroLot" class="form-control" id="numeroLot" 
+                       placeholder="ex: 01" maxlength="50" />
+            <ValidationMessage For="() => DocumentGenere.NumeroLot" class="text-danger" />
+        </div>
+        <div class="col-md-8">
+            <label for="intituleLot" class="form-label">Intitulé du Lot *</label>
+            <InputText @bind-Value="DocumentGenere.IntituleLot" class="form-control" id="intituleLot" 
+                       placeholder="ex: Gros œuvre - Structure béton" maxlength="300" />
+            <ValidationMessage For="() => DocumentGenere.IntituleLot" class="text-danger" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
         <div class="col-md-6">
             <div class="form-check">
                 <InputCheckbox @bind-Value="DocumentGenere.IncludePageDeGarde" class="form-check-input" id="includePageDeGarde" />
@@ -150,6 +165,12 @@
 
         if (string.IsNullOrWhiteSpace(DocumentGenere.NomFichier))
             errors.Add("Le nom du fichier est requis");
+
+        if (string.IsNullOrWhiteSpace(DocumentGenere.NumeroLot))
+            errors.Add("Le numéro de lot est requis");
+
+        if (string.IsNullOrWhiteSpace(DocumentGenere.IntituleLot))
+            errors.Add("L'intitulé du lot est requis");
 
         if (errors.Any())
         {

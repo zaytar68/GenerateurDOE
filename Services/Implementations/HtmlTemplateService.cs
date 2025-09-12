@@ -7,7 +7,7 @@ namespace GenerateurDOE.Services.Implementations
 {
     public class HtmlTemplateService : IHtmlTemplateService
     {
-        public async Task<string> GeneratePageDeGardeHtmlAsync(Chantier chantier, string typeDocument, PageDeGardeTemplate? template = null)
+        public async Task<string> GeneratePageDeGardeHtmlAsync(DocumentGenere document, string typeDocument, PageDeGardeTemplate? template = null)
         {
             template ??= new PageDeGardeTemplate();
 
@@ -108,23 +108,23 @@ namespace GenerateurDOE.Services.Implementations
                 <div class='project-info'>
                     <div class='info-row'>
                         <span class='label'>Projet :</span>
-                        <span class='value'>{chantier.NomProjet}</span>
+                        <span class='value'>{document.Chantier.NomProjet}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'œuvre :</span>
-                        <span class='value'>{chantier.MaitreOeuvre}</span>
+                        <span class='value'>{document.Chantier.MaitreOeuvre}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'ouvrage :</span>
-                        <span class='value'>{chantier.MaitreOuvrage}</span>
+                        <span class='value'>{document.Chantier.MaitreOuvrage}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Adresse :</span>
-                        <span class='value'>{chantier.Adresse}</span>
+                        <span class='value'>{document.Chantier.Adresse}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Lot :</span>
-                        <span class='value'>{chantier.NumeroLot} - {chantier.IntituleLot}</span>
+                        <span class='value'>{document.NumeroLot} - {document.IntituleLot}</span>
                     </div>
                 </div>
                 

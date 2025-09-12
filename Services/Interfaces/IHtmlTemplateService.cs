@@ -7,7 +7,7 @@ namespace GenerateurDOE.Services.Interfaces
         /// <summary>
         /// Génère le HTML pour une page de garde
         /// </summary>
-        Task<string> GeneratePageDeGardeHtmlAsync(Chantier chantier, string typeDocument, PageDeGardeTemplate? template = null);
+        Task<string> GeneratePageDeGardeHtmlAsync(DocumentGenere document, string typeDocument, PageDeGardeTemplate? template = null);
 
         /// <summary>
         /// Génère le HTML pour une table des matières

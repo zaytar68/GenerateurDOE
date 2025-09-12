@@ -30,7 +30,6 @@
                     <div class="p-2">
                         <div class="fw-bold text-primary">@context.NomProjet</div>
                         <div class="text-muted small">@context.MaitreOuvrage - @context.Adresse</div>
-                        <div class="text-info small">Lot @context.NumeroLot: @context.IntituleLot</div>
                     </div>
                 </ItemTemplate>
             </AutoComplete>
@@ -90,7 +89,6 @@
                                 <p><strong>Adresse:</strong> @selectedChantier.Adresse</p>
                             </div>
                             <div class="col-md-6">
-                                <p><strong>Lot:</strong> @selectedChantier.NumeroLot - @selectedChantier.IntituleLot</p>
                                 <p><strong>Créé le:</strong> @selectedChantier.DateCreation.ToString("dd/MM/yyyy")</p>
                                 <p><strong>Modifié le:</strong> @selectedChantier.DateModification.ToString("dd/MM/yyyy")</p>
                             </div>
@@ -153,7 +151,6 @@
                                         <th>Nom du Projet</th>
                                         <th>Maître d'Ouvrage</th>
                                         <th>Adresse</th>
-                                        <th>Lot</th>
                                         <th>Modifié le</th>
                                         <th>Statut</th>
                                         <th>Actions</th>
@@ -168,7 +165,6 @@
                                             <td>@chantier.NomProjet</td>
                                             <td>@chantier.MaitreOuvrage</td>
                                             <td>@chantier.Adresse</td>
-                                            <td>@chantier.NumeroLot</td>
                                             <td>@chantier.DateModification.ToString("dd/MM/yyyy")</td>
                                             <td>
                                                 @if (chantier.EstArchive)

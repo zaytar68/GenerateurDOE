@@ -22,7 +22,7 @@ namespace GenerateurDOE.Services.Interfaces
         /// <summary>
         /// Génère une page de garde en PDF
         /// </summary>
-        Task<byte[]> GeneratePageDeGardeAsync(Chantier chantier, string typeDocument, PdfGenerationOptions? options = null);
+        Task<byte[]> GeneratePageDeGardeAsync(DocumentGenere document, string typeDocument, PdfGenerationOptions? options = null);
 
         /// <summary>
         /// Génère une table des matières en PDF

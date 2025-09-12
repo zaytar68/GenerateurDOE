@@ -29,6 +29,14 @@ public class DocumentGenere
     
     public bool EnCours { get; set; } = true;
     
+    [Required(ErrorMessage = "Le numéro de lot est requis")]
+    [StringLength(50, ErrorMessage = "Le numéro de lot ne peut pas dépasser 50 caractères")]
+    public string NumeroLot { get; set; } = string.Empty;
+    
+    [Required(ErrorMessage = "L'intitulé du lot est requis")]
+    [StringLength(300, ErrorMessage = "L'intitulé du lot ne peut pas dépasser 300 caractères")]
+    public string IntituleLot { get; set; } = string.Empty;
+    
     [Required]
     public int ChantierId { get; set; }
     public virtual Chantier Chantier { get; set; } = null!;

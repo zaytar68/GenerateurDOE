@@ -49,7 +49,7 @@ public class DocumentGenereService : IDocumentGenereService
         if (document.IncludePageDeGarde)
         {
             var typeDocumentTitle = GetDocumentTypeTitle(document.TypeDocument);
-            content.AppendLine(GeneratePageDeGarde(document.Chantier!, typeDocumentTitle));
+            content.AppendLine(GeneratePageDeGarde(document, typeDocumentTitle));
             content.AppendLine();
         }
 
@@ -99,7 +99,10 @@ public class DocumentGenereService : IDocumentGenereService
             DateCreation = s.DateCreation,
             EnCours = s.EnCours,
             IncludePageDeGarde = s.IncludePageDeGarde,
-            IncludeTableMatieres = s.IncludeTableMatieres
+            IncludeTableMatieres = s.IncludeTableMatieres,
+            NumeroLot = s.NumeroLot,
+            IntituleLot = s.IntituleLot,
+            ChantierId = chantierId
         });
     }
 
@@ -123,17 +126,17 @@ public class DocumentGenereService : IDocumentGenereService
         return await _documentRepository.DeleteAsync(documentGenereId);
     }
 
-    private string GeneratePageDeGarde(Chantier chantier, string typeDocument)
+    private string GeneratePageDeGarde(DocumentGenere document, string typeDocument)
     {
         var pageDeGarde = new StringBuilder();
 
         pageDeGarde.AppendLine($"# {typeDocument}");
         pageDeGarde.AppendLine();
-        pageDeGarde.AppendLine($"**Projet :** {chantier.NomProjet}");
-        pageDeGarde.AppendLine($"**Maître d'œuvre :** {chantier.MaitreOeuvre}");
-        pageDeGarde.AppendLine($"**Maître d'ouvrage :** {chantier.MaitreOuvrage}");
-        pageDeGarde.AppendLine($"**Adresse :** {chantier.Adresse}");
-        pageDeGarde.AppendLine($"**Lot :** {chantier.NumeroLot} - {chantier.IntituleLot}");
+        pageDeGarde.AppendLine($"**Projet :** {document.Chantier.NomProjet}");
+        pageDeGarde.AppendLine($"**Maître d'œuvre :** {document.Chantier.MaitreOeuvre}");
+        pageDeGarde.AppendLine($"**Maître d'ouvrage :** {document.Chantier.MaitreOuvrage}");
+        pageDeGarde.AppendLine($"**Adresse :** {document.Chantier.Adresse}");
+        pageDeGarde.AppendLine($"**Lot :** {document.NumeroLot} - {document.IntituleLot}");
         pageDeGarde.AppendLine();
         pageDeGarde.AppendLine($"**Société :** {_appSettings.NomSociete}");
         pageDeGarde.AppendLine($"**Date :** {DateTime.Now:dd/MM/yyyy}");

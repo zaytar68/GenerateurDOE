@@ -35,6 +35,8 @@ public class DocumentSummaryDto
     public string ChantierNom { get; set; } = string.Empty;
     public string ChantierAdresse { get; set; } = string.Empty;
     public string ChantierLot { get; set; } = string.Empty;
+    public string NumeroLot { get; set; } = string.Empty;
+    public string IntituleLot { get; set; } = string.Empty;
     public TypeDocumentGenere TypeDocument { get; set; }
     public FormatExport FormatExport { get; set; }
     public DateTime DateCreation { get; set; }
@@ -76,8 +78,6 @@ public class ChantierSummaryDto
     public string MaitreOeuvre { get; set; } = string.Empty;
     public string MaitreOuvrage { get; set; } = string.Empty;
     public string Adresse { get; set; } = string.Empty;
-    public string NumeroLot { get; set; } = string.Empty;
-    public string IntituleLot { get; set; } = string.Empty;
 }
 
 public class SectionConteneurSummaryDto

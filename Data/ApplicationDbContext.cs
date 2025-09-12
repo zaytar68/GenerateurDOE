@@ -38,8 +38,6 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.MaitreOeuvre).HasMaxLength(200).IsRequired();
             entity.Property(e => e.MaitreOuvrage).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Adresse).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.NumeroLot).HasMaxLength(50).IsRequired();
-            entity.Property(e => e.IntituleLot).HasMaxLength(300).IsRequired();
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.EstArchive).HasDefaultValue(false);
@@ -105,6 +103,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.NomFichier).HasMaxLength(255).IsRequired();
             entity.Property(e => e.CheminFichier).HasMaxLength(500);
             entity.Property(e => e.Parametres).HasMaxLength(2000);
+            entity.Property(e => e.NumeroLot).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.IntituleLot).HasMaxLength(300).IsRequired();
             entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.EnCours).HasDefaultValue(true);
             

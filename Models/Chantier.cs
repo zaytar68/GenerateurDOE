@@ -22,14 +22,6 @@ public class Chantier
     [StringLength(500, ErrorMessage = "L'adresse ne peut pas dépasser 500 caractères")]
     public string Adresse { get; set; } = string.Empty;
     
-    [Required(ErrorMessage = "Le numéro de lot est requis")]
-    [StringLength(50, ErrorMessage = "Le numéro de lot ne peut pas dépasser 50 caractères")]
-    public string NumeroLot { get; set; } = string.Empty;
-    
-    [Required(ErrorMessage = "L'intitulé du lot est requis")]
-    [StringLength(300, ErrorMessage = "L'intitulé du lot ne peut pas dépasser 300 caractères")]
-    public string IntituleLot { get; set; } = string.Empty;
-    
     public DateTime DateCreation { get; set; } = DateTime.Now;
     public DateTime DateModification { get; set; } = DateTime.Now;
     

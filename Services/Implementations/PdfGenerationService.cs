@@ -72,7 +72,7 @@ namespace GenerateurDOE.Services.Implementations
                 // 1. Page de garde
                 if (document.IncludePageDeGarde && document.Chantier != null)
                 {
-                    var pageDeGarde = await GeneratePageDeGardeAsync(document.Chantier, GetTypeDocumentLabel(document.TypeDocument), options);
+                    var pageDeGarde = await GeneratePageDeGardeAsync(document, GetTypeDocumentLabel(document.TypeDocument), options);
                     pdfParts.Add(pageDeGarde);
                 }
 
@@ -226,7 +226,7 @@ namespace GenerateurDOE.Services.Implementations
             return outputStream.ToArray();
         }
 
-        public async Task<byte[]> GeneratePageDeGardeAsync(Chantier chantier, string typeDocument, PdfGenerationOptions? options = null)
+        public async Task<byte[]> GeneratePageDeGardeAsync(DocumentGenere document, string typeDocument, PdfGenerationOptions? options = null)
         {
             var html = $@"
             <!DOCTYPE html>
@@ -286,23 +286,23 @@ namespace GenerateurDOE.Services.Implementations
                 <div class='project-info'>
                     <div class='info-row'>
                         <span class='label'>Projet :</span>
-                        <span>{chantier.NomProjet}</span>
+                        <span>{document.Chantier.NomProjet}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'œuvre :</span>
-                        <span>{chantier.MaitreOeuvre}</span>
+                        <span>{document.Chantier.MaitreOeuvre}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'ouvrage :</span>
-                        <span>{chantier.MaitreOuvrage}</span>
+                        <span>{document.Chantier.MaitreOuvrage}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Adresse :</span>
-                        <span>{chantier.Adresse}</span>
+                        <span>{document.Chantier.Adresse}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Lot :</span>
-                        <span>{chantier.NumeroLot} - {chantier.IntituleLot}</span>
+                        <span>{document.NumeroLot} - {document.IntituleLot}</span>
                     </div>
                 </div>
                 

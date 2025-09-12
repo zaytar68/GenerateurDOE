@@ -48,9 +48,7 @@ public class ChantierService : IChantierService
             c.NomProjet.ToLower().Contains(searchTerm) ||
             c.MaitreOeuvre.ToLower().Contains(searchTerm) ||
             c.MaitreOuvrage.ToLower().Contains(searchTerm) ||
-            c.Adresse.ToLower().Contains(searchTerm) ||
-            c.NumeroLot.ToLower().Contains(searchTerm) ||
-            c.IntituleLot.ToLower().Contains(searchTerm)
+            c.Adresse.ToLower().Contains(searchTerm)
         );
         
         return await query
