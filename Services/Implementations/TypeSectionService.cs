@@ -2,33 +2,44 @@ using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
 
 namespace GenerateurDOE.Services.Implementations;
 
 public class TypeSectionService : ITypeSectionService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public TypeSectionService(ApplicationDbContext context)
+    public TypeSectionService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<IEnumerable<TypeSection>> GetAllAsync()
     {
-        return await _context.TypesSections
-            .Include(t => t.SectionsLibres)
-            .OrderBy(t => t.Nom)
-            .ToListAsync();
+        // ⚡ Cache L1 : TypesSections avec expiration 1h
+        return await _cache.GetOrCreateAsync(TYPES_SECTIONS_KEY, async () =>
+        {
+            return await _context.TypesSections
+                .Include(t => t.SectionsLibres)
+                .OrderBy(t => t.Nom)
+                .ToListAsync();
+        }, TimeSpan.FromHours(1));
     }
 
     public async Task<IEnumerable<TypeSection>> GetActiveAsync()
     {
-        return await _context.TypesSections
-            .Where(t => t.IsActive)
-            .Include(t => t.SectionsLibres)
-            .OrderBy(t => t.Nom)
-            .ToListAsync();
+        // ⚡ Cache L1 : TypesSections actifs avec expiration 1h
+        return await _cache.GetOrCreateAsync(TYPES_SECTIONS_ACTIVE_KEY, async () =>
+        {
+            return await _context.TypesSections
+                .Where(t => t.IsActive)
+                .Include(t => t.SectionsLibres)
+                .OrderBy(t => t.Nom)
+                .ToListAsync();
+        }, TimeSpan.FromHours(1));
     }
 
     public async Task<TypeSection?> GetByIdAsync(int id)
@@ -45,6 +56,10 @@ public class TypeSectionService : ITypeSectionService
 
         _context.TypesSections.Add(typeSection);
         await _context.SaveChangesAsync();
+        
+        // ⚡ Invalidation cache après création
+        _cache.RemoveByPrefix(TYPES_PREFIX);
+        
         return typeSection;
     }
 
@@ -62,6 +77,10 @@ public class TypeSectionService : ITypeSectionService
         existingType.DateModification = DateTime.Now;
 
         await _context.SaveChangesAsync();
+        
+        // ⚡ Invalidation cache après modification
+        _cache.RemoveByPrefix(TYPES_PREFIX);
+        
         return existingType;
     }
 
@@ -82,6 +101,10 @@ public class TypeSectionService : ITypeSectionService
 
         _context.TypesSections.Remove(typeSection);
         await _context.SaveChangesAsync();
+        
+        // ⚡ Invalidation cache après suppression
+        _cache.RemoveByPrefix(TYPES_PREFIX);
+        
         return true;
     }
 
@@ -95,6 +118,10 @@ public class TypeSectionService : ITypeSectionService
         typeSection.DateModification = DateTime.Now;
         
         await _context.SaveChangesAsync();
+        
+        // ⚡ Invalidation cache après changement statut
+        _cache.RemoveByPrefix(TYPES_PREFIX);
+        
         return true;
     }
 

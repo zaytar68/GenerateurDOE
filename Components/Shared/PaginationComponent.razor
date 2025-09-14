@@ -1,0 +1,161 @@
+@using GenerateurDOE.Models.DTOs
+@typeparam T
+
+<div class="d-flex justify-content-between align-items-center">
+    <!-- Informations sur les résultats -->
+    <div class="small text-muted">
+        @if (PagedData?.TotalCount > 0)
+        {
+            <span>
+                Affichage de @PagedData.StartIndex à @PagedData.EndIndex sur @PagedData.TotalCount éléments
+            </span>
+        }
+        else
+        {
+            <span>Aucun élément trouvé</span>
+        }
+    </div>
+
+    <!-- Contrôles de pagination -->
+    @if (PagedData?.TotalPages > 1)
+    {
+        <nav aria-label="Pagination">
+            <ul class="pagination pagination-sm mb-0">
+                <!-- Bouton Première page -->
+                <li class="page-item @(PagedData.HasPreviousPage ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(1)" disabled="@(!PagedData.HasPreviousPage)">
+                        <span class="oi oi-media-step-backward" aria-hidden="true"></span>
+                        <span class="sr-only">Première</span>
+                    </button>
+                </li>
+
+                <!-- Bouton Page précédente -->
+                <li class="page-item @(PagedData.HasPreviousPage ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(PagedData.CurrentPage - 1)" disabled="@(!PagedData.HasPreviousPage)">
+                        <span class="oi oi-chevron-left" aria-hidden="true"></span>
+                        <span class="sr-only">Précédent</span>
+                    </button>
+                </li>
+
+                <!-- Pages numérotées -->
+                @foreach (var pageNum in GetVisiblePages())
+                {
+                    <li class="page-item @(pageNum == PagedData.CurrentPage ? "active" : "")">
+                        <button class="page-link" @onclick="() => GoToPage(pageNum)">
+                            @pageNum
+                        </button>
+                    </li>
+                }
+
+                <!-- Bouton Page suivante -->
+                <li class="page-item @(PagedData.HasNextPage ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(PagedData.CurrentPage + 1)" disabled="@(!PagedData.HasNextPage)">
+                        <span class="oi oi-chevron-right" aria-hidden="true"></span>
+                        <span class="sr-only">Suivant</span>
+                    </button>
+                </li>
+
+                <!-- Bouton Dernière page -->
+                <li class="page-item @(PagedData.HasNextPage ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(PagedData.TotalPages)" disabled="@(!PagedData.HasNextPage)">
+                        <span class="oi oi-media-step-forward" aria-hidden="true"></span>
+                        <span class="sr-only">Dernière</span>
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    }
+
+    <!-- Sélecteur de taille de page -->
+    <div class="d-flex align-items-center small">
+        <label class="form-label me-2 mb-0">Éléments par page :</label>
+        <select class="form-select form-select-sm" style="width: auto;" value="@PageSize" @onchange="OnPageSizeChangedInternal">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+    </div>
+</div>
+
+@code {
+    [Parameter] public PagedResult<T>? PagedData { get; set; }
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+
+    private async Task GoToPage(int page)
+    {
+        if (PagedData != null && page != PagedData.CurrentPage && page >= 1 && page <= PagedData.TotalPages)
+        {
+            await OnPageChanged.InvokeAsync(page);
+        }
+    }
+
+    private async Task OnPageSizeChangedInternal(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int newPageSize))
+        {
+            await OnPageSizeChanged.InvokeAsync(newPageSize);
+        }
+    }
+
+    private List<int> GetVisiblePages()
+    {
+        if (PagedData == null) return new List<int>();
+
+        var visiblePages = new List<int>();
+        var currentPage = PagedData.CurrentPage;
+        var totalPages = PagedData.TotalPages;
+
+        // Logique pour afficher 5 pages maximum autour de la page courante
+        var startPage = Math.Max(1, currentPage - 2);
+        var endPage = Math.Min(totalPages, currentPage + 2);
+
+        // Ajuster si on est près du début ou de la fin
+        if (endPage - startPage < 4)
+        {
+            if (startPage == 1)
+            {
+                endPage = Math.Min(totalPages, startPage + 4);
+            }
+            else if (endPage == totalPages)
+            {
+                startPage = Math.Max(1, endPage - 4);
+            }
+        }
+
+        for (int i = startPage; i <= endPage; i++)
+        {
+            visiblePages.Add(i);
+        }
+
+        return visiblePages;
+    }
+}
+
+<style>
+    .pagination .page-link {
+        color: #007bff;
+        border: 1px solid #dee2e6;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .pagination .page-item.active .page-link {
+        background-color: #007bff;
+        border-color: #007bff;
+        color: white;
+    }
+
+    .pagination .page-item.disabled .page-link {
+        color: #6c757d;
+        background-color: #fff;
+        border-color: #dee2e6;
+        cursor: not-allowed;
+    }
+
+    .pagination .page-link:hover:not(.disabled) {
+        background-color: #e9ecef;
+        border-color: #dee2e6;
+    }
+</style>

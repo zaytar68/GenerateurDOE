@@ -2,11 +2,18 @@ using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using System.Text;
 using System.Text.Json;
+using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
 
 namespace GenerateurDOE.Services.Implementations
 {
     public class HtmlTemplateService : IHtmlTemplateService
     {
+        private readonly ICacheService _cache;
+
+        public HtmlTemplateService(ICacheService cache)
+        {
+            _cache = cache;
+        }
         public async Task<string> GeneratePageDeGardeHtmlAsync(DocumentGenere document, string typeDocument, PageDeGardeTemplate? template = null)
         {
             template ??= new PageDeGardeTemplate();

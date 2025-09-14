@@ -2,31 +2,42 @@ using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
 
 namespace GenerateurDOE.Services.Implementations;
 
 public class TypeDocumentImportService : ITypeDocumentImportService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public TypeDocumentImportService(ApplicationDbContext context)
+    public TypeDocumentImportService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<IEnumerable<TypeDocumentImport>> GetAllAsync()
     {
-        return await _context.TypesDocuments
-            .OrderBy(t => t.Nom)
-            .ToListAsync();
+        // ⚡ Cache L1 : TypesDocuments avec expiration 1h
+        return await _cache.GetOrCreateAsync(TYPES_DOCUMENTS_KEY, async () =>
+        {
+            return await _context.TypesDocuments
+                .OrderBy(t => t.Nom)
+                .ToListAsync();
+        }, TimeSpan.FromHours(1));
     }
 
     public async Task<IEnumerable<TypeDocumentImport>> GetActiveAsync()
     {
-        return await _context.TypesDocuments
-            .Where(t => t.IsActive)
-            .OrderBy(t => t.Nom)
-            .ToListAsync();
+        // ⚡ Cache L1 : TypesDocuments actifs avec expiration 1h
+        return await _cache.GetOrCreateAsync(TYPES_DOCUMENTS_ACTIVE_KEY, async () =>
+        {
+            return await _context.TypesDocuments
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.Nom)
+                .ToListAsync();
+        }, TimeSpan.FromHours(1));
     }
 
     public async Task<TypeDocumentImport?> GetByIdAsync(int id)
@@ -42,6 +53,9 @@ public class TypeDocumentImportService : ITypeDocumentImportService
 
         _context.TypesDocuments.Add(typeDocument);
         await _context.SaveChangesAsync();
+        
+        // ⚡ Invalidation cache après création
+        _cache.RemoveByPrefix(TYPES_PREFIX);
         
         return typeDocument;
     }

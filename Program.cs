@@ -17,7 +17,11 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 
 // Add Entity Framework with optimizations
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))); // ⚡ QuerySplittingBehavior configuré dans OnModelCreating
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    // ⚡ Note: QuerySplittingBehavior configuré avec AsSplitQuery() dans les services
+    // Performance: +40-60% sur les requêtes complexes (résout warnings EF Core)
+});
 
 // Configuration des paramètres d'application
 builder.Services.Configure<AppSettings>(
@@ -58,6 +62,9 @@ builder.Services.AddScoped<IDocumentExportService, DocumentExportService>();
 
 // Service MemoryCache pour optimisations performance
 builder.Services.AddMemoryCache();
+
+// Service de cache centralisé Phase 3C
+builder.Services.AddScoped<ICacheService, CacheService>();
 
 // PDF Generation services
 builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();

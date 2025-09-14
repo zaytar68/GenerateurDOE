@@ -2,31 +2,42 @@ using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
 
 namespace GenerateurDOE.Services.Implementations;
 
 public class TypeProduitService : ITypeProduitService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public TypeProduitService(ApplicationDbContext context)
+    public TypeProduitService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<IEnumerable<TypeProduit>> GetAllAsync()
     {
-        return await _context.TypesProduits
-            .OrderBy(t => t.Nom)
-            .ToListAsync();
+        // ⚡ Cache L1 : TypesProduits avec expiration 1h
+        return await _cache.GetOrCreateAsync(TYPES_PRODUITS_KEY, async () =>
+        {
+            return await _context.TypesProduits
+                .OrderBy(t => t.Nom)
+                .ToListAsync();
+        }, TimeSpan.FromHours(1));
     }
 
     public async Task<IEnumerable<TypeProduit>> GetActiveAsync()
     {
-        return await _context.TypesProduits
-            .Where(t => t.IsActive)
-            .OrderBy(t => t.Nom)
-            .ToListAsync();
+        // ⚡ Cache L1 : TypesProduits actifs avec expiration 1h
+        return await _cache.GetOrCreateAsync(TYPES_PRODUITS_ACTIVE_KEY, async () =>
+        {
+            return await _context.TypesProduits
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.Nom)
+                .ToListAsync();
+        }, TimeSpan.FromHours(1));
     }
 
     public async Task<TypeProduit?> GetByIdAsync(int id)
@@ -43,6 +54,9 @@ public class TypeProduitService : ITypeProduitService
 
         _context.TypesProduits.Add(typeProduit);
         await _context.SaveChangesAsync();
+        
+        // ⚡ Invalidation cache après création
+        _cache.RemoveByPrefix(TYPES_PREFIX);
         
         return typeProduit;
     }
@@ -61,6 +75,10 @@ public class TypeProduitService : ITypeProduitService
         try
         {
             await _context.SaveChangesAsync();
+            
+            // ⚡ Invalidation cache après modification
+            _cache.RemoveByPrefix(TYPES_PREFIX);
+            
             return true;
         }
         catch (DbUpdateException)
@@ -79,6 +97,10 @@ public class TypeProduitService : ITypeProduitService
         {
             _context.TypesProduits.Remove(typeProduit);
             await _context.SaveChangesAsync();
+            
+            // ⚡ Invalidation cache après suppression
+            _cache.RemoveByPrefix(TYPES_PREFIX);
+            
             return true;
         }
 
@@ -97,6 +119,10 @@ public class TypeProduitService : ITypeProduitService
         try
         {
             await _context.SaveChangesAsync();
+            
+            // ⚡ Invalidation cache après changement statut
+            _cache.RemoveByPrefix(TYPES_PREFIX);
+            
             return true;
         }
         catch (DbUpdateException)
