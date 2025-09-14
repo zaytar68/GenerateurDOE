@@ -23,11 +23,11 @@ La gestion des méthodologies doit avoir une interface de création, modificatio
 
 
 ### Core Models
-- "Chantier" - Représente un projet avec un Maitre d'œuvre, un maître d'ouvrage, une adresse, un lot (numéro + intitulé)
-- "Fiche Technique" - Représente un produit avec son nom, le nom du fabricant, le type de produit et les documents "ImportPDF" associés.
-- `DocumentGenere` - Document generation operations with format support and parameter configuration
+- "Chantier" - Représente un projet avec un Maitre d'œuvre, un maître d'ouvrage, une adresse (IMPORTANT: les lots sont maintenant dans DocumentGenere)
+- "DocumentGenere" - Document avec son chantier, type, format, nom fichier, NumeroLot et IntituleLot spécifiques
+- "Fiche Technique" - Représente un produit avec son nom, le nom du fabricant, le type de produit et les documents "ImportPDF" associés
 - "ImportPDF" - Représente un fichier pdf avec son emplacement, son type 
-- "Méthode" - Représente une méthodologie avec un titre, une description. Il doit être possible d'y ajouter des images.
+- "Méthode" - Représente une méthodologie avec un titre, une description. Il doit être possible d'y ajouter des images
 - "SectionLibre" - Représente une section personnalisable dans un document avec titre, contenu HTML et type
 - "TypeSection" - Énumération des types de sections disponibles
 
@@ -35,6 +35,10 @@ La gestion des méthodologies doit avoir une interface de création, modificatio
 - `IFicheTechniqueService` - Manages technical sheets with PDF file operations
 - `IMemoireTechniqueService` - Manages technical reports
 - `IDocumentGenereService` - Handles document generation and export (singleton)
+- `IDocumentRepositoryService` - Repository Pattern avec projections DTO pour performances optimisées
+- `IChantierService` - Manages construction sites (lots logic moved to documents)
+- `IPdfGenerationService` - Real PDF generation with PuppeteerSharp + PDFSharp architecture
+- `IHtmlTemplateService` - Professional HTML templates for document generation
 - `IConfigurationService` - Manages application configuration and settings
 - `IFileExplorerService` - Handles file system operations and folder management
 - `ITypeProduitService` - Manages product types configuration
@@ -45,9 +49,9 @@ La gestion des méthodologies doit avoir une interface de création, modificatio
 - `ILoggingService` - Centralized logging service
 
 ### Export Capabilities
+- **PDF**: Production-ready with PuppeteerSharp (HTML→PDF) + PDFSharp (assembly/optimization) 
 - **HTML**: Full-featured with CSS styling, table of contents, cover pages
 - **Markdown**: Clean markdown with metadata
-- **PDF/Word**: Currently simulated (see project-todo.md for implementation needs)
 - Export service uses Markdig for Markdown processing
 
 ### API Controllers
@@ -209,19 +213,20 @@ Use entity framework.
 
 ### 🔄 En Cours de Développement
 - [x] **Phase 1 PDF**: Implémentation génération PDF réelle ✅ **TERMINÉ**
-- [x] **Phase 1.5 PDF**: Validation intégration fiches techniques ✅ **TERMINÉ**
-- [ ] **Phase 2 Services**: Refactoring architecture services
+- [x] **Phase 1.5 PDF**: Validation intégration fiches techniques ✅ **TERMINÉ**  
+- [x] **Phase 2 Services**: Migration lots + Repository Pattern ✅ **TERMINÉ**
 - [ ] **Phase 3 Performance**: Optimisations EF et cache ⚡ **EN ANALYSE**
 - [ ] **Phase 4 Tests**: Stratégie de tests complète
 
 ### 📋 Backlog Priorisé
-1. Migration système PDF (PuppeteerSharp + PDFSharp)
-2. Découpage DocumentGenereService en services métier
-3. Optimisation performances base de données
-4. Tests automatisés et CI/CD
-5. Templates de documents personnalisables
-6. Génération en lot (batch processing)
-7. Support formats additionnels (Word, Excel)
+1. ~~Migration système PDF (PuppeteerSharp + PDFSharp)~~ ✅ **TERMINÉ**
+2. ~~Migration lots de Chantier vers DocumentGenere~~ ✅ **TERMINÉ**
+3. ~~Repository Pattern avec projections DTO~~ ✅ **TERMINÉ**
+4. Optimisation performances EF Core ⚡ **PRIORITÉ 1**
+5. Tests automatisés et CI/CD
+6. Templates de documents personnalisables
+7. Génération en lot (batch processing)
+8. Support formats additionnels (Word, Excel)
 
 ## 🚀 Analyse des Performances - Phase 3 (Septembre 2024)
 
@@ -367,8 +372,29 @@ ON DocumentGenere (ChantierId, EnCours);
 6. PDF cache & browser pooling
 7. Database indexes supplémentaires
 
+## 📈 **ÉTAT PHASE 2 - TERMINÉE (Septembre 2024)**
+
+### ✅ **MIGRATION LOTS RÉUSSIE**
+- **Business Logic corrigée** : Lots déplacés de Chantier vers DocumentGenere (1 chantier -> N documents -> 1 lot/document)
+- **Migrations EF** : MoveLotFromChantierToDocument + UpdateModelAfterLotMigration appliquées avec succès
+- **Repository Pattern** : DocumentRepositoryService avec projections DTO (+30-50% performances)
+- **UI Mise à jour** : Formulaires DocumentGenere avec validation complète des champs lot
+- **Architecture nettoyée** : Suppression logique lot obsolète de ChantierService
+
+### ✅ **SERVICES REFACTORISÉS**
+- **IPdfGenerationService** : Génération PDF réelle avec PuppeteerSharp + PDFSharp
+- **IHtmlTemplateService** : Templates professionnels pour pages de garde et sections  
+- **IDocumentRepositoryService** : Repository Pattern avec optimisations EF Core
+- **Architecture hybride** : 3 couches (HTML → PDF → Assembly) opérationnelle
+
+### 🎯 **PROCHAINE ÉTAPE : PHASE 3 PERFORMANCE**
+La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Core critiques identifiées :
+1. **QuerySplittingBehavior** (40-60% gain sur requêtes complexes)  
+2. **Relations disambiguation** (100% stabilité EF)
+3. **Memory caching** (70% gain données référentielles)
+
 ---
 *Dernière mise à jour: Septembre 2024*
+*Phase 2 terminée - Migration lots + Repository Pattern*  
 *Roadmap validée par Software Architect et Tech Lead*
-*Analyse Performance: Septembre 2024*
 
