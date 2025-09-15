@@ -136,7 +136,20 @@
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td><strong>@(section.Titre)</strong></td>
+                                                <td>
+                                                    <div>
+                                                        <strong>@(section.Titre)</strong>
+                                                        @if (!string.IsNullOrWhiteSpace(section.ContenuHtml))
+                                                        {
+                                                            <div class="mt-1">
+                                                                <small class="text-muted fw-bold">Aperçu :</small>
+                                                                <div class="border rounded p-2 mt-1 section-preview-main">
+                                                                    @((MarkupString)TronquerHtmlProprement(section.ContenuHtml, 150))
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </td>
                                                 <td>
                                                     <span class="badge bg-info">@(section.TypeSection.Nom)</span>
                                                 </td>
@@ -525,4 +538,77 @@
     {
         statusMessage = string.Empty;
     }
+
+    private string TronquerHtmlProprement(string html, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return string.Empty;
+
+        // Supprimer les balises HTML pour avoir le texte pur pour la limite
+        var texteSansBalises = System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", string.Empty);
+
+        if (texteSansBalises.Length <= maxLength)
+            return html; // Retourner le HTML complet si le texte est court
+
+        // Si le texte est trop long, tronquer intelligemment
+        var texteTronque = texteSansBalises.Substring(0, maxLength);
+        var positionDernierEspace = texteTronque.LastIndexOf(' ');
+
+        if (positionDernierEspace > 0)
+            texteTronque = texteTronque.Substring(0, positionDernierEspace);
+
+        // Maintenant tronquer le HTML original en essayant de garder les balises cohérentes
+        var htmlTronque = TronquerHtmlAvecBalises(html, texteTronque.Length);
+
+        return htmlTronque + "...";
+    }
+
+    private string TronquerHtmlAvecBalises(string html, int maxTextLength)
+    {
+        var textLength = 0;
+        var result = "";
+        var inTag = false;
+
+        for (int i = 0; i < html.Length && textLength < maxTextLength; i++)
+        {
+            var c = html[i];
+
+            if (c == '<')
+                inTag = true;
+            else if (c == '>')
+                inTag = false;
+            else if (!inTag)
+                textLength++;
+
+            result += c;
+        }
+
+        return result;
+    }
 }
+
+<style>
+    .section-preview-main {
+        max-height: 4em;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        font-size: 0.8rem;
+        line-height: 1.3;
+        max-width: 400px;
+    }
+
+    .section-preview-main * {
+        margin: 0.1em 0;
+        font-size: inherit !important;
+    }
+
+    .section-preview-main img {
+        max-width: 100%;
+        height: auto;
+        max-height: 2em;
+    }
+
+    .table td {
+        vertical-align: top;
+    }
+</style>
