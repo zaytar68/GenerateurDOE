@@ -15,13 +15,13 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Services(services)
     .Enrich.FromLogContext());
 
-// Add Entity Framework with optimizations
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// Add Entity Framework with DbContextFactory Pattern for optimal concurrency
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
         sqlOptions => sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
-    // ✅ QuerySplittingBehavior configuré pour résoudre les erreurs de concurrence
-    // et améliorer les performances sur les requêtes avec multiple collections
+    // ✅ QuerySplittingBehavior + DbContextFactory Pattern: résolution définitive des problèmes de concurrence
+    // Chaque opération aura sa propre instance de contexte isolée
 });
 
 // Configuration des paramètres d'application

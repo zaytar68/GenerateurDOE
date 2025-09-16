@@ -7,16 +7,17 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class ChantierService : IChantierService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-    public ChantierService(ApplicationDbContext context)
+    public ChantierService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     public async Task<List<Chantier>> GetAllAsync(bool includeArchived = false)
     {
-        var query = _context.Chantiers.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.Chantiers.AsQueryable();
         
         if (!includeArchived)
         {
@@ -35,9 +36,10 @@ public class ChantierService : IChantierService
             return await GetAllAsync(includeArchived);
         }
 
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
         searchTerm = searchTerm.Trim().ToLower();
-        
-        var query = _context.Chantiers.AsQueryable();
+
+        var query = context.Chantiers.AsQueryable();
         
         if (!includeArchived)
         {
@@ -59,13 +61,15 @@ public class ChantierService : IChantierService
 
     public async Task<Chantier?> GetByIdAsync(int id)
     {
-        return await _context.Chantiers
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.Chantiers
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
     public async Task<Chantier?> GetByIdWithDocumentsAsync(int id)
     {
-        return await _context.Chantiers
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.Chantiers
             .Include(c => c.DocumentsGeneres)
             .Include(c => c.FichesTechniques)
             .FirstOrDefaultAsync(c => c.Id == id);
@@ -73,21 +77,23 @@ public class ChantierService : IChantierService
 
     public async Task<Chantier> CreateAsync(Chantier chantier)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
         chantier.DateCreation = DateTime.Now;
         chantier.DateModification = DateTime.Now;
-        
-        _context.Chantiers.Add(chantier);
-        await _context.SaveChangesAsync();
+
+        context.Chantiers.Add(chantier);
+        await context.SaveChangesAsync();
         
         return chantier;
     }
 
     public async Task<Chantier> UpdateAsync(Chantier chantier)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
         chantier.DateModification = DateTime.Now;
-        
-        _context.Chantiers.Update(chantier);
-        await _context.SaveChangesAsync();
+
+        context.Chantiers.Update(chantier);
+        await context.SaveChangesAsync();
         
         return chantier;
     }
@@ -97,8 +103,9 @@ public class ChantierService : IChantierService
         var chantier = await GetByIdAsync(id);
         if (chantier != null)
         {
-            _context.Chantiers.Remove(chantier);
-            await _context.SaveChangesAsync();
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            context.Chantiers.Remove(chantier);
+            await context.SaveChangesAsync();
         }
     }
 
@@ -112,8 +119,10 @@ public class ChantierService : IChantierService
         
         chantier.EstArchive = true;
         chantier.DateModification = DateTime.Now;
-        
-        await _context.SaveChangesAsync();
+
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        context.Chantiers.Update(chantier);
+        await context.SaveChangesAsync();
         return chantier;
     }
 
@@ -127,20 +136,24 @@ public class ChantierService : IChantierService
         
         chantier.EstArchive = false;
         chantier.DateModification = DateTime.Now;
-        
-        await _context.SaveChangesAsync();
+
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        context.Chantiers.Update(chantier);
+        await context.SaveChangesAsync();
         return chantier;
     }
 
     public async Task<bool> ExistsAsync(int id)
     {
-        return await _context.Chantiers
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.Chantiers
             .AnyAsync(c => c.Id == id);
     }
 
     public async Task<List<Chantier>> GetRecentAsync(int count = 5, bool includeArchived = false)
     {
-        var query = _context.Chantiers.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.Chantiers.AsQueryable();
         
         if (!includeArchived)
         {
@@ -155,7 +168,8 @@ public class ChantierService : IChantierService
 
     public async Task<int> CountAsync(bool includeArchived = false)
     {
-        var query = _context.Chantiers.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.Chantiers.AsQueryable();
         
         if (!includeArchived)
         {

@@ -9,19 +9,20 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class DocumentRepositoryService : IDocumentRepositoryService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly IMemoryCache _cache;
     private const string CACHE_KEY_PREFIX = "DocumentRepo_";
 
-    public DocumentRepositoryService(ApplicationDbContext context, IMemoryCache cache)
+    public DocumentRepositoryService(IDbContextFactory<ApplicationDbContext> contextFactory, IMemoryCache cache)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _cache = cache;
     }
 
     public async Task<DocumentGenere> GetByIdAsync(int documentId)
     {
-        var document = await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var document = await context.DocumentsGeneres
             .Include(d => d.Chantier)
             .FirstOrDefaultAsync(d => d.Id == documentId)
             .ConfigureAwait(false);
@@ -34,8 +35,9 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<DocumentGenere> GetWithCompleteContentAsync(int documentId)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
         // 🔧 CORRECTION CONCURRENCE CRITIQUE: AsSplitQuery pour contrôler la concurrence
-        var document = await _context.DocumentsGeneres
+        var document = await context.DocumentsGeneres
             .Include(d => d.Chantier)
             .Include(d => d.SectionsConteneurs.OrderBy(sc => sc.Ordre))
                 .ThenInclude(sc => sc.Items.OrderBy(i => i.Ordre))
@@ -62,7 +64,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
         if (!_cache.TryGetValue(cacheKey, out DocumentSummaryDto? summary))
         {
-            summary = await _context.DocumentsGeneres
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            summary = await context.DocumentsGeneres
                 .Where(d => d.Id == documentId)
                 .Select(d => new DocumentSummaryDto
                 {
@@ -99,8 +102,9 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         
         if (!_cache.TryGetValue(cacheKey, out List<DocumentSummaryDto>? summaries))
         {
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
             // ⚡ Projection DTO pour réduire les transferts de données (30-50% gain)
-            summaries = await _context.DocumentsGeneres
+            summaries = await context.DocumentsGeneres
                 .Select(d => new DocumentSummaryDto
                 {
                     Id = d.Id,
@@ -134,7 +138,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         
         if (!_cache.TryGetValue(cacheKey, out List<DocumentSummaryDto>? summaries))
         {
-            summaries = await _context.DocumentsGeneres
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            summaries = await context.DocumentsGeneres
                 .Where(d => d.ChantierId == chantierId)
                 .Select(d => new DocumentSummaryDto
                 {
@@ -165,7 +170,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<PagedResult<DocumentSummaryDto>> GetPagedDocumentsAsync(int page, int pageSize, string? searchTerm = null)
     {
-        var query = _context.DocumentsGeneres.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.DocumentsGeneres.AsQueryable();
 
         if (!string.IsNullOrEmpty(searchTerm))
         {
@@ -208,11 +214,12 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<PagedResult<DocumentSummaryDto>> GetPagedDocumentsByChantierId(int chantierId, int page, int pageSize)
     {
-        var totalCount = await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var totalCount = await context.DocumentsGeneres
             .Where(d => d.ChantierId == chantierId)
             .CountAsync().ConfigureAwait(false);
 
-        var items = await _context.DocumentsGeneres
+        var items = await context.DocumentsGeneres
             .Where(d => d.ChantierId == chantierId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -246,9 +253,10 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<DocumentGenere> CreateAsync(DocumentGenere document)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
         document.DateCreation = DateTime.Now;
-        _context.DocumentsGeneres.Add(document);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        context.DocumentsGeneres.Add(document);
+        await context.SaveChangesAsync().ConfigureAwait(false);
 
         // Invalidate cache
         InvalidateDocumentCaches();
@@ -258,8 +266,9 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<DocumentGenere> UpdateAsync(DocumentGenere document)
     {
-        _context.DocumentsGeneres.Update(document);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        context.DocumentsGeneres.Update(document);
+        await context.SaveChangesAsync().ConfigureAwait(false);
 
         // Invalidate cache
         InvalidateDocumentCaches();
@@ -270,7 +279,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<bool> DeleteAsync(int documentId)
     {
-        var document = await _context.DocumentsGeneres.FindAsync(documentId).ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var document = await context.DocumentsGeneres.FindAsync(documentId).ConfigureAwait(false);
         if (document == null)
             return false;
 
@@ -279,8 +289,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             File.Delete(document.CheminFichier);
         }
 
-        _context.DocumentsGeneres.Remove(document);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        context.DocumentsGeneres.Remove(document);
+        await context.SaveChangesAsync().ConfigureAwait(false);
 
         // Invalidate cache
         InvalidateDocumentCaches();
@@ -313,7 +323,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         var originalDocument = await GetByIdAsync(documentId);
 
         // Vérifier que le chantier de destination existe
-        var chantierExists = await _context.Chantiers.AnyAsync(c => c.Id == newChantierId && !c.EstArchive);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var chantierExists = await context.Chantiers.AnyAsync(c => c.Id == newChantierId && !c.EstArchive);
         if (!chantierExists)
         {
             throw new ArgumentException($"Le chantier avec l'ID {newChantierId} n'existe pas ou est archivé.");
@@ -339,7 +350,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<List<DocumentGenere>> GetDocumentsEnCoursAsync()
     {
-        return await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.DocumentsGeneres
             .Where(d => d.EnCours)
             .Include(d => d.Chantier)
             .OrderByDescending(d => d.DateCreation)
@@ -348,13 +360,15 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<bool> ExistsAsync(int documentId)
     {
-        return await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.DocumentsGeneres
             .AnyAsync(d => d.Id == documentId).ConfigureAwait(false);
     }
 
     public async Task<bool> CanFinalizeAsync(int documentId)
     {
-        var hasContent = await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var hasContent = await context.DocumentsGeneres
             .Where(d => d.Id == documentId)
             .Select(d => d.SectionsConteneurs.Any(sc => sc.Items.Any()) ||
                         (d.FTConteneur != null && d.FTConteneur.Elements.Any()))
@@ -371,7 +385,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// </summary>
     public async Task<PagedResult<DocumentListDto>> GetPagedDocumentsAsync(int page = 1, int pageSize = 20, int? chantierId = null)
     {
-        var query = _context.DocumentsGeneres.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.DocumentsGeneres.AsQueryable();
         
         if (chantierId.HasValue)
         {
@@ -418,7 +433,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// </summary>
     public async Task<PagedResult<ChantierSummaryDto>> GetPagedChantierSummariesAsync(int page = 1, int pageSize = 20, bool includeArchived = false)
     {
-        var query = _context.Chantiers.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.Chantiers.AsQueryable();
         
         if (!includeArchived)
         {
@@ -471,7 +487,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// </summary>
     public async Task<PagedResult<FicheTechniqueSummaryDto>> GetPagedFicheTechniquesSummariesAsync(int page = 1, int pageSize = 20, string searchTerm = "")
     {
-        var query = _context.FichesTechniques.AsQueryable();
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var query = context.FichesTechniques.AsQueryable();
         
         if (!string.IsNullOrEmpty(searchTerm))
         {
@@ -517,7 +534,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<DocumentGenere?> GetFirstDocumentAsync()
     {
-        return await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.DocumentsGeneres
             .Include(d => d.Chantier)
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
@@ -525,7 +543,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<DocumentGenere?> GetDocumentWithFTContainerAsync()
     {
-        return await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        return await context.DocumentsGeneres
             .Include(d => d.Chantier)
             .Include(d => d.FTConteneur)
                 .ThenInclude(ftc => ftc!.Elements)
