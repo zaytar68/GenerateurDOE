@@ -515,10 +515,34 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return PagedResult<FicheTechniqueSummaryDto>.Create(items, totalCount, page, pageSize);
     }
 
+    public async Task<DocumentGenere?> GetFirstDocumentAsync()
+    {
+        return await _context.DocumentsGeneres
+            .Include(d => d.Chantier)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
+
+    public async Task<DocumentGenere?> GetDocumentWithFTContainerAsync()
+    {
+        return await _context.DocumentsGeneres
+            .Include(d => d.Chantier)
+            .Include(d => d.FTConteneur)
+                .ThenInclude(ftc => ftc!.Elements)
+                    .ThenInclude(fte => fte.ImportPDF)
+            .Include(d => d.FTConteneur)
+                .ThenInclude(ftc => ftc!.Elements)
+                    .ThenInclude(fte => fte.FicheTechnique)
+            .AsSplitQuery()
+            .Where(d => d.FTConteneur != null && d.FTConteneur.Elements.Any(e => e.ImportPDF != null))
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
+
     private void InvalidateDocumentCaches()
     {
         _cache.Remove(CACHE_KEY_PREFIX + "AllSummaries");
-        
+
         // Invalider tous les caches de count
         var keysToRemove = new[] { "Count_", "ChantierCount_", "FTCount_" };
         foreach (var keyPattern in keysToRemove)

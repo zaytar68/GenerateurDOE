@@ -6,9 +6,9 @@
 @implements IDisposable
 
 @inject IDocumentGenereService DocumentGenereService
+@inject IDocumentRepositoryService DocumentRepositoryService
 @inject ILoadingStateService LoadingStateService
 @inject IJSRuntime JSRuntime
-@inject ApplicationDbContext Context
 
 <PageTitle>Test Génération PDF</PageTitle>
 
@@ -289,9 +289,7 @@
             
             // Test de génération PDF avec la vraie API
             // 1. Rechercher un document existant ou utiliser le premier disponible
-            var documentForTest = await Context.DocumentsGeneres
-                .Include(d => d.Chantier)
-                .FirstOrDefaultAsync();
+            var documentForTest = await DocumentRepositoryService.GetFirstDocumentAsync();
 
             if (documentForTest == null)
             {
@@ -387,18 +385,8 @@
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
             // 1. Rechercher un document avec FTConteneur et des éléments
-            // 🔧 CORRECTION CONCURRENCE CRITIQUE: AsSplitQuery pour multiple ThenInclude
-            var documentWithFT = await Context.DocumentsGeneres
-                .Include(d => d.Chantier)
-                .Include(d => d.FTConteneur)
-                    .ThenInclude(ftc => ftc!.Elements)
-                        .ThenInclude(fte => fte.ImportPDF)
-                .Include(d => d.FTConteneur)
-                    .ThenInclude(ftc => ftc!.Elements)
-                        .ThenInclude(fte => fte.FicheTechnique)
-                .AsSplitQuery()  // ✅ OBLIGATOIRE pour éviter erreurs concurrence
-                .Where(d => d.FTConteneur != null && d.FTConteneur.Elements.Any(e => e.ImportPDF != null))
-                .FirstOrDefaultAsync();
+            // Rechercher un document avec fiches techniques via le service
+            var documentWithFT = await DocumentRepositoryService.GetDocumentWithFTContainerAsync();
             
             if (documentWithFT == null)
             {
@@ -469,9 +457,7 @@
     {
         // Si aucun document avec FT existe, créer un document de test
         // Pour l'instant, retourner le premier document disponible
-        var firstDoc = await Context.DocumentsGeneres
-            .Include(d => d.Chantier)
-            .FirstOrDefaultAsync();
+        var firstDoc = await DocumentRepositoryService.GetFirstDocumentAsync();
             
         if (firstDoc == null)
         {

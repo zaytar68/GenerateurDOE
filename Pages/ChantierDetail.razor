@@ -179,16 +179,19 @@
     private Chantier? chantier;
     private List<DocumentGenere> documentsGeneres = new();
     private bool isLoading = true;
+    private bool isInitialized = false;
 
 
     protected override async Task OnInitializedAsync()
     {
         await ChargerChantier();
+        isInitialized = true;
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (ChantierId > 0)
+        // ⚡ CORRECTION CONCURRENCE: Éviter double exécution OnInitialized + OnParametersSet
+        if (ChantierId > 0 && isInitialized)
         {
             await ChargerChantier();
         }

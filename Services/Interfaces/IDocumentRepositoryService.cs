@@ -31,5 +31,9 @@ public interface IDocumentRepositoryService
     Task<List<DocumentGenere>> GetDocumentsEnCoursAsync();
     Task<bool> ExistsAsync(int documentId);
     Task<bool> CanFinalizeAsync(int documentId);
+
+    // Méthodes pour tests et composants
+    Task<DocumentGenere?> GetFirstDocumentAsync();
+    Task<DocumentGenere?> GetDocumentWithFTContainerAsync();
 }
 
