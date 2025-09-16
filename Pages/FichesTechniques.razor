@@ -7,6 +7,7 @@
 @inject IFicheTechniqueService FicheTechniqueService
 @inject ITypeProduitService TypeProduitService
 @inject ITypeDocumentImportService TypeDocumentImportService
+@inject ILoadingStateService LoadingStateService
 @inject ApplicationDbContext Context
 @inject IJSRuntime JSRuntime
 
@@ -657,9 +658,12 @@
                         };
 
                         var pdfCree = await FicheTechniqueService.AddPDFAsync(fichePDFEnCours.Id, nouveauPDF);
+
+                        // ✅ CORRECTION DOUBLONS PDF: Synchroniser les deux collections
+                        // 1. Ajouter au modal local pour affichage immédiat
                         pdfsFiche.Add(pdfCree);
-                        
-                        // Mettre à jour la fiche dans la liste principale
+
+                        // 2. Mettre à jour la fiche dans la liste principale pour cohérence
                         var ficheAMettreAJour = fiches.FirstOrDefault(f => f.Id == fichePDFEnCours.Id);
                         ficheAMettreAJour?.ImportsPDF.Add(pdfCree);
                         

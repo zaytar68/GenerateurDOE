@@ -23,7 +23,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     {
         var document = await _context.DocumentsGeneres
             .Include(d => d.Chantier)
-            .FirstOrDefaultAsync(d => d.Id == documentId);
+            .FirstOrDefaultAsync(d => d.Id == documentId)
+            .ConfigureAwait(false);
 
         if (document == null)
             throw new InvalidOperationException($"Document avec l'ID {documentId} introuvable");
@@ -33,9 +34,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<DocumentGenere> GetWithCompleteContentAsync(int documentId)
     {
-        // Utilisation de AsSplitQuery() pour résoudre le multiple collection warning
+        // 🔧 CORRECTION CONCURRENCE CRITIQUE: AsSplitQuery pour contrôler la concurrence
         var document = await _context.DocumentsGeneres
-            .AsSplitQuery() // ⚡ Résout les warnings EF Core multiple collection
             .Include(d => d.Chantier)
             .Include(d => d.SectionsConteneurs.OrderBy(sc => sc.Ordre))
                 .ThenInclude(sc => sc.Items.OrderBy(i => i.Ordre))
@@ -45,11 +45,10 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             .Include(d => d.FTConteneur)
                 .ThenInclude(ftc => ftc!.Elements.OrderBy(e => e.Ordre))
                     .ThenInclude(e => e.FicheTechnique)
-            .Include(d => d.FTConteneur)
-                .ThenInclude(ftc => ftc!.Elements)
-                    .ThenInclude(e => e.ImportPDF)
-                        .ThenInclude(pdf => pdf.TypeDocumentImport)
-            .FirstOrDefaultAsync(d => d.Id == documentId);
+            .Include(d => d.FTConteneur!.Elements)
+                .ThenInclude(e => e.ImportPDF)
+            .AsSplitQuery()  // ✅ OBLIGATOIRE pour éviter erreurs concurrence
+            .FirstOrDefaultAsync(d => d.Id == documentId).ConfigureAwait(false);
 
         if (document == null)
             throw new InvalidOperationException($"Document avec l'ID {documentId} introuvable");
@@ -60,7 +59,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     public async Task<DocumentSummaryDto> GetSummaryAsync(int documentId)
     {
         var cacheKey = $"{CACHE_KEY_PREFIX}Summary_{documentId}";
-        
+
         if (!_cache.TryGetValue(cacheKey, out DocumentSummaryDto? summary))
         {
             summary = await _context.DocumentsGeneres
@@ -121,7 +120,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                     NombreFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count : 0
                 })
                 .OrderByDescending(d => d.DateCreation)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
 
             _cache.Set(cacheKey, summaries, TimeSpan.FromMinutes(10));
         }
@@ -156,7 +155,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                     NombreFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count : 0
                 })
                 .OrderByDescending(d => d.DateCreation)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
 
             _cache.Set(cacheKey, summaries, TimeSpan.FromMinutes(15));
         }
@@ -175,7 +174,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         }
 
         // ⚡ FIX CONCURRENCE: Count et Items en séquentiel pour éviter conflit DbContext
-        var totalCount = await query.CountAsync();
+        var totalCount = await query.CountAsync().ConfigureAwait(false);
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -196,7 +195,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                 NombreFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count : 0
             })
             .OrderByDescending(d => d.DateCreation)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
 
         return new PagedResult<DocumentSummaryDto>
         {
@@ -211,7 +210,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     {
         var totalCount = await _context.DocumentsGeneres
             .Where(d => d.ChantierId == chantierId)
-            .CountAsync();
+            .CountAsync().ConfigureAwait(false);
 
         var items = await _context.DocumentsGeneres
             .Where(d => d.ChantierId == chantierId)
@@ -234,7 +233,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                 NombreFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count : 0
             })
             .OrderByDescending(d => d.DateCreation)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
 
         return new PagedResult<DocumentSummaryDto>
         {
@@ -249,7 +248,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     {
         document.DateCreation = DateTime.Now;
         _context.DocumentsGeneres.Add(document);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Invalidate cache
         InvalidateDocumentCaches();
@@ -260,7 +259,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     public async Task<DocumentGenere> UpdateAsync(DocumentGenere document)
     {
         _context.DocumentsGeneres.Update(document);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Invalidate cache
         InvalidateDocumentCaches();
@@ -271,7 +270,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 
     public async Task<bool> DeleteAsync(int documentId)
     {
-        var document = await _context.DocumentsGeneres.FindAsync(documentId);
+        var document = await _context.DocumentsGeneres.FindAsync(documentId).ConfigureAwait(false);
         if (document == null)
             return false;
 
@@ -281,7 +280,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         }
 
         _context.DocumentsGeneres.Remove(document);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Invalidate cache
         InvalidateDocumentCaches();
@@ -309,19 +308,48 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return await CreateAsync(duplicatedDocument);
     }
 
+    public async Task<DocumentGenere> DuplicateToChantierAsync(int documentId, string newName, int newChantierId, string numeroLot, string intituleLot)
+    {
+        var originalDocument = await GetByIdAsync(documentId);
+
+        // Vérifier que le chantier de destination existe
+        var chantierExists = await _context.Chantiers.AnyAsync(c => c.Id == newChantierId && !c.EstArchive);
+        if (!chantierExists)
+        {
+            throw new ArgumentException($"Le chantier avec l'ID {newChantierId} n'existe pas ou est archivé.");
+        }
+
+        var duplicatedDocument = new DocumentGenere
+        {
+            TypeDocument = originalDocument.TypeDocument,
+            FormatExport = originalDocument.FormatExport,
+            NomFichier = newName,
+            ChantierId = newChantierId, // Nouveau chantier
+            NumeroLot = numeroLot,      // Nouveau lot
+            IntituleLot = intituleLot,  // Nouvel intitulé
+            IncludePageDeGarde = originalDocument.IncludePageDeGarde,
+            IncludeTableMatieres = originalDocument.IncludeTableMatieres,
+            Parametres = originalDocument.Parametres,
+            DateCreation = DateTime.Now,
+            EnCours = true // Nouveau document en cours
+        };
+
+        return await CreateAsync(duplicatedDocument);
+    }
+
     public async Task<List<DocumentGenere>> GetDocumentsEnCoursAsync()
     {
         return await _context.DocumentsGeneres
             .Where(d => d.EnCours)
             .Include(d => d.Chantier)
             .OrderByDescending(d => d.DateCreation)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
     }
 
     public async Task<bool> ExistsAsync(int documentId)
     {
         return await _context.DocumentsGeneres
-            .AnyAsync(d => d.Id == documentId);
+            .AnyAsync(d => d.Id == documentId).ConfigureAwait(false);
     }
 
     public async Task<bool> CanFinalizeAsync(int documentId)
@@ -356,7 +384,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         var totalCount = await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await query.CountAsync();
+            return await query.CountAsync().ConfigureAwait(false);
         });
         
         // Requête optimisée avec projection DTO (exécutée APRÈS le count)
@@ -379,7 +407,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                 NbSections = d.SectionsConteneurs.Sum(sc => sc.Items.Count),
                 NbFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count : 0
             })
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
             
         return PagedResult<DocumentListDto>.Create(items, totalCount, page, pageSize);
     }
@@ -402,7 +430,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         var totalCount = await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
-            return await query.CountAsync();
+            return await query.CountAsync().ConfigureAwait(false);
         });
         
         // Projection optimisée avec métriques calculées
@@ -432,7 +460,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                     .Select(d => d.DateCreation)
                     .FirstOrDefault()
             })
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
             
         return PagedResult<ChantierSummaryDto>.Create(items, totalCount, page, pageSize);
     }
@@ -458,7 +486,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         var totalCount = await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await query.CountAsync();
+            return await query.CountAsync().ConfigureAwait(false);
         });
         
         // Projection optimisée avec métriques calculées
@@ -482,7 +510,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                 NbUtilisationsDansDocuments = 0, // TODO: Implémenter si nécessaire
                 DernierDocumentUtilise = null    // TODO: Implémenter si nécessaire
             })
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
             
         return PagedResult<FicheTechniqueSummaryDto>.Create(items, totalCount, page, pageSize);
     }

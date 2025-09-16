@@ -2,6 +2,7 @@
 @using GenerateurDOE.Services.Interfaces
 @inject IFTConteneurService ftConteneurService
 @inject IFicheTechniqueService ficheTechniqueService
+@inject IOperationLockService operationLockService
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
@@ -82,20 +83,50 @@
                                placeholder="ex: 1.1" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Document PDF (optionnel)</label>
-                        <select class="form-select" @bind="selectedImportPDFId">
-                            <option value="">-- Tous les documents --</option>
-                            @if (importsDisponibles.Any())
-                            {
-                                @foreach (var import in importsDisponibles)
+                        <label class="form-label">Documents PDF (optionnel)</label>
+                        @if (pdfsByCategory.Any())
+                        {
+                            <div class="pdf-selection-container border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                @foreach (var categoryGroup in pdfsByCategory.Where(kvp => kvp.Value.Any()))
                                 {
-                                    <option value="@import.Id">
-                                        <!-- TODO(human): Remplacez pdf.TypeDocument par pdf.TypeDocumentImport?.Nom ?? "Non défini" -->
-                                        @import.NomFichierOriginal (@(import.TypeDocumentImport?.Nom ?? "Non défini"))
-                                    </option>
+                                    <div class="category-group mb-2">
+                                        <h6 class="category-title text-primary fw-bold mb-1">
+                                            <span class="oi oi-folder" aria-hidden="true"></span>
+                                            @categoryGroup.Key
+                                        </h6>
+                                        @foreach (var pdfItem in categoryGroup.Value)
+                                        {
+                                            <div class="form-check ms-3">
+                                                <input class="form-check-input" type="checkbox"
+                                                       @bind="pdfItem.IsSelected"
+                                                       id="pdf_@pdfItem.ImportPDF.Id">
+                                                <label class="form-check-label" for="pdf_@pdfItem.ImportPDF.Id">
+                                                    @pdfItem.NomFichierOriginal
+                                                </label>
+                                            </div>
+                                        }
+                                    </div>
                                 }
-                            }
-                        </select>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <span class="oi oi-info" aria-hidden="true"></span>
+                                        Sélectionnez un ou plusieurs documents PDF à associer
+                                    </small>
+                                </div>
+                            </div>
+                        }
+                        else if (selectedFicheTechniqueId > 0)
+                        {
+                            <div class="alert alert-info py-2">
+                                <small>Aucun document PDF disponible pour cette fiche technique</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="form-control text-muted">
+                                Sélectionnez d'abord une fiche technique
+                            </div>
+                        }
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
                         <button class="btn btn-primary w-100" @onclick="AjouterFicheTechnique" 
@@ -219,12 +250,22 @@
 
     private List<FicheTechnique> fichesDisponibles = new();
     private List<ImportPDF> importsDisponibles = new();
-    
+    private Dictionary<string, List<ImportPDFWithSelection>> pdfsByCategory = new();
+
     private bool isLoading = false;
     private bool isAdding = false;
     private int selectedFicheTechniqueId = 0;
-    private int selectedImportPDFId = 0;
+    private List<int> selectedImportPDFIds = new();
     private string nouvellePositionMarche = string.Empty;
+
+    // Classe helper pour la sélection multiple
+    public class ImportPDFWithSelection
+    {
+        public ImportPDF ImportPDF { get; set; } = null!;
+        public bool IsSelected { get; set; }
+        public string NomFichierOriginal => ImportPDF.NomFichierOriginal;
+        public string CategoryName => ImportPDF.TypeDocumentImport?.Nom ?? "Non défini";
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -262,17 +303,33 @@
     private void OnFicheTechniqueChanged()
     {
         importsDisponibles.Clear();
-        selectedImportPDFId = 0;
-        
+        pdfsByCategory.Clear();
+        selectedImportPDFIds.Clear();
+
         if (selectedFicheTechniqueId > 0)
         {
             var ficheSelectionnee = fichesDisponibles.FirstOrDefault(f => f.Id == selectedFicheTechniqueId);
             if (ficheSelectionnee != null)
             {
                 importsDisponibles = ficheSelectionnee.ImportsPDF.ToList();
+
+                // Grouper les PDFs par catégorie
+                var groupedPdfs = ficheSelectionnee.ImportsPDF
+                    .GroupBy(pdf => pdf.TypeDocumentImport?.Nom ?? "Non défini")
+                    .Where(group => group.Any()) // N'afficher que les catégories avec des fichiers
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.Select(pdf => new ImportPDFWithSelection
+                        {
+                            ImportPDF = pdf,
+                            IsSelected = false
+                        }).ToList()
+                    );
+
+                pdfsByCategory = groupedPdfs;
             }
         }
-        
+
         StateHasChanged();
     }
 
@@ -284,26 +341,62 @@
         try
         {
             isAdding = true;
-            
-            var element = await ftConteneurService.AddFTElementAsync(
-                FTConteneur.Id,
-                selectedFicheTechniqueId,
-                nouvellePositionMarche,
-                selectedImportPDFId > 0 ? selectedImportPDFId : null);
+
+            // Récupérer les PDFs sélectionnés
+            var pdfsSelectionnes = pdfsByCategory
+                .SelectMany(kvp => kvp.Value)
+                .Where(pdf => pdf.IsSelected)
+                .Select(pdf => pdf.ImportPDF.Id)
+                .ToList();
+
+            if (pdfsSelectionnes.Any())
+            {
+                // Créer un élément pour chaque PDF sélectionné
+                var elementsAjoutes = new List<FTElement>();
+
+                for (int i = 0; i < pdfsSelectionnes.Count; i++)
+                {
+                    var pdfId = pdfsSelectionnes[i];
+                    var positionMarche = pdfsSelectionnes.Count == 1
+                        ? nouvellePositionMarche
+                        : $"{nouvellePositionMarche}.{i + 1}";
+
+                    var element = await ftConteneurService.AddFTElementAsync(
+                        FTConteneur.Id,
+                        selectedFicheTechniqueId,
+                        positionMarche,
+                        pdfId);
+
+                    elementsAjoutes.Add(element);
+                }
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"{elementsAjoutes.Count} élément(s) ajouté(s) avec succès");
+            }
+            else
+            {
+                // Aucun PDF sélectionné - créer un élément avec tous les documents
+                var element = await ftConteneurService.AddFTElementAsync(
+                    FTConteneur.Id,
+                    selectedFicheTechniqueId,
+                    nouvellePositionMarche,
+                    null);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"Fiche technique ajoutée à la position {element.PositionMarche} (tous documents)");
+            }
 
             // Recharger le conteneur pour avoir les données complètes
             FTConteneur = await ftConteneurService.GetByIdAsync(FTConteneur.Id);
-            
+
             // Reset du formulaire
             selectedFicheTechniqueId = 0;
-            selectedImportPDFId = 0;
+            selectedImportPDFIds.Clear();
             nouvellePositionMarche = string.Empty;
             importsDisponibles.Clear();
-            
+            pdfsByCategory.Clear();
+
             await OnConteneurChanged.InvokeAsync(FTConteneur);
-            
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                $"Fiche technique ajoutée à la position {element.PositionMarche}");
         }
         catch (Exception ex)
         {
@@ -326,18 +419,29 @@
         {
             try
             {
-                await ftConteneurService.RemoveFTElementAsync(element.Id);
-                
-                // Recharger le conteneur
-                if (FTConteneur != null)
+                // 🔧 CORRECTION CONCURRENCE: Protection suppression élément
+                var operationKey = $"remove-ftelement-{element.Id}";
+                var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
                 {
-                    FTConteneur = await ftConteneurService.GetByIdAsync(FTConteneur.Id);
+                    await ftConteneurService.RemoveFTElementAsync(element.Id);
+
+                    // Recharger le conteneur
+                    if (FTConteneur != null)
+                    {
+                        FTConteneur = await ftConteneurService.GetByIdAsync(FTConteneur.Id);
+                    }
+
+                    await OnConteneurChanged.InvokeAsync(FTConteneur);
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        "Élément supprimé avec succès");
+                });
+
+                if (!executed)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                        "Une suppression est déjà en cours");
                 }
-                
-                await OnConteneurChanged.InvokeAsync(FTConteneur);
-                
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                    "Élément supprimé avec succès");
             }
             catch (Exception ex)
             {
@@ -427,28 +531,70 @@
     .ft-conteneur-editor {
         min-height: 200px;
     }
-    
+
     .drag-handle {
         color: #6c757d;
         font-size: 1.1em;
     }
-    
+
     .drag-handle:hover {
         color: #495057;
     }
-    
+
     .table th {
         border-top: none;
         font-weight: 600;
         font-size: 0.9em;
     }
-    
+
     .form-control-sm {
         border: 1px solid transparent;
     }
-    
+
     .form-control-sm:focus {
         border-color: #86b7fe;
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    /* Styles pour l'interface de sélection PDF */
+    .pdf-selection-container {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+
+    .category-group {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 8px;
+    }
+
+    .category-group:last-child {
+        border-bottom: none;
+        margin-bottom: 0 !important;
+    }
+
+    .category-title {
+        font-size: 0.875rem;
+        margin-bottom: 4px;
+        color: #0d6efd;
+    }
+
+    .category-title .oi {
+        font-size: 0.8rem;
+        margin-right: 4px;
+    }
+
+    .form-check {
+        margin-bottom: 4px;
+    }
+
+    .form-check-label {
+        font-size: 0.875rem;
+        color: #495057;
+        cursor: pointer;
+    }
+
+    .form-check-input:checked + .form-check-label {
+        color: #0d6efd;
+        font-weight: 500;
     }
 </style>

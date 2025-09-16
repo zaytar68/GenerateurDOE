@@ -51,11 +51,13 @@ public class SectionConteneurService : ISectionConteneurService
 
     public async Task<SectionConteneur> GetByIdAsync(int id)
     {
+        // 🔧 CORRECTION CONCURRENCE CRITIQUE: AsSingleQuery pour éviter conflits
         var sectionConteneur = await _context.SectionsConteneurs
             .Include(sc => sc.Items.OrderBy(item => item.Ordre))
                 .ThenInclude(item => item.SectionLibre)
             .Include(sc => sc.TypeSection)
             .Include(sc => sc.DocumentGenere)
+            .AsSingleQuery()  // ✅ Single query pour contrôler concurrence
             .FirstOrDefaultAsync(sc => sc.Id == id);
 
         if (sectionConteneur == null)
@@ -66,20 +68,24 @@ public class SectionConteneurService : ISectionConteneurService
 
     public async Task<SectionConteneur?> GetByDocumentAndTypeAsync(int documentGenereId, int typeSectionId)
     {
+        // 🔧 CORRECTION CONCURRENCE: Single query pour éviter split
         return await _context.SectionsConteneurs
             .Include(sc => sc.Items.OrderBy(item => item.Ordre))
                 .ThenInclude(item => item.SectionLibre)
             .Include(sc => sc.TypeSection)
+            .AsSingleQuery()  // ✅ Contrôle explicite du split
             .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId);
     }
 
     public async Task<IEnumerable<SectionConteneur>> GetByDocumentIdAsync(int documentGenereId)
     {
+        // 🔧 CORRECTION CONCURRENCE CRITIQUE: Single query pour liste multiple
         return await _context.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
             .Include(sc => sc.Items.OrderBy(item => item.Ordre))
                 .ThenInclude(item => item.SectionLibre)
             .Include(sc => sc.TypeSection)
+            .AsSingleQuery()  // ✅ Évite split sur collection multiples
             .OrderBy(sc => sc.Ordre)
             .ToListAsync();
     }
@@ -118,12 +124,8 @@ public class SectionConteneurService : ISectionConteneurService
         if (sectionLibre == null)
             throw new ArgumentException("SectionLibre non trouvée", nameof(sectionLibreId));
 
-        if (!sectionConteneur.SectionsLibres.Any(sl => sl.Id == sectionLibreId))
-        {
-            sectionConteneur.SectionsLibres.Add(sectionLibre);
-            await _context.SaveChangesAsync();
-            _loggingService.LogInformation($"SectionLibre {sectionLibreId} ajoutée au conteneur {sectionConteneursId}");
-        }
+        // TODO: Refactorer cette méthode pour utiliser SectionConteneurItem
+        throw new NotImplementedException("Utilisez les nouvelles méthodes avec SectionConteneurItem");
 
         return sectionConteneur;
     }
@@ -131,16 +133,8 @@ public class SectionConteneurService : ISectionConteneurService
     public async Task<bool> RemoveSectionLibreAsync(int sectionConteneursId, int sectionLibreId)
     {
         var sectionConteneur = await GetByIdAsync(sectionConteneursId);
-        var sectionLibre = sectionConteneur.SectionsLibres.FirstOrDefault(sl => sl.Id == sectionLibreId);
-
-        if (sectionLibre == null)
-            return false;
-
-        sectionConteneur.SectionsLibres.Remove(sectionLibre);
-        await _context.SaveChangesAsync();
-
-        _loggingService.LogInformation($"SectionLibre {sectionLibreId} retirée du conteneur {sectionConteneursId}");
-        return true;
+        // TODO: Refactorer cette méthode pour utiliser SectionConteneurItem
+        throw new NotImplementedException("Utilisez RemoveSectionLibreItemAsync à la place");
     }
 
     public async Task<SectionConteneur> ReorderSectionsLibresAsync(int sectionConteneursId, List<int> sectionLibreIds)

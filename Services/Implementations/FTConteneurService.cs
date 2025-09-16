@@ -44,12 +44,15 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTConteneur> GetByIdAsync(int id)
     {
+        // 🔧 CORRECTION CONCURRENCE: Single Include chain pour éviter conflits
         var ftConteneur = await _context.FTConteneurs
             .Include(ftc => ftc.Elements.OrderBy(fte => fte.Ordre))
                 .ThenInclude(fte => fte.FicheTechnique)
             .Include(ftc => ftc.Elements)
                 .ThenInclude(fte => fte.ImportPDF)
+                    .ThenInclude(ip => ip!.TypeDocumentImport)
             .Include(ftc => ftc.DocumentGenere)
+            .AsSingleQuery()  // ✅ Forcer single query pour éviter split concurrentiel
             .FirstOrDefaultAsync(ftc => ftc.Id == id);
 
         if (ftConteneur == null)
@@ -60,11 +63,14 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTConteneur?> GetByDocumentIdAsync(int documentGenereId)
     {
+        // 🔧 CORRECTION CONCURRENCE: Même pattern sécurisé que GetByIdAsync
         return await _context.FTConteneurs
             .Include(ftc => ftc.Elements.OrderBy(fte => fte.Ordre))
                 .ThenInclude(fte => fte.FicheTechnique)
             .Include(ftc => ftc.Elements)
                 .ThenInclude(fte => fte.ImportPDF)
+                    .ThenInclude(ip => ip!.TypeDocumentImport)
+            .AsSingleQuery()  // ✅ Single query pour éviter concurrence
             .FirstOrDefaultAsync(ftc => ftc.DocumentGenereId == documentGenereId);
     }
 

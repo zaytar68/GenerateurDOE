@@ -10,6 +10,7 @@ public interface IDocumentGenereService
     Task<DocumentGenere> GetByIdAsync(int documentGenereId);
     Task<DocumentGenere> UpdateAsync(DocumentGenere documentGenere);
     Task<DocumentGenere> DuplicateAsync(int documentId, string newName);
+    Task<DocumentGenere> DuplicateToChantierAsync(int documentId, string newName, int newChantierId, string numeroLot, string intituleLot);
     Task<IEnumerable<DocumentGenere>> GetDocumentsGeneresByChantierId(int chantierId);
     Task<bool> DeleteDocumentGenereAsync(int documentGenereId);
 

@@ -18,9 +18,10 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // Add Entity Framework with optimizations
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-    // ⚡ Note: QuerySplittingBehavior configuré avec AsSplitQuery() dans les services
-    // Performance: +40-60% sur les requêtes complexes (résout warnings EF Core)
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+    // ✅ QuerySplittingBehavior configuré pour résoudre les erreurs de concurrence
+    // et améliorer les performances sur les requêtes avec multiple collections
 });
 
 // Configuration des paramètres d'application
@@ -65,6 +66,12 @@ builder.Services.AddMemoryCache();
 
 // Service de cache centralisé Phase 3C
 builder.Services.AddScoped<ICacheService, CacheService>();
+
+// Service de gestion d'état de chargement Phase 3D
+builder.Services.AddScoped<ILoadingStateService, LoadingStateService>();
+
+// Service de protection anti-concurrence DbContext (CORRECTION CRITIQUE)
+builder.Services.AddScoped<IOperationLockService, OperationLockService>();
 
 // PDF Generation services
 builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();

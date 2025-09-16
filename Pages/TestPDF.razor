@@ -3,8 +3,10 @@
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Data
 @using Microsoft.EntityFrameworkCore
+@implements IDisposable
 
 @inject IDocumentGenereService DocumentGenereService
+@inject ILoadingStateService LoadingStateService
 @inject IJSRuntime JSRuntime
 @inject ApplicationDbContext Context
 
@@ -69,36 +71,44 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <button class="btn btn-info w-100" 
-                                    @onclick="TestHtmlGeneration"
-                                    disabled="@isGenerating">
+                            <button class="btn btn-secondary w-100"
+                                    disabled="true">
                                 <i class="oi oi-code"></i>
-                                Test HTML
+                                Test HTML (Désactivé)
                             </button>
                         </div>
                         <div class="col-md-3">
-                            <button class="btn btn-success w-100" 
-                                    @onclick="TestMarkdownGeneration"
-                                    disabled="@isGenerating">
+                            <button class="btn btn-secondary w-100"
+                                    disabled="true">
                                 <i class="oi oi-text"></i>
-                                Test Markdown
+                                Test Markdown (Désactivé)
                             </button>
                         </div>
                         <div class="col-md-3">
-                            <button class="btn btn-primary w-100" 
-                                    @onclick="TestPdfGeneration"
-                                    disabled="@isGenerating">
-                                <i class="oi oi-document"></i>
-                                Test PDF ✨
-                            </button>
+                            <LoadingWrapper IsLoading="@LoadingStateService.IsLoading("pdf-test")"
+                                          LoadingMessage="Génération PDF...">
+                                <ContentTemplate>
+                                    <button class="btn btn-primary w-100"
+                                            @onclick="TestPdfGeneration"
+                                            disabled="@LoadingStateService.IsAnyLoading()">
+                                        <i class="oi oi-document"></i>
+                                        Test PDF ✨
+                                    </button>
+                                </ContentTemplate>
+                            </LoadingWrapper>
                         </div>
                         <div class="col-md-3">
-                            <button class="btn btn-danger w-100" 
-                                    @onclick="TestCompletePdfWithFiches"
-                                    disabled="@isGenerating">
-                                <i class="oi oi-document"></i>
-                                Test PDF Complet 🎯
-                            </button>
+                            <LoadingWrapper IsLoading="@LoadingStateService.IsLoading("pdf-complete")"
+                                          LoadingMessage="Génération PDF complet...">
+                                <ContentTemplate>
+                                    <button class="btn btn-danger w-100"
+                                            @onclick="TestCompletePdfWithFiches"
+                                            disabled="@LoadingStateService.IsAnyLoading()">
+                                        <i class="oi oi-document"></i>
+                                        Test PDF Complet 🎯
+                                    </button>
+                                </ContentTemplate>
+                            </LoadingWrapper>
                         </div>
                     </div>
                 </div>
@@ -165,12 +175,20 @@
     private long lastGenerationTime = 0;
     private string errorMessage = "";
     private int testChantierId = 0;
-    
+
     protected override async Task OnInitializedAsync()
     {
         // On va utiliser un ID de chantier fictif pour les tests
         // Dans une vraie implémentation, on créerait un chantier de test
         testChantierId = 1;
+
+        // Abonnement aux changements d'état de chargement
+        LoadingStateService.StateChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        LoadingStateService.StateChanged -= StateHasChanged;
     }
     
     private async Task TestHtmlGeneration()
@@ -261,17 +279,35 @@
     {
         try
         {
+            LoadingStateService.SetLoading("pdf-test", true);
             isGenerating = true;
             statusMessage = "🚀 Génération PDF avec PuppeteerSharp...";
             errorMessage = "";
             StateHasChanged();
-            
+
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
-            // TODO(human): TEST DE LA VRAIE GÉNÉRATION PDF avec nouvelle API
-            // 1. Créer un DocumentGenere temporaire pour testChantierId  
-            // 2. Appeler ExportDocumentAsync(documentId, FormatExport.PDF)
-            var pdfPath = "TODO: Implémenter nouvelle logique PDF";
+            // Test de génération PDF avec la vraie API
+            // 1. Rechercher un document existant ou utiliser le premier disponible
+            var documentForTest = await Context.DocumentsGeneres
+                .Include(d => d.Chantier)
+                .FirstOrDefaultAsync();
+
+            if (documentForTest == null)
+            {
+                throw new InvalidOperationException("Aucun document disponible pour le test PDF");
+            }
+
+            // 2. Générer le PDF avec GenerateCompletePdfAsync
+            var pdfBytes = await DocumentGenereService.GenerateCompletePdfAsync(documentForTest.Id);
+
+            // 3. Sauvegarder le PDF de test
+            var fileName = $"test-pdf-{documentForTest.Id}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf";
+            var tempDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "temp");
+            Directory.CreateDirectory(tempDir);
+            var pdfPath = Path.Combine(tempDir, fileName);
+
+            await File.WriteAllBytesAsync(pdfPath, pdfBytes);
             
             stopwatch.Stop();
             lastGenerationTime = stopwatch.ElapsedMilliseconds;
@@ -294,6 +330,7 @@
         }
         finally
         {
+            LoadingStateService.SetLoading("pdf-test", false);
             isGenerating = false;
             StateHasChanged();
         }
@@ -341,6 +378,7 @@
     {
         try
         {
+            LoadingStateService.SetLoading("pdf-complete", true);
             isGenerating = true;
             statusMessage = "🎯 Recherche d'un document avec fiches techniques...";
             errorMessage = "";
@@ -349,6 +387,7 @@
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
             // 1. Rechercher un document avec FTConteneur et des éléments
+            // 🔧 CORRECTION CONCURRENCE CRITIQUE: AsSplitQuery pour multiple ThenInclude
             var documentWithFT = await Context.DocumentsGeneres
                 .Include(d => d.Chantier)
                 .Include(d => d.FTConteneur)
@@ -357,6 +396,7 @@
                 .Include(d => d.FTConteneur)
                     .ThenInclude(ftc => ftc!.Elements)
                         .ThenInclude(fte => fte.FicheTechnique)
+                .AsSplitQuery()  // ✅ OBLIGATOIRE pour éviter erreurs concurrence
                 .Where(d => d.FTConteneur != null && d.FTConteneur.Elements.Any(e => e.ImportPDF != null))
                 .FirstOrDefaultAsync();
             
@@ -419,11 +459,12 @@
         }
         finally
         {
+            LoadingStateService.SetLoading("pdf-complete", false);
             isGenerating = false;
             StateHasChanged();
         }
     }
-    
+
     private async Task<DocumentGenere> CreateTestDocumentWithFTAsync()
     {
         // Si aucun document avec FT existe, créer un document de test

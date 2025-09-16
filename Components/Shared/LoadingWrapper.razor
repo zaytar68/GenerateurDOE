@@ -1,0 +1,55 @@
+@if (IsLoading)
+{
+    <div class="loading-container d-flex flex-column justify-content-center align-items-center">
+        @if (LoadingTemplate != null)
+        {
+            @LoadingTemplate
+        }
+        else
+        {
+            <div class="d-flex flex-column align-items-center">
+                <RadzenProgressBarCircular ShowValue="false"
+                                         Style="@($"color: {Color}; width: {SizeValue}; height: {SizeValue};")" />
+                @if (!string.IsNullOrEmpty(LoadingMessage))
+                {
+                    <span class="mt-2 text-muted">@LoadingMessage</span>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    @if (ContentTemplate != null)
+    {
+        @ContentTemplate
+    }
+    else
+    {
+        @ChildContent
+    }
+}
+
+@code {
+    [Parameter] public bool IsLoading { get; set; } = false;
+    [Parameter] public string LoadingMessage { get; set; } = "Chargement en cours...";
+    [Parameter] public string Color { get; set; } = "var(--rz-primary)";
+    [Parameter] public string Size { get; set; } = "Medium";
+    [Parameter] public RenderFragment? ContentTemplate { get; set; }
+    [Parameter] public RenderFragment? LoadingTemplate { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string SizeValue => Size switch
+    {
+        "Small" => "24px",
+        "Large" => "64px",
+        _ => "40px" // Medium par défaut
+    };
+}
+
+<style>
+    .loading-container {
+        min-height: 100px;
+        width: 100%;
+    }
+</style>

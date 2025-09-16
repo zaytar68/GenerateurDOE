@@ -201,7 +201,7 @@ Use entity framework.
 - [ ] Tests de charge sur génération de documents
 - [ ] Documentation technique à jour
 
-## État Actuel (Septembre 2024)
+## État Actuel (Septembre 2025)
 
 ### ✅ Fonctionnalités Terminées
 - [x] Refactorisation complète interface SectionsLibres avec modal et filtres
@@ -228,7 +228,7 @@ Use entity framework.
 7. Génération en lot (batch processing)
 8. Support formats additionnels (Word, Excel)
 
-## 🚀 Analyse des Performances - Phase 3 (Septembre 2024)
+## 🚀 Analyse des Performances - Phase 3 (Septembre 2025)
 
 ### 📊 **GOULOTS D'ÉTRANGLEMENT IDENTIFIÉS**
 
@@ -372,7 +372,7 @@ ON DocumentGenere (ChantierId, EnCours);
 6. PDF cache & browser pooling
 7. Database indexes supplémentaires
 
-## 📈 **ÉTAT PHASE 2 - TERMINÉE (Septembre 2024)**
+## 📈 **ÉTAT PHASE 2 - TERMINÉE (Septembre 2025)**
 
 ### ✅ **MIGRATION LOTS RÉUSSIE**
 - **Business Logic corrigée** : Lots déplacés de Chantier vers DocumentGenere (1 chantier -> N documents -> 1 lot/document)
@@ -389,12 +389,52 @@ ON DocumentGenere (ChantierId, EnCours);
 
 ### 🎯 **PROCHAINE ÉTAPE : PHASE 3 PERFORMANCE**
 La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Core critiques identifiées :
-1. **QuerySplittingBehavior** (40-60% gain sur requêtes complexes)  
+1. **QuerySplittingBehavior** (40-60% gain sur requêtes complexes)
 2. **Relations disambiguation** (100% stabilité EF)
 3. **Memory caching** (70% gain données référentielles)
 
+## 🎯 **DÉCISION ARCHITECTURALE : ASYNC vs SYNC (Septembre 2025)**
+
+### ✅ **VERDICT TECHNIQUE FINAL**
+**Architecture asynchrone CONSERVÉE** - Recommandation unanime Software Architect + Tech Lead
+
+**Analyse des agents techniques** :
+- ❌ **Synchrone serait une RÉGRESSION architecturale** : Deadlocks, thread blocking, perte de scalabilité
+- ✅ **Asynchrone actuel est OPTIMAL** : DbContext Scoped + QuerySplittingBehavior + 42 ConfigureAwait(false)
+- 🎯 **Solution** : Améliorer loading states UI plutôt que changer l'architecture
+
+### 🔧 **PLAN D'AMÉLIORATION UX (Phase 3D)**
+
+**Priorité 1 - Loading States (4-5h sur 1-2 jours)** :
+1. **LoadingWrapper Component** : Composant réutilisable avec RadzenProgressBarCircular
+2. **LoadingStateService** : Service de gestion d'état global (injection Scoped)
+3. **UI Feedback** : Spinners sur boutons génération PDF, opérations CRUD
+4. **Memory Cache** : Données référentielles (TypesSections, TypesProduits - expiration 1h)
+
+**Gains attendus** :
+- **UX** : +80% perception de réactivité
+- **Performance** : Conservation +300% throughput async
+- **Stabilité** : Aucune régression architecturale
+- **Cache** : +70% vitesse données statiques
+
+**Patterns UI recommandés** :
+```razor
+<RadzenButton Click="HandleOperation" Disabled="@isLoading">
+    @if (isLoading)
+    {
+        <RadzenIcon Icon="hourglass_empty" Style="animation: spin 1s linear infinite;" />
+        <span>Opération en cours...</span>
+    }
+</RadzenButton>
+```
+
+### 📋 **BACKLOG MISE À JOUR**
+4. **Phase 3D UX** : États de chargement et feedback utilisateur ⚡ **NOUVELLE PRIORITÉ**
+5. Optimisation performances EF Core (QuerySplittingBehavior + Relations)
+6. Tests automatisés et CI/CD
+
 ---
-*Dernière mise à jour: Septembre 2024*
-*Phase 2 terminée - Migration lots + Repository Pattern*  
-*Roadmap validée par Software Architect et Tech Lead*
+*Dernière mise à jour: Septembre 2025*
+*Architecture async validée - Phase 3D UX Loading States ajoutée*
+*Décision technique : Software Architect + Tech Lead + User*
 

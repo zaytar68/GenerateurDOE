@@ -1,0 +1,308 @@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@using Radzen
+@inject IChantierService ChantierService
+@inject Radzen.NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<style>
+    .duplication-form {
+        padding: 20px;
+        min-width: 500px;
+        max-width: 600px;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #333;
+    }
+
+    .required::after {
+        content: " *";
+        color: #dc3545;
+    }
+
+    .validation-message {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .autocomplete-wrapper {
+        position: relative;
+    }
+</style>
+
+<div class="duplication-form">
+    <h4 class="mb-3">Dupliquer le document</h4>
+
+    <div class="form-group">
+        <label class="form-label required">Nouveau nom du fichier</label>
+        <RadzenTextBox @bind-Value="NomFichier"
+                      Placeholder="Nom du document dupliqué"
+                      Style="width: 100%;"
+                      MaxLength="255" />
+        @if (!string.IsNullOrEmpty(ErrorNomFichier))
+        {
+            <div class="validation-message">@ErrorNomFichier</div>
+        }
+    </div>
+
+    <div class="form-group">
+        <label class="form-label required">Chantier de destination</label>
+        <div class="autocomplete-wrapper">
+            <AutoComplete T="Chantier"
+                         Items="@chantiers"
+                         OnItemSelected="@OnChantierSelected"
+                         DisplaySelector="@GetChantierNom"
+                         Placeholder="Rechercher un chantier..."
+                         CssClass="@(string.IsNullOrEmpty(ErrorChantier) ? "" : "is-invalid")" />
+        </div>
+        @if (!string.IsNullOrEmpty(ErrorChantier))
+        {
+            <div class="validation-message">@ErrorChantier</div>
+        }
+    </div>
+
+    <div class="form-group">
+        <label class="form-label required">Numéro de lot</label>
+        <RadzenTextBox @bind-Value="NumeroLot"
+                      Placeholder="Ex: 01, 02A, 05..."
+                      Style="width: 100%;"
+                      MaxLength="50" />
+        @if (!string.IsNullOrEmpty(ErrorNumeroLot))
+        {
+            <div class="validation-message">@ErrorNumeroLot</div>
+        }
+    </div>
+
+    <div class="form-group">
+        <label class="form-label required">Intitulé du lot</label>
+        <RadzenTextArea @bind-Value="IntituleLot"
+                       Placeholder="Description du lot..."
+                       Style="width: 100%; min-height: 80px;"
+                       MaxLength="300" />
+        @if (!string.IsNullOrEmpty(ErrorIntituleLot))
+        {
+            <div class="validation-message">@ErrorIntituleLot</div>
+        }
+    </div>
+
+    <div class="modal-actions">
+        <RadzenButton Text="Annuler"
+                     ButtonStyle="ButtonStyle.Light"
+                     Click="OnCancel" />
+        <RadzenButton Text="Dupliquer"
+                     ButtonStyle="ButtonStyle.Primary"
+                     Click="OnConfirm"
+                     Disabled="@isProcessing" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public DocumentGenere? OriginalDocument { get; set; }
+
+    private List<Chantier> chantiers = new();
+    private bool isProcessing = false;
+
+    private string GetChantierNom(Chantier chantier) => chantier?.NomProjet ?? "";
+
+    // Propriétés du formulaire
+    private string nomFichier = "";
+    private Chantier? chantierSelectionne;
+    private string numeroLot = "";
+    private string intituleLot = "";
+
+    // Messages d'erreur
+    private string ErrorNomFichier = "";
+    private string ErrorChantier = "";
+    private string ErrorNumeroLot = "";
+    private string ErrorIntituleLot = "";
+
+    // Propriétés publiques pour le binding
+    public string NomFichier
+    {
+        get => nomFichier;
+        set { nomFichier = value; ClearError(nameof(NomFichier)); }
+    }
+
+    public Chantier? ChantierSelectionne
+    {
+        get => chantierSelectionne;
+        set { chantierSelectionne = value; ClearError(nameof(ChantierSelectionne)); }
+    }
+
+    public string NumeroLot
+    {
+        get => numeroLot;
+        set { numeroLot = value; ClearError(nameof(NumeroLot)); }
+    }
+
+    public string IntituleLot
+    {
+        get => intituleLot;
+        set { intituleLot = value; ClearError(nameof(IntituleLot)); }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeForm();
+    }
+
+    private async Task InitializeForm()
+    {
+        // Charger la liste des chantiers
+        chantiers = await ChantierService.GetAllAsync(includeArchived: false);
+
+        // Pré-remplir les champs avec des valeurs par défaut
+        if (OriginalDocument != null)
+        {
+            NomFichier = $"{OriginalDocument.NomFichier}_Copie_{DateTime.Now:yyyyMMdd_HHmm}";
+            ChantierSelectionne = null; // L'utilisateur doit choisir
+            NumeroLot = OriginalDocument.NumeroLot ?? "";
+            IntituleLot = OriginalDocument.IntituleLot ?? "";
+        }
+
+        ClearAllErrors();
+    }
+
+    private bool ValidateForm()
+    {
+        ClearAllErrors();
+        bool isValid = true;
+
+        if (string.IsNullOrWhiteSpace(NomFichier))
+        {
+            ErrorNomFichier = "Le nom du fichier est requis.";
+            isValid = false;
+        }
+        else if (NomFichier.Length > 255)
+        {
+            ErrorNomFichier = "Le nom du fichier ne peut pas dépasser 255 caractères.";
+            isValid = false;
+        }
+
+        if (ChantierSelectionne == null)
+        {
+            ErrorChantier = "Vous devez sélectionner un chantier de destination.";
+            isValid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(NumeroLot))
+        {
+            ErrorNumeroLot = "Le numéro de lot est requis.";
+            isValid = false;
+        }
+        else if (NumeroLot.Length > 50)
+        {
+            ErrorNumeroLot = "Le numéro de lot ne peut pas dépasser 50 caractères.";
+            isValid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(IntituleLot))
+        {
+            ErrorIntituleLot = "L'intitulé du lot est requis.";
+            isValid = false;
+        }
+        else if (IntituleLot.Length > 300)
+        {
+            ErrorIntituleLot = "L'intitulé du lot ne peut pas dépasser 300 caractères.";
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    private async Task OnConfirm()
+    {
+        if (!ValidateForm())
+        {
+            return;
+        }
+
+        isProcessing = true;
+
+        try
+        {
+            var result = new DuplicationResult
+            {
+                NomFichier = NomFichier.Trim(),
+                ChantierId = ChantierSelectionne!.Id,
+                NumeroLot = NumeroLot.Trim(),
+                IntituleLot = IntituleLot.Trim()
+            };
+
+            DialogService.Close(result);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Erreur",
+                $"Une erreur est survenue lors de la duplication : {ex.Message}");
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private void ClearError(string fieldName)
+    {
+        switch (fieldName)
+        {
+            case nameof(NomFichier):
+                ErrorNomFichier = "";
+                break;
+            case nameof(ChantierSelectionne):
+                ErrorChantier = "";
+                break;
+            case nameof(NumeroLot):
+                ErrorNumeroLot = "";
+                break;
+            case nameof(IntituleLot):
+                ErrorIntituleLot = "";
+                break;
+        }
+    }
+
+    private void OnChantierSelected(Chantier chantier)
+    {
+        ChantierSelectionne = chantier;
+        StateHasChanged();
+    }
+
+    private void ClearAllErrors()
+    {
+        ErrorNomFichier = "";
+        ErrorChantier = "";
+        ErrorNumeroLot = "";
+        ErrorIntituleLot = "";
+    }
+
+    public class DuplicationResult
+    {
+        public string NomFichier { get; set; } = "";
+        public int ChantierId { get; set; }
+        public string NumeroLot { get; set; } = "";
+        public string IntituleLot { get; set; } = "";
+    }
+}

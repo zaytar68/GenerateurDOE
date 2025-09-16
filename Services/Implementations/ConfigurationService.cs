@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
+using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
 
 namespace GenerateurDOE.Services.Implementations;
 
@@ -10,18 +11,24 @@ public class ConfigurationService : IConfigurationService
     private readonly IConfiguration _configuration;
     private readonly IOptionsMonitor<AppSettings> _appSettings;
     private readonly IWebHostEnvironment _environment;
+    private readonly ICacheService _cache;
 
-    public ConfigurationService(IConfiguration configuration, IOptionsMonitor<AppSettings> appSettings, IWebHostEnvironment environment)
+    public ConfigurationService(IConfiguration configuration, IOptionsMonitor<AppSettings> appSettings, IWebHostEnvironment environment, ICacheService cache)
     {
         _configuration = configuration;
         _appSettings = appSettings;
         _environment = environment;
+        _cache = cache;
     }
 
     public async Task<AppSettings> GetAppSettingsAsync()
     {
-        await Task.Delay(1);
-        return _appSettings.CurrentValue;
+        // ⚡ Cache L1 : AppSettings avec expiration 30min
+        return await _cache.GetOrCreateAsync(APP_SETTINGS_KEY, async () =>
+        {
+            await Task.Delay(1); // Simulation async minimal
+            return _appSettings.CurrentValue;
+        }, TimeSpan.FromMinutes(30));
     }
 
     public async Task<bool> UpdateAppSettingsAsync(AppSettings appSettings)
@@ -67,6 +74,9 @@ public class ConfigurationService : IConfigurationService
                 var updatedJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
                 await File.WriteAllTextAsync(appSettingsPath, updatedJson);
             }
+
+            // ⚡ Invalider le cache après mise à jour des settings
+            _cache.Remove(APP_SETTINGS_KEY);
 
             return true;
         }

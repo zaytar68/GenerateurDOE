@@ -6,6 +6,7 @@
 @inject NavigationManager Navigation
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Détail du Chantier</PageTitle>
 
@@ -107,7 +108,6 @@
                                     <thead>
                                         <tr>
                                             <th>Type de Document</th>
-                                            <th>Format</th>
                                             <th>Nom du Fichier</th>
                                             <th>Date de Création</th>
                                             <th>Options</th>
@@ -123,7 +123,6 @@
                                                         @GetTypeDisplayName(document.TypeDocument)
                                                     </span>
                                                 </td>
-                                                <td>@document.FormatExport</td>
                                                 <td>@document.NomFichier</td>
                                                 <td>@document.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
                                                 <td>
@@ -147,16 +146,13 @@
                                                             title="Éditer le contenu">
                                                         📝
                                                     </button>
-                                                    <button class="btn btn-outline-success btn-sm me-1" 
+                                                    
+                                                    <button class="btn btn-outline-info btn-sm me-1"
                                                             @onclick="() => DupliquerDocument(document)"
                                                             title="Dupliquer">
-                                                        📄
+                                                            📚
                                                     </button>
-                                                    <button class="btn btn-outline-secondary btn-sm me-1" 
-                                                            @onclick="() => ModifierDocument(document)"
-                                                            title="Modifier les paramètres">
-                                                        ⚙️
-                                                    </button>
+
                                                     <button class="btn btn-outline-danger btn-sm" 
                                                             @onclick="() => SupprimerDocument(document)"
                                                             title="Supprimer">
@@ -176,12 +172,14 @@
     }
 </div>
 
+
 @code {
     [Parameter] public int ChantierId { get; set; }
     
     private Chantier? chantier;
     private List<DocumentGenere> documentsGeneres = new();
     private bool isLoading = true;
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -291,18 +289,42 @@
     {
         try
         {
-            // Générer le document s'il n'existe pas encore
-            if (string.IsNullOrEmpty(document.CheminFichier) || !File.Exists(document.CheminFichier))
+            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Génération", "Génération du PDF en cours...");
+
+            byte[] pdfBytes;
+
+            // Génération PDF selon le format demandé
+            if (document.FormatExport == FormatExport.PDF)
             {
-                var contenu = await documentGenereService.ExportDocumentAsync(
-                    document.Id, 
-                    document.FormatExport);
-                
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", "Document généré avec succès");
+                // Utilisation de la génération PDF complète avec PuppeteerSharp + PDFSharp
+                pdfBytes = await documentGenereService.GenerateCompletePdfAsync(document.Id);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", "PDF généré avec succès");
             }
-            
-            // Pour l'instant, on simule le téléchargement
-            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Téléchargement", $"Téléchargement de {document.NomFichier} simulé");
+            else
+            {
+                // Pour les autres formats (HTML, Markdown), utiliser l'export standard
+                var cheminFichier = await documentGenereService.ExportDocumentAsync(document.Id, document.FormatExport);
+
+                if (File.Exists(cheminFichier))
+                {
+                    pdfBytes = await File.ReadAllBytesAsync(cheminFichier);
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", $"Document {document.FormatExport} généré");
+                }
+                else
+                {
+                    throw new FileNotFoundException("Le fichier généré n'a pas été trouvé");
+                }
+            }
+
+            // Téléchargement automatique du fichier
+            var fileName = $"{document.NomFichier}_{DateTime.Now:yyyyMMdd_HHmm}.{GetFileExtension(document.FormatExport)}";
+            var base64 = Convert.ToBase64String(pdfBytes);
+            var mimeType = GetMimeType(document.FormatExport);
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64, mimeType);
+
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement", $"Téléchargement de {fileName} démarré");
         }
         catch (Exception ex)
         {
@@ -310,26 +332,58 @@
         }
     }
 
+    private string GetFileExtension(FormatExport format)
+    {
+        return format switch
+        {
+            FormatExport.PDF => "pdf",
+            FormatExport.HTML => "html",
+            FormatExport.Markdown => "md",
+            _ => "pdf"
+        };
+    }
+
+    private string GetMimeType(FormatExport format)
+    {
+        return format switch
+        {
+            FormatExport.PDF => "application/pdf",
+            FormatExport.HTML => "text/html",
+            FormatExport.Markdown => "text/markdown",
+            _ => "application/pdf"
+        };
+    }
+
     private async Task DupliquerDocument(DocumentGenere document)
     {
-        var result = await DialogService.Confirm(
-            $"Voulez-vous dupliquer le document '{document.NomFichier}' ?",
-            "Confirmation de duplication",
-            new Radzen.ConfirmOptions { OkButtonText = "Dupliquer", CancelButtonText = "Annuler" });
-
-        if (result == true)
+        try
         {
-            try
+            var result = await DialogService.OpenAsync<DuplicationModal>("Dupliquer le document",
+                new Dictionary<string, object> { { "OriginalDocument", document } });
+
+            if (result is DuplicationModal.DuplicationResult duplicationResult)
             {
-                var nouveauNom = $"{document.NomFichier}_Copie_{DateTime.Now:yyyyMMdd_HHmm}";
-                await documentGenereService.DuplicateAsync(document.Id, nouveauNom);
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document dupliqué avec succès");
-                await ChargerChantier(); // Recharger la liste
+                await documentGenereService.DuplicateToChantierAsync(
+                    document.Id,
+                    duplicationResult.NomFichier,
+                    duplicationResult.ChantierId,
+                    duplicationResult.NumeroLot,
+                    duplicationResult.IntituleLot);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    "Document dupliqué avec succès vers le chantier de destination");
+
+                // Recharger la liste si le document est dupliqué dans le même chantier
+                if (duplicationResult.ChantierId == ChantierId)
+                {
+                    await ChargerChantier();
+                }
             }
-            catch (Exception ex)
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la duplication: {ex.Message}");
-            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la duplication: {ex.Message}");
         }
     }
 
@@ -389,3 +443,14 @@
         };
     }
 }
+
+<script>
+    window.downloadFile = function (fileName, base64String, mimeType = 'application/pdf') {
+        const link = document.createElement('a');
+        link.href = 'data:' + mimeType + ';base64,' + base64String;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+</script>

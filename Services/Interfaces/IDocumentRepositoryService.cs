@@ -25,6 +25,7 @@ public interface IDocumentRepositoryService
     Task<DocumentGenere> UpdateAsync(DocumentGenere document);
     Task<bool> DeleteAsync(int documentId);
     Task<DocumentGenere> DuplicateAsync(int documentId, string newName);
+    Task<DocumentGenere> DuplicateToChantierAsync(int documentId, string newName, int newChantierId, string numeroLot, string intituleLot);
     
     // Queries spécialisées
     Task<List<DocumentGenere>> GetDocumentsEnCoursAsync();

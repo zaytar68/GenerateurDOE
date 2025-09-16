@@ -3,6 +3,7 @@
 @inject ISectionConteneurService sectionConteneurService
 @inject ITypeSectionService typeSectionService
 @inject ISectionLibreService sectionLibreService
+@inject IOperationLockService operationLockService
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
@@ -114,12 +115,10 @@
                                                                     <strong>@(section.Titre)</strong>
                                                                     <span class="badge bg-secondary ms-2 small">@item.Ordre</span>
                                                                     <br>
-                                                                    <small class="text-muted">
+                                                                    <small class="text-muted section-preview">
                                                                         @if (!string.IsNullOrWhiteSpace(section.ContenuHtml))
                                                                         {
-                                                                            @(section.ContenuHtml.Length > 100 ?
-                                                                              section.ContenuHtml.Substring(0, 100) + "..." :
-                                                                              section.ContenuHtml)
+                                                                            @((MarkupString)TronquerHtml(section.ContenuHtml, 100))
                                                                         }
                                                                     </small>
                                                                 </div>
@@ -244,34 +243,47 @@
     {
         if (selectedTypeSection == 0) return;
 
-        try
+        // 🔧 CORRECTION CONCURRENCE: Protection anti-concurrence UI
+        var operationKey = $"create-container-{DocumentId}-{selectedTypeSection}";
+        var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
         {
-            isCreating = true;
-            
-            var conteneur = await sectionConteneurService.CreateAsync(
-                DocumentId, 
-                selectedTypeSection, 
-                string.IsNullOrWhiteSpace(nouveauTitre) ? null : nouveauTitre);
+            try
+            {
+                isCreating = true;
 
-            SectionsConteneurs.Add(conteneur);
-            MettreAJourTypesDisponibles();
-            
-            // Reset du formulaire
-            selectedTypeSection = 0;
-            nouveauTitre = string.Empty;
-            
-            await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
-            
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                $"Conteneur '{conteneur.Titre}' créé avec succès");
-        }
-        catch (Exception ex)
+                var conteneur = await sectionConteneurService.CreateAsync(
+                    DocumentId,
+                    selectedTypeSection,
+                    string.IsNullOrWhiteSpace(nouveauTitre) ? null : nouveauTitre);
+
+                SectionsConteneurs.Add(conteneur);
+                MettreAJourTypesDisponibles();
+
+                // Reset du formulaire
+                selectedTypeSection = 0;
+                nouveauTitre = string.Empty;
+
+                // 🔧 CORRECTION: InvokeAsync dans la même opération protégée
+                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"Conteneur '{conteneur.Titre}' créé avec succès");
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+                throw; // Re-throw pour la gestion par OperationLockService
+            }
+            finally
+            {
+                isCreating = false;
+            }
+        });
+
+        if (!executed)
         {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
-        }
-        finally
-        {
-            isCreating = false;
+            NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                "Une opération similaire est déjà en cours");
         }
     }
 
@@ -286,14 +298,25 @@
         {
             try
             {
-                await sectionConteneurService.DeleteAsync(conteneur.Id);
-                SectionsConteneurs.Remove(conteneur);
-                MettreAJourTypesDisponibles();
-                
-                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
-                
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                    "Conteneur supprimé avec succès");
+                // 🔧 CORRECTION CONCURRENCE: Protection deletion
+                var operationKey = $"delete-container-{conteneur.Id}";
+                var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
+                {
+                    await sectionConteneurService.DeleteAsync(conteneur.Id);
+                    SectionsConteneurs.Remove(conteneur);
+                    MettreAJourTypesDisponibles();
+
+                    await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        "Conteneur supprimé avec succès");
+                });
+
+                if (!executed)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                        "Une opération de suppression est déjà en cours");
+                }
             }
             catch (Exception ex)
             {
@@ -334,22 +357,33 @@ new Radzen.DialogOptions
                 var sectionsSelectionneesList = (List<int>)result;
                 if (sectionsSelectionneesList.Any())
                 {
-                    // Ajouter les sections sélectionnées au conteneur
-                    var itemsAjoutes = await sectionConteneurService.AddMultipleSectionsLibresAsync(
-                        conteneur.Id, sectionsSelectionneesList);
+                    // 🔧 CORRECTION CONCURRENCE: Protection ajout multiple sections
+                    var operationKey = $"add-sections-{conteneur.Id}";
+                    var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
+                    {
+                        // Ajouter les sections sélectionnées au conteneur
+                        var itemsAjoutes = await sectionConteneurService.AddMultipleSectionsLibresAsync(
+                            conteneur.Id, sectionsSelectionneesList);
 
-                // Recharger le conteneur pour avoir les nouvelles données
-                var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
-                var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
-                if (index >= 0)
-                {
-                    SectionsConteneurs[index] = conteneurMisAJour;
-                }
+                        // Recharger le conteneur pour avoir les nouvelles données
+                        var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
+                        var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
+                        if (index >= 0)
+                        {
+                            SectionsConteneurs[index] = conteneurMisAJour;
+                        }
 
-                    await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+                        await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
 
-                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
-                        $"{itemsAjoutes.Count} section(s) ajoutée(s) au conteneur");
+                        NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                            $"{itemsAjoutes.Count} section(s) ajoutée(s) au conteneur");
+                    });
+
+                    if (!executed)
+                    {
+                        NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                            "Une opération d'ajout est déjà en cours");
+                    }
                 }
             }
         }
@@ -396,20 +430,31 @@ new Radzen.DialogOptions
         {
             try
             {
-                await sectionConteneurService.RemoveSectionLibreItemAsync(item.Id);
-                
-                // Recharger le conteneur
-                var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
-                var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
-                if (index >= 0)
+                // 🔧 CORRECTION CONCURRENCE: Protection suppression item
+                var operationKey = $"remove-item-{item.Id}";
+                var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
                 {
-                    SectionsConteneurs[index] = conteneurMisAJour;
-                }
+                    await sectionConteneurService.RemoveSectionLibreItemAsync(item.Id);
 
-                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
-                
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                    $"Section '{item.SectionLibre.Titre}' retirée du conteneur");
+                    // Recharger le conteneur
+                    var conteneurMisAJour = await sectionConteneurService.GetByIdAsync(conteneur.Id);
+                    var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
+                    if (index >= 0)
+                    {
+                        SectionsConteneurs[index] = conteneurMisAJour;
+                    }
+
+                    await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        $"Section '{item.SectionLibre.Titre}' retirée du conteneur");
+                });
+
+                if (!executed)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                        "Une opération est déjà en cours");
+                }
             }
             catch (Exception ex)
             {
@@ -438,13 +483,24 @@ new Radzen.DialogOptions
                 itemIds.RemoveAt(currentIndex);
                 itemIds.Insert(currentIndex - 1, item.Id);
                 
-                await sectionConteneurService.ReorderItemsAsync(conteneur.Id, itemIds);
+                // 🔧 CORRECTION CONCURRENCE: Protection réorganisation
+                var operationKey = $"reorder-up-{conteneur.Id}-{item.Id}";
+                var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
+                {
+                    await sectionConteneurService.ReorderItemsAsync(conteneur.Id, itemIds);
 
-                // Recharger pour avoir les bonnes données
-                await RechargerConteneur(conteneur);
+                    // Recharger pour avoir les bonnes données
+                    await RechargerConteneur(conteneur);
 
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                    "Section déplacée vers le haut");
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        "Section déplacée vers le haut");
+                });
+
+                if (!executed)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                        "Une réorganisation est déjà en cours");
+                }
             }
         }
         catch (Exception ex)
@@ -473,13 +529,24 @@ new Radzen.DialogOptions
                 itemIds.RemoveAt(currentIndex);
                 itemIds.Insert(currentIndex + 1, item.Id);
                 
-                await sectionConteneurService.ReorderItemsAsync(conteneur.Id, itemIds);
+                // 🔧 CORRECTION CONCURRENCE: Protection réorganisation bas
+                var operationKey = $"reorder-down-{conteneur.Id}-{item.Id}";
+                var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
+                {
+                    await sectionConteneurService.ReorderItemsAsync(conteneur.Id, itemIds);
 
-                // Recharger pour avoir les bonnes données
-                await RechargerConteneur(conteneur);
+                    // Recharger pour avoir les bonnes données
+                    await RechargerConteneur(conteneur);
 
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", 
-                    "Section déplacée vers le bas");
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        "Section déplacée vers le bas");
+                });
+
+                if (!executed)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                        "Une réorganisation est déjà en cours");
+                }
             }
         }
         catch (Exception ex)
@@ -498,6 +565,30 @@ new Radzen.DialogOptions
         }
         await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
         StateHasChanged();
+    }
+
+    private string TronquerHtml(string html, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return string.Empty;
+
+        if (html.Length <= maxLength)
+            return html;
+
+        // Tronquer à la longueur maximale et ajouter "..."
+        var tronque = html.Substring(0, Math.Min(maxLength, html.Length));
+
+        // Si on a coupé au milieu d'une balise, essayer de fermer proprement
+        if (tronque.EndsWith("<") || tronque.Contains("<") && !tronque.Contains(">"))
+        {
+            var lastOpenTag = tronque.LastIndexOf('<');
+            if (lastOpenTag > 0)
+            {
+                tronque = tronque.Substring(0, lastOpenTag);
+            }
+        }
+
+        return tronque + "...";
     }
 }
 
@@ -526,5 +617,13 @@ new Radzen.DialogOptions
     .sections-list {
         max-height: 400px;
         overflow-y: auto;
+    }
+
+    .section-preview {
+        max-height: 3em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
     }
 </style>

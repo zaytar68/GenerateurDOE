@@ -25,11 +25,9 @@ public class SectionConteneur : IDocumentSection
     public virtual TypeSection TypeSection { get; set; } = null!;
     
     public virtual ICollection<SectionConteneurItem> Items { get; set; } = new List<SectionConteneurItem>();
+
+    // Méthode pour accéder aux sections libres ordonnées via Items
+    public IEnumerable<SectionLibre> GetSectionsLibresOrdered() =>
+        Items?.OrderBy(i => i.Ordre).Select(i => i.SectionLibre) ?? Enumerable.Empty<SectionLibre>();
     
-    // Propriété de convenance pour accéder aux sections libres ordonnées
-    public IEnumerable<SectionLibre> SectionsLibresOrdered => Items.OrderBy(i => i.Ordre).Select(i => i.SectionLibre);
-    
-    // TEMPORAIRE : Propriété de compatibilité pour permettre compilation pendant migration
-    [System.Obsolete("Utilisez Items ou SectionsLibresOrdered à la place - sera supprimée en Phase 2")]
-    public ICollection<SectionLibre> SectionsLibres => Items.Select(i => i.SectionLibre).ToList();
 }
