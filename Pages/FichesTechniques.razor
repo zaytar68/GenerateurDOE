@@ -311,7 +311,7 @@
                         else
                         {
                             <div class="row g-3">
-                                @foreach (var pdf in pdfsFiche.OrderBy(p => p.TypeDocumentImport?.Nom ?? "").ThenBy(p => p.NomFichierOriginal))
+                                @foreach (var pdf in pdfsFiche.GroupBy(p => p.Id).Select(g => g.First()).OrderBy(p => p.TypeDocumentImport?.Nom ?? "").ThenBy(p => p.NomFichierOriginal))
                                 {
                                     <div class="col-md-6 col-lg-4">
                                         <div class="card h-100 border">
@@ -592,7 +592,8 @@
     private void OuvrirModalPDF(FicheTechnique fiche)
     {
         fichePDFEnCours = fiche;
-        pdfsFiche = fiche.ImportsPDF.ToList();
+        // ✅ CORRECTION DOUBLONS FINALE: Éliminer les doublons par ID dès l'ouverture
+        pdfsFiche = fiche.ImportsPDF?.GroupBy(p => p.Id).Select(g => g.First()).ToList() ?? new List<ImportPDF>();
         afficherModalPDF = true;
     }
 
@@ -608,9 +609,9 @@
         try
         {
             await FicheTechniqueService.RemovePDFAsync(pdf.Id);
-            pdfsFiche.Remove(pdf);
-            
-            // Mettre à jour la fiche dans la liste principale
+
+            // ✅ CORRECTION DOUBLONS: Une seule source de vérité pour la suppression avec déduplication
+            // 1. Mettre à jour la fiche dans la liste principale
             var ficheAMettreAJour = fiches.FirstOrDefault(f => f.Id == fichePDFEnCours?.Id);
             if (ficheAMettreAJour != null)
             {
@@ -618,9 +619,16 @@
                 if (pdfASupprimer != null)
                 {
                     ficheAMettreAJour.ImportsPDF.Remove(pdfASupprimer);
+                    // 2. Recréer la liste locale depuis la source mise à jour AVEC déduplication
+                    pdfsFiche = ficheAMettreAJour.ImportsPDF.GroupBy(p => p.Id).Select(g => g.First()).ToList();
                 }
             }
-            
+            else
+            {
+                // Fallback si la fiche n'est pas trouvée
+                pdfsFiche.Remove(pdf);
+            }
+
             FiltrerFiches();
         }
         catch (Exception ex)
@@ -659,13 +667,20 @@
 
                         var pdfCree = await FicheTechniqueService.AddPDFAsync(fichePDFEnCours.Id, nouveauPDF);
 
-                        // ✅ CORRECTION DOUBLONS PDF: Synchroniser les deux collections
-                        // 1. Ajouter au modal local pour affichage immédiat
-                        pdfsFiche.Add(pdfCree);
-
-                        // 2. Mettre à jour la fiche dans la liste principale pour cohérence
+                        // ✅ CORRECTION DOUBLONS PDF FINALE: Une seule source de vérité avec déduplication
+                        // 1. Mettre à jour la fiche dans la liste principale
                         var ficheAMettreAJour = fiches.FirstOrDefault(f => f.Id == fichePDFEnCours.Id);
-                        ficheAMettreAJour?.ImportsPDF.Add(pdfCree);
+                        if (ficheAMettreAJour != null)
+                        {
+                            ficheAMettreAJour.ImportsPDF.Add(pdfCree);
+                            // 2. Recréer la liste locale depuis la source mise à jour AVEC déduplication
+                            pdfsFiche = ficheAMettreAJour.ImportsPDF.GroupBy(p => p.Id).Select(g => g.First()).ToList();
+                        }
+                        else
+                        {
+                            // Fallback si la fiche n'est pas trouvée
+                            pdfsFiche.Add(pdfCree);
+                        }
                         
                         await JSRuntime.InvokeVoidAsync("console.log", $"PDF sauvegardé avec succès: {file.Name} -> {cheminFichier}");
                     }
