@@ -4,6 +4,7 @@
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
 @inject IDocumentGenereService documentGenereService
+@inject IDocumentDownloadService documentDownloadService
 @inject IChantierService chantierService
 @inject ISectionConteneurService sectionConteneurService
 @inject IFTConteneurService ftConteneurService
@@ -12,6 +13,7 @@
 @inject NavigationManager Navigation
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>@(IsEditMode ? $"Modifier {document?.NomFichier}" : "Nouveau Document")</PageTitle>
 
@@ -80,9 +82,16 @@
                                 
                                 @if (IsEditMode)
                                 {
-                                    <button class="btn btn-outline-info" @onclick="AperçuDocument">
-                                        <span class="oi oi-eye" aria-hidden="true"></span>
-                                        Aperçu
+                                    <button class="btn btn-outline-success" @onclick="GenererDocument" disabled="@isGenerating">
+                                        @if (isGenerating)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <span class="oi oi-cloud-download" aria-hidden="true"></span>
+                                        }
+                                        Générer
                                     </button>
                                 }
                             </div>
@@ -341,6 +350,7 @@
     
     private bool isLoading = true;
     private bool isSaving = false;
+    private bool isGenerating = false;
     private bool hasUnsavedChanges = false;
     private string activeTab = "general";
     private bool isLoadingData = false;
@@ -606,15 +616,31 @@
         }
     }
 
-    private void AperçuDocument()
+    private async Task GenererDocument()
     {
         if (document?.Id == null) return;
-        
+
         try
         {
-            // Pour l'instant, juste afficher un message
-            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Aperçu", "Génération de l'aperçu en cours...");
-            SetActiveTab("preview");
+            isGenerating = true;
+            StateHasChanged();
+
+            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Génération", "Génération du document en cours...");
+
+            // Utilisation du service factorisé pour la génération
+            var result = await documentDownloadService.PrepareDocumentForDownloadAsync(document.Id);
+
+            if (!result.Success)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", result.ErrorMessage);
+                return;
+            }
+
+            // Téléchargement automatique du fichier
+            var base64 = Convert.ToBase64String(result.FileBytes);
+            await JSRuntime.InvokeVoidAsync("downloadFile", result.FileName, base64, result.MimeType);
+
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement", $"Téléchargement de {result.FileName} démarré");
         }
         catch (Exception ex)
         {
@@ -622,9 +648,14 @@
             if (!ex.Message.Contains("A second operation was started on this context") &&
                 !ex.Message.Contains("context instance"))
             {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la génération: {ex.Message}");
             }
-            Console.WriteLine($"[DEBUG] PreviewDocument error (masqué): {ex.Message}");
+            Console.WriteLine($"[DEBUG] GenererDocument error (masqué): {ex.Message}");
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
         }
     }
 
@@ -752,3 +783,14 @@
         font-size: 0.75em;
     }
 </style>
+
+<script>
+    window.downloadFile = function (fileName, base64String, mimeType = 'application/pdf') {
+        const link = document.createElement('a');
+        link.href = 'data:' + mimeType + ';base64,' + base64String;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+</script>

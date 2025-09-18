@@ -3,6 +3,7 @@
 @using GenerateurDOE.Services.Interfaces
 @inject IChantierService chantierService
 @inject IDocumentGenereService documentGenereService
+@inject IDocumentDownloadService documentDownloadService
 @inject NavigationManager Navigation
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
@@ -311,42 +312,22 @@
     {
         try
         {
-            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Génération", "Génération du PDF en cours...");
+            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Génération", "Génération du document en cours...");
 
-            byte[] pdfBytes;
+            // Utilisation du service factorisé pour la génération
+            var result = await documentDownloadService.PrepareDocumentForDownloadAsync(document.Id);
 
-            // Génération PDF selon le format demandé
-            if (document.FormatExport == FormatExport.PDF)
+            if (!result.Success)
             {
-                // Utilisation de la génération PDF complète avec PuppeteerSharp + PDFSharp
-                pdfBytes = await documentGenereService.GenerateCompletePdfAsync(document.Id);
-
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", "PDF généré avec succès");
-            }
-            else
-            {
-                // Pour les autres formats (HTML, Markdown), utiliser l'export standard
-                var cheminFichier = await documentGenereService.ExportDocumentAsync(document.Id, document.FormatExport);
-
-                if (File.Exists(cheminFichier))
-                {
-                    pdfBytes = await File.ReadAllBytesAsync(cheminFichier);
-                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Génération", $"Document {document.FormatExport} généré");
-                }
-                else
-                {
-                    throw new FileNotFoundException("Le fichier généré n'a pas été trouvé");
-                }
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", result.ErrorMessage);
+                return;
             }
 
             // Téléchargement automatique du fichier
-            var fileName = $"{document.NomFichier}_{DateTime.Now:yyyyMMdd_HHmm}.{GetFileExtension(document.FormatExport)}";
-            var base64 = Convert.ToBase64String(pdfBytes);
-            var mimeType = GetMimeType(document.FormatExport);
+            var base64 = Convert.ToBase64String(result.FileBytes);
+            await JSRuntime.InvokeVoidAsync("downloadFile", result.FileName, base64, result.MimeType);
 
-            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64, mimeType);
-
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement", $"Téléchargement de {fileName} démarré");
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement", $"Téléchargement de {result.FileName} démarré");
         }
         catch (Exception ex)
         {
@@ -360,27 +341,6 @@
         }
     }
 
-    private string GetFileExtension(FormatExport format)
-    {
-        return format switch
-        {
-            FormatExport.PDF => "pdf",
-            FormatExport.HTML => "html",
-            FormatExport.Markdown => "md",
-            _ => "pdf"
-        };
-    }
-
-    private string GetMimeType(FormatExport format)
-    {
-        return format switch
-        {
-            FormatExport.PDF => "application/pdf",
-            FormatExport.HTML => "text/html",
-            FormatExport.Markdown => "text/markdown",
-            _ => "application/pdf"
-        };
-    }
 
     private async Task DupliquerDocument(DocumentGenere document)
     {

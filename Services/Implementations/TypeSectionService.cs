@@ -144,6 +144,8 @@ public class TypeSectionService : ITypeSectionService
                 new TypeSection { Nom = "Introduction", Description = "Section d'introduction du document" },
                 new TypeSection { Nom = "Méthodologie", Description = "Description des méthodes employées" },
                 new TypeSection { Nom = "Présentation société", Description = "Présentation de l'entreprise" },
+                new TypeSection { Nom = "Références chantier", Description = "Références et expériences sur des chantiers similaires" },
+                new TypeSection { Nom = "Démarche environnementale", Description = "Approche et mesures environnementales du projet" },
                 new TypeSection { Nom = "Conclusion", Description = "Section de conclusion" },
                 new TypeSection { Nom = "Annexes", Description = "Documents annexes" },
                 new TypeSection { Nom = "Section libre", Description = "Section personnalisée" }
@@ -159,5 +161,40 @@ public class TypeSectionService : ITypeSectionService
             _context.TypesSections.AddRange(defaultTypes);
             await _context.SaveChangesAsync();
         }
+        else
+        {
+            // Ajouter les nouveaux types s'ils n'existent pas déjà
+            await AddMissingDefaultTypesAsync();
+        }
+    }
+
+    private async Task AddMissingDefaultTypesAsync()
+    {
+        var newTypes = new[]
+        {
+            new { Nom = "Références chantier", Description = "Références et expériences sur des chantiers similaires" },
+            new { Nom = "Démarche environnementale", Description = "Approche et mesures environnementales du projet" }
+        };
+
+        foreach (var newType in newTypes)
+        {
+            var exists = await _context.TypesSections.AnyAsync(t => t.Nom == newType.Nom);
+            if (!exists)
+            {
+                _context.TypesSections.Add(new TypeSection
+                {
+                    Nom = newType.Nom,
+                    Description = newType.Description,
+                    IsActive = true,
+                    DateCreation = DateTime.Now,
+                    DateModification = DateTime.Now
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        // ⚡ Invalidation cache après ajout de nouveaux types
+        _cache.RemoveByPrefix(TYPES_PREFIX);
     }
 }

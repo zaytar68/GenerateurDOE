@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using GenerateurDOE.Services.Interfaces;
 
 namespace GenerateurDOE.Models;
 

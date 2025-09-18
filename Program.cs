@@ -5,6 +5,7 @@ using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using GenerateurDOE.Services.Implementations;
+using GenerateurDOE.Services;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,6 +73,9 @@ builder.Services.AddScoped<ILoadingStateService, LoadingStateService>();
 
 // Service de protection anti-concurrence DbContext (CORRECTION CRITIQUE)
 builder.Services.AddScoped<IOperationLockService, OperationLockService>();
+
+// Service de téléchargement de documents factorisé
+builder.Services.AddScoped<IDocumentDownloadService, DocumentDownloadService>();
 
 // PDF Generation services
 builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();

@@ -437,4 +437,7 @@ La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Cor
 *Dernière mise à jour: Septembre 2025*
 *Architecture async validée - Phase 3D UX Loading States ajoutée*
 *Décision technique : Software Architect + Tech Lead + User*
-
+- Todo : \
+- "Position marché" non obligatoire\
+- Numéro de lot non obligatoire\
+- Possibilité de modifier le sommaire

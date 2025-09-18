@@ -1,0 +1,29 @@
+<!-- Bandeau entête -->
+<header style="background-color:#EF3D34; color:white; position: relative; display: flex; align-items: center; justify-content: space-between;">
+    <div style="flex: 1; text-align: left; padding: 10px 10px 10px 30px;">
+        <img src="/images/Titre_blanc_20250918_150259_6ae67880.png" alt="Titre" style="max-width: 50%; height: auto;">
+    </div>
+    <div style="text-align: right; padding: 10px 20px; font-size: 14px; line-height: 1.4;">
+        116, route de Rouffach<br>          
+        68000 COLMAR
+    </div>
+</header>
+
+  <!-- Contenu centré -->
+
+  <main style="flex:1; display:flex; flex-direction:column; color: rgb(10, 45, 74);">
+   <br><h2 style="margin:10px 0;"><br></h2><div><br></div><h2 style="margin: 10px 0px; text-align: center;">{{document.type}}</h2>
+    <div><br></div><div><br></div><div><br></div>
+    <h3 style="text-align: center;">{{chantier.nomProjet}}</h3>
+    <div style="text-align: center;"><font size="3">{{chantier.adresse}}&nbsp;</font></div>
+    <div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div><div style="text-align: center;"><br></div>
+    <h4 style="text-align: left;">Lot N°&nbsp;<span style="font-weight: normal;">{{document.numeroLot}} : {{document.intituleLot}}</span></h4>
+    <br>
+    <h4 style="text-align: left;">Maître d'ouvrage : <span style="font-weight: normal;">{{chantier.maitreOuvrage}}</span></h4>
+   <h4 style="text-align: left;">Maître d'oeuvre : <span style="font-weight: normal;">{{chantier.maitreOeuvre}}</span></h4><div><br></div><div><br></div>
+    <p style="margin: 0px; text-align: right;"><br></p>
+   </main>
+
+  <!-- Bandeau pied de page -->
+  <footer style="background-color:#EF3D34; color:white; text-align:center; padding:10px 10px 10px 30px;">
+    <p style="margin: 0px; text-align: right;">{{system.date}}</p></footer>

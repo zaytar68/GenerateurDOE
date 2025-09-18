@@ -1,4 +1,4 @@
-namespace GenerateurDOE.Models;
+namespace GenerateurDOE.Services.Interfaces;
 
 public interface IDocumentSection
 {
