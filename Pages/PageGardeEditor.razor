@@ -1,0 +1,659 @@
+@page "/templates/page-garde"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Components.Shared
+@using Radzen.Blazor
+@inject IPageGardeTemplateService PageGardeTemplateService
+@inject IJSRuntime JSRuntime
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+
+<PageTitle>Éditeur de Page de Garde</PageTitle>
+
+<div class="container-fluid page-garde-container">
+    <!-- Messages de statut -->
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+            <span class="oi oi-@(isSuccess ? "check" : "warning")" aria-hidden="true"></span>
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="ClearMessage" aria-label="Close"></button>
+        </div>
+    }
+    <h1 class="mb-4">
+        <span class="oi oi-document" aria-hidden="true"></span>
+        Gestion des Templates de Page de Garde
+    </h1>
+
+    <!-- Actions principales -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-1">Templates disponibles</h5>
+                    <p class="text-muted small mb-0">Créez et gérez vos templates de page de garde</p>
+                </div>
+                <button type="button" class="btn btn-primary" @onclick="OpenNewTemplateModal">
+                    <span class="oi oi-plus" aria-hidden="true"></span>
+                    Nouveau Template
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des templates -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <span class="oi oi-list" aria-hidden="true"></span>
+                Templates existants (@existingTemplates.Count)
+            </h5>
+        </div>
+        <div class="card-body">
+            @if (isLoading)
+            {
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                </div>
+            }
+            else if (!existingTemplates.Any())
+            {
+                <div class="text-center text-muted py-4">
+                    <span class="oi oi-info" aria-hidden="true"></span>
+                    <p class="mb-0">Aucun template créé pour le moment.</p>
+                    <small>Créez votre premier template avec le bouton "Nouveau Template".</small>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nom</th>
+                                <th>Description</th>
+                                <th>Par défaut</th>
+                                <th>Modifié le</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var template in existingTemplates.OrderByDescending(t => t.EstParDefaut).ThenByDescending(t => t.DateModification))
+                            {
+                                <tr class="@(template.EstParDefaut ? "table-success" : "")">
+                                    <td>
+                                        <strong>@template.Nom</strong>
+                                        @if (template.EstParDefaut)
+                                        {
+                                            <span class="badge bg-success ms-2">Par défaut</span>
+                                        }
+                                    </td>
+                                    <td>@template.Description</td>
+                                    <td>
+                                        @if (template.EstParDefaut)
+                                        {
+                                            <span class="text-success">
+                                                <span class="oi oi-check" aria-hidden="true"></span>
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-success"
+                                                    @onclick="() => SetAsDefault(template.Id)" title="Définir par défaut">
+                                                <span class="oi oi-thumb-up"></span>
+                                            </button>
+                                        }
+                                    </td>
+                                    <td>@template.DateModification.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary"
+                                                    @onclick="async () => await OpenEditTemplateModal(template)" title="Modifier">
+                                                <span class="oi oi-pencil"></span>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-info"
+                                                    @onclick="() => PreviewTemplate(template)" title="Aperçu">
+                                                <span class="oi oi-eye"></span>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger"
+                                                    @onclick="() => DeleteTemplate(template.Id)" title="Supprimer">
+                                                <span class="oi oi-trash"></span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal pour l'édition des templates (modal-xl comme SectionsLibres) -->
+@if (showModal)
+{
+<div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <span class="oi oi-@(templateInEdit != null ? "pencil" : "plus")" aria-hidden="true"></span>
+                    @(templateInEdit != null ? "Modifier Template" : "Nouveau Template")
+                </h5>
+                <button type="button" class="btn-close" @onclick="CloseModal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Colonne 1: Formulaire principal -->
+                    <div class="col-md-8">
+                        <EditForm Model="currentTemplate" OnValidSubmit="SaveTemplate">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger mb-3" />
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="templateName" class="form-label">Nom du template</label>
+                                    <InputText @bind-Value="currentTemplate.Nom"
+                                             class="form-control" id="templateName" placeholder="Nom du template" />
+                                    <ValidationMessage For="() => currentTemplate.Nom" class="text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="templateDescription" class="form-label">Description (optionnelle)</label>
+                                    <InputText @bind-Value="currentTemplate.Description"
+                                             class="form-control" id="templateDescription" placeholder="Description du template" />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="contenu" class="form-label">Contenu de la page de garde</label>
+                                <RichTextEditor @bind-Value="currentTemplate.ContenuHtml"
+                                              Placeholder="Saisissez le contenu de votre page de garde..."
+                                              Height="400px"
+                                              CssClass="border" />
+                                <small class="form-text text-muted mt-2">
+                                    Utilisez la barre d'outils pour formater votre texte et insérer des variables depuis le panneau de droite.
+                                </small>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(currentTemplate.ContenuHtml))
+                            {
+                                <div class="mb-3">
+                                    <strong>Aperçu :</strong>
+                                    <div class="border p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                                        @((MarkupString)previewHtml)
+                                    </div>
+                                </div>
+                            }
+                        </EditForm>
+                    </div>
+
+                    <!-- Colonne 2: Variables disponibles -->
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <span class="oi oi-tags" aria-hidden="true"></span>
+                                    Variables disponibles
+                                </h6>
+                            </div>
+                            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                                <p class="text-muted small mb-3">Cliquez sur une variable pour l'insérer.</p>
+
+                                @foreach (var category in availableVariables.GroupBy(v => v.Category))
+                                {
+                                    <div class="mb-3">
+                                        <h6 class="text-secondary">
+                                            <span class="oi oi-@GetCategoryIcon(category.Key)" aria-hidden="true"></span>
+                                            @category.Key
+                                        </h6>
+                                        <div class="d-grid gap-1">
+                                            @foreach (var variable in category)
+                                            {
+                                                <button type="button" class="btn btn-outline-primary btn-sm text-start"
+                                                        @onclick="() => InsertVariable(variable.Placeholder)"
+                                                        title="@variable.Description">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="fw-bold">@variable.Name</span>
+                                                        <code class="small">@variable.Placeholder</code>
+                                                    </div>
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="d-flex justify-content-between w-100">
+                    <div>
+                        @if (templateInEdit != null)
+                        {
+                            <button type="button" class="btn btn-danger" @onclick="DeleteCurrentTemplate">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                                Supprimer ce template
+                            </button>
+                        }
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary me-2" @onclick="CloseModal">
+                            <span class="oi oi-x" aria-hidden="true"></span>
+                            Annuler
+                        </button>
+                        <button type="button" class="btn btn-primary" @onclick="SaveTemplate" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            <span class="oi oi-@(templateInEdit != null ? "check" : "plus")" aria-hidden="true"></span>
+                            @(templateInEdit != null ? "Modifier" : "Créer")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@code {
+    private bool isLoading = false;
+    private bool isSaving = false;
+    private string statusMessage = string.Empty;
+    private bool isSuccess = false;
+    private string previewHtml = string.Empty;
+
+    private PageGardeTemplate currentTemplate = new();
+    private PageGardeTemplate? templateInEdit = null;
+    private List<PageGardeTemplate> existingTemplates = new();
+    private List<TemplateVariable> availableVariables = new();
+    private bool showModal = false;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Charger les variables disponibles
+            availableVariables = PageGardeTemplateService.GetAvailableVariables().ToList();
+
+            // Charger les templates existants
+            await LoadExistingTemplates();
+
+            // Charger le template par défaut
+            var defaultTemplate = await PageGardeTemplateService.GetDefaultTemplateAsync();
+            if (defaultTemplate != null)
+            {
+                currentTemplate = new PageGardeTemplate
+                {
+                    Nom = "",
+                    Description = "",
+                    ContenuHtml = defaultTemplate.ContenuHtml,
+                    ContenuJson = defaultTemplate.ContenuJson
+                };
+            }
+
+            // Générer l'aperçu initial
+            await UpdatePreview();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors du chargement : {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Force un recalcul du layout pour éviter les problèmes de débordement initial
+            await JSRuntime.InvokeVoidAsync("eval", "window.dispatchEvent(new Event('resize'))");
+        }
+    }
+
+    private async Task LoadExistingTemplates()
+    {
+        try
+        {
+            existingTemplates = (await PageGardeTemplateService.GetAllTemplatesAsync()).ToList();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors du chargement des templates : {ex.Message}");
+        }
+    }
+
+    private void OpenNewTemplateModal()
+    {
+        templateInEdit = null;
+        currentTemplate = new PageGardeTemplate();
+        previewHtml = string.Empty;
+        showModal = true;
+        StateHasChanged();
+    }
+
+    private async Task OpenEditTemplateModal(PageGardeTemplate template)
+    {
+        templateInEdit = template;
+        currentTemplate = new PageGardeTemplate
+        {
+            Id = template.Id,
+            Nom = template.Nom,
+            Description = template.Description,
+            ContenuHtml = template.ContenuHtml,
+            ContenuJson = template.ContenuJson,
+            EstParDefaut = template.EstParDefaut
+        };
+        showModal = true;
+        StateHasChanged();
+        await UpdatePreview();
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        templateInEdit = null;
+        currentTemplate = new PageGardeTemplate();
+        previewHtml = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task SaveTemplate()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(currentTemplate.Nom))
+            {
+                ShowError("Le nom du template est requis");
+                return;
+            }
+
+            isSaving = true;
+            StateHasChanged();
+
+            if (currentTemplate.Id == 0)
+            {
+                // Nouveau template
+                await PageGardeTemplateService.CreateTemplateAsync(currentTemplate);
+                ShowSuccess($"Template '{currentTemplate.Nom}' créé avec succès");
+            }
+            else
+            {
+                // Mise à jour du template existant
+                await PageGardeTemplateService.UpdateTemplateAsync(currentTemplate);
+                ShowSuccess($"Template '{currentTemplate.Nom}' mis à jour avec succès");
+            }
+
+            // Recharger la liste des templates
+            await LoadExistingTemplates();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors de la sauvegarde : {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTemplate()
+    {
+        try
+        {
+            var templates = await PageGardeTemplateService.GetAllTemplatesAsync();
+            var templateOptions = templates.Select(t => new
+            {
+                Value = t.Id,
+                Text = $"{t.Nom} {(t.EstParDefaut ? " (Défaut)" : "")}"
+            }).ToList();
+
+            if (!templateOptions.Any())
+            {
+                ShowError("Aucun template disponible");
+                return;
+            }
+
+            // Ici, idéalement, on utiliserait un dialog pour choisir le template
+            // Pour simplifier, on charge le premier template non défaut ou le défaut
+            var templateToLoad = templates.FirstOrDefault(t => !t.EstParDefaut) ?? templates.First();
+            await LoadExistingTemplate(templateToLoad);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors du chargement : {ex.Message}");
+        }
+    }
+
+    private async Task LoadExistingTemplate(PageGardeTemplate template)
+    {
+        try
+        {
+            currentTemplate = new PageGardeTemplate
+            {
+                Id = template.Id,
+                Nom = template.Nom,
+                Description = template.Description,
+                ContenuHtml = template.ContenuHtml,
+                ContenuJson = template.ContenuJson,
+                EstParDefaut = template.EstParDefaut
+            };
+
+            // L'éditeur HTML sera automatiquement mis à jour via le binding
+
+            await UpdatePreview();
+            ShowSuccess($"Template '{template.Nom}' chargé");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors du chargement du template : {ex.Message}");
+        }
+    }
+
+    private async Task PreviewTemplate()
+    {
+        await UpdatePreview();
+        ShowSuccess("Aperçu mis à jour");
+    }
+
+    private async Task PreviewTemplate(PageGardeTemplate template)
+    {
+        try
+        {
+            var previewContent = await PageGardeTemplateService.CompileTemplateForPreviewAsync(template);
+            await DialogService.OpenAsync("Aperçu du Template", ds =>
+                @<div>
+                    <h5>@template.Nom</h5>
+                    <div class="border p-3" style="background-color: white; min-height: 300px;">
+                        @((MarkupString)previewContent)
+                    </div>
+                </div>,
+                new Radzen.DialogOptions() { Width = "80%", Height = "70%" });
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors de l'aperçu : {ex.Message}");
+        }
+    }
+
+    private async Task DeleteCurrentTemplate()
+    {
+        if (templateInEdit != null)
+        {
+            var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Êtes-vous sûr de vouloir supprimer le template '{templateInEdit.Nom}' ?");
+
+            if (confirmed)
+            {
+                await DeleteTemplate(templateInEdit.Id);
+                CloseModal();
+            }
+        }
+    }
+
+    private async Task UpdatePreview()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(currentTemplate.ContenuHtml))
+            {
+                previewHtml = await PageGardeTemplateService.CompileTemplateForPreviewAsync(currentTemplate);
+            }
+            else
+            {
+                previewHtml = string.Empty;
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors de la génération de l'aperçu : {ex.Message}");
+        }
+    }
+
+    private async Task InsertVariable(string placeholder)
+    {
+        try
+        {
+            // Ajouter la variable à la fin du contenu HTML
+            if (string.IsNullOrEmpty(currentTemplate.ContenuHtml))
+            {
+                currentTemplate.ContenuHtml = placeholder;
+            }
+            else
+            {
+                currentTemplate.ContenuHtml += $" {placeholder}";
+            }
+
+            await UpdatePreview();
+            ShowSuccess($"Variable '{placeholder}' ajoutée");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur lors de l'insertion de la variable : {ex.Message}");
+        }
+    }
+
+    private async Task SetAsDefault(int templateId)
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var success = await PageGardeTemplateService.SetAsDefaultTemplateAsync(templateId);
+            if (success)
+            {
+                await LoadExistingTemplates();
+                ShowSuccess("Template défini comme défaut");
+            }
+            else
+            {
+                ShowError("Erreur lors de la définition du template par défaut");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur : {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteTemplate(int templateId)
+    {
+        try
+        {
+            var template = existingTemplates.FirstOrDefault(t => t.Id == templateId);
+            if (template == null) return;
+
+            // Demander confirmation
+            var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", new object[] { $"Êtes-vous sûr de vouloir supprimer le template '{template.Nom}' ?" });
+            if (!confirmed) return;
+
+            isLoading = true;
+            StateHasChanged();
+
+            var success = await PageGardeTemplateService.DeleteTemplateAsync(templateId);
+            if (success)
+            {
+                await LoadExistingTemplates();
+                ShowSuccess($"Template '{template.Nom}' supprimé");
+
+                // Si c'était le template en cours d'édition, le réinitialiser
+                if (currentTemplate.Id == templateId)
+                {
+                    currentTemplate = new PageGardeTemplate();
+                    previewHtml = string.Empty;
+                }
+            }
+            else
+            {
+                ShowError("Erreur lors de la suppression du template");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Erreur : {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetCategoryIcon(string category)
+    {
+        return category switch
+        {
+            "Document" => "document",
+            "Chantier" => "home",
+            "Système" => "cog",
+            _ => "tag"
+        };
+    }
+
+    private void ShowSuccess(string message)
+    {
+        statusMessage = message;
+        isSuccess = true;
+        StateHasChanged();
+    }
+
+    private void ShowError(string message)
+    {
+        statusMessage = message;
+        isSuccess = false;
+        StateHasChanged();
+    }
+
+    private void ClearMessage()
+    {
+        statusMessage = string.Empty;
+        StateHasChanged();
+    }
+
+}

@@ -37,6 +37,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<SectionConteneurItem> SectionConteneurItems { get; set; }
     public DbSet<FTConteneur> FTConteneurs { get; set; }
     public DbSet<FTElement> FTElements { get; set; }
+    public DbSet<PageGardeTemplate> PageGardeTemplates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -265,6 +266,21 @@ public class ApplicationDbContext : DbContext
             // Index unique pour éviter les doublons section/conteneur
             entity.HasIndex(e => new { e.SectionConteneursId, e.SectionLibreId })
                 .IsUnique();
+        });
+
+        modelBuilder.Entity<PageGardeTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.ContenuHtml).HasColumnType("nvarchar(max)").IsRequired();
+            entity.Property(e => e.ContenuJson).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.EstParDefaut).HasDefaultValue(false);
+            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+
+            // Index unique pour le nom
+            entity.HasIndex(e => e.Nom).IsUnique();
         });
     }
 }

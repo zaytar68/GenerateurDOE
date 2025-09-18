@@ -77,6 +77,9 @@ builder.Services.AddScoped<IOperationLockService, OperationLockService>();
 builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();
 builder.Services.AddScoped<IHtmlTemplateService, HtmlTemplateService>();
 
+// Template management services
+builder.Services.AddScoped<IPageGardeTemplateService, PageGardeTemplateService>();
+
 var app = builder.Build();
 
 // Initialize default types on startup

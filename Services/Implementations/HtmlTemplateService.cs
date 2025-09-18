@@ -9,28 +9,62 @@ namespace GenerateurDOE.Services.Implementations
     public class HtmlTemplateService : IHtmlTemplateService
     {
         private readonly ICacheService _cache;
+        private readonly IPageGardeTemplateService _pageGardeTemplateService;
 
-        public HtmlTemplateService(ICacheService cache)
+        public HtmlTemplateService(ICacheService cache, IPageGardeTemplateService pageGardeTemplateService)
         {
             _cache = cache;
+            _pageGardeTemplateService = pageGardeTemplateService;
         }
-        public async Task<string> GeneratePageDeGardeHtmlAsync(DocumentGenere document, string typeDocument, PageDeGardeTemplate? template = null)
+        public async Task<string> GeneratePageDeGardeHtmlAsync(DocumentGenere document, string typeDocument, PageDeGardeTemplate? legacyTemplate = null)
         {
-            template ??= new PageDeGardeTemplate();
+            try
+            {
+                // Obtenir le template depuis la base de données (template par défaut ou spécifié)
+                Models.PageGardeTemplate? pageGardeTemplate = null;
 
-            var html = $@"
+                if (legacyTemplate != null)
+                {
+                    // Si un ancien template est fourni, on essaie de le convertir ou utiliser le défaut
+                    pageGardeTemplate = await _pageGardeTemplateService.GetDefaultTemplateAsync();
+                }
+                else
+                {
+                    // Utiliser le template par défaut
+                    pageGardeTemplate = await _pageGardeTemplateService.GetDefaultTemplateAsync();
+                }
+
+                // Si aucun template n'est trouvé, créer un template minimal
+                if (pageGardeTemplate == null)
+                {
+                    return GenerateFallbackPageDeGarde(document, typeDocument);
+                }
+
+                // Compiler le template avec les données du document
+                return await _pageGardeTemplateService.CompileTemplateAsync(pageGardeTemplate, document, typeDocument);
+            }
+            catch (Exception)
+            {
+                // En cas d'erreur, générer une page de garde de fallback
+                return GenerateFallbackPageDeGarde(document, typeDocument);
+            }
+        }
+
+        private string GenerateFallbackPageDeGarde(DocumentGenere document, string typeDocument)
+        {
+            return $@"
             <!DOCTYPE html>
             <html lang='fr'>
             <head>
                 <meta charset='UTF-8'>
                 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
                 <style>
-                    body {{ 
-                        font-family: {template.FontFamily};
+                    body {{
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                         margin: 0;
                         padding: 60px;
-                        background: {template.BackgroundGradient};
-                        color: {template.TextColor};
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
                         height: 100vh;
                         display: flex;
                         flex-direction: column;
@@ -61,7 +95,7 @@ namespace GenerateurDOE.Services.Implementations
                         font-size: 1.1em;
                         flex-wrap: wrap;
                     }}
-                    .info-row .label {{ 
+                    .info-row .label {{
                         font-weight: 600;
                         margin-right: 20px;
                         min-width: 150px;
@@ -86,13 +120,6 @@ namespace GenerateurDOE.Services.Implementations
                         opacity: 0.8;
                         font-weight: 300;
                     }}
-                    {(template.ShowLogo && !string.IsNullOrEmpty(template.LogoPath) ? $@"
-                    .logo {{
-                        max-height: 100px;
-                        margin-bottom: 30px;
-                        opacity: 0.9;
-                    }}" : "")}
-                    
                     @media print {{
                         body {{
                             height: 297mm;
@@ -107,46 +134,40 @@ namespace GenerateurDOE.Services.Implementations
                 </style>
             </head>
             <body>
-                {(template.ShowLogo && !string.IsNullOrEmpty(template.LogoPath) ? 
-                    $"<img src='{template.LogoPath}' alt='Logo' class='logo' />" : "")}
-                
                 <h1 class='main-title'>{typeDocument}</h1>
-                
+
                 <div class='project-info'>
                     <div class='info-row'>
                         <span class='label'>Projet :</span>
-                        <span class='value'>{document.Chantier.NomProjet}</span>
+                        <span class='value'>{document.Chantier?.NomProjet ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'œuvre :</span>
-                        <span class='value'>{document.Chantier.MaitreOeuvre}</span>
+                        <span class='value'>{document.Chantier?.MaitreOeuvre ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'ouvrage :</span>
-                        <span class='value'>{document.Chantier.MaitreOuvrage}</span>
+                        <span class='value'>{document.Chantier?.MaitreOuvrage ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Adresse :</span>
-                        <span class='value'>{document.Chantier.Adresse}</span>
+                        <span class='value'>{document.Chantier?.Adresse ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Lot :</span>
                         <span class='value'>{document.NumeroLot} - {document.IntituleLot}</span>
                     </div>
                 </div>
-                
+
                 <div class='company-info'>
                     <strong>Réalisé par notre société</strong>
                 </div>
-                
+
                 <div class='date'>
                     {DateTime.Now:dd/MM/yyyy}
                 </div>
             </body>
             </html>";
-
-            await Task.CompletedTask;
-            return html;
         }
 
         public async Task<string> GenerateTableMatieresHtmlAsync(TableOfContentsData tocData, TocTemplate? template = null)
