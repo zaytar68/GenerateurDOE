@@ -334,5 +334,40 @@ html, body {
   color: var(--primary) !important;
 }
 
+/* ================================
+   🪟 Modal Z-Index Management
+   ================================ */
+/* Modal principal d'édition PageGarde */
+.modal.show {
+  z-index: 1050 !important;
+}
+
+.modal-backdrop {
+  z-index: 1040 !important;
+}
+
+/* Modals Radzen (insertion image, etc.) doivent être au-dessus */
+.rz-dialog-wrapper,
+.rz-dialog-mask {
+  z-index: 1060 !important;
+}
+
+.rz-dialog {
+  z-index: 1061 !important;
+}
+
+/* Assurer que les dropdowns et tooltips Radzen restent visibles */
+.rz-dropdown-panel,
+.rz-tooltip,
+.rz-popup {
+  z-index: 1065 !important;
+}
+
+/* Modal d'insertion d'image spécifique */
+.rz-fileupload-dialog,
+.rz-image-dialog {
+  z-index: 1062 !important;
+}
+
 
 

@@ -1,5 +1,6 @@
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
+using GenerateurDOE.Services.Shared;
 using Microsoft.Extensions.Options;
 using PuppeteerSharp;
 using PuppeteerSharp.Media;
@@ -13,13 +14,18 @@ namespace GenerateurDOE.Services.Implementations
     {
         private readonly AppSettings _appSettings;
         private readonly ILoggingService _loggingService;
+        private readonly IPageGardeTemplateService _pageGardeTemplateService;
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
 
-        public PdfGenerationService(IOptions<AppSettings> appSettings, ILoggingService loggingService)
+        public PdfGenerationService(
+            IOptions<AppSettings> appSettings,
+            ILoggingService loggingService,
+            IPageGardeTemplateService pageGardeTemplateService)
         {
             _appSettings = appSettings.Value;
             _loggingService = loggingService;
+            _pageGardeTemplateService = pageGardeTemplateService;
         }
 
         private async Task<IBrowser> GetBrowserAsync()
@@ -228,95 +234,166 @@ namespace GenerateurDOE.Services.Implementations
 
         public async Task<byte[]> GeneratePageDeGardeAsync(DocumentGenere document, string typeDocument, PdfGenerationOptions? options = null)
         {
-            var html = $@"
+            string html;
+
+            try
+            {
+                // Si un template spécifique est sélectionné, l'utiliser
+                if (document.PageGardeTemplateId.HasValue)
+                {
+                    var template = await _pageGardeTemplateService.GetTemplateByIdAsync(document.PageGardeTemplateId.Value);
+                    if (template != null)
+                    {
+                        _loggingService.LogInformation($"Utilisation du template personnalisé {template.Nom} pour la page de garde");
+                        html = await _pageGardeTemplateService.CompileTemplateAsync(template, document, typeDocument);
+                    }
+                    else
+                    {
+                        _loggingService.LogWarning($"Template {document.PageGardeTemplateId} introuvable, utilisation du template par défaut");
+                        html = await GetDefaultPageGardeHtmlAsync(document, typeDocument);
+                    }
+                }
+                else
+                {
+                    // Essayer d'utiliser le template par défaut du service
+                    var defaultTemplate = await _pageGardeTemplateService.GetDefaultTemplateAsync();
+                    if (defaultTemplate != null)
+                    {
+                        _loggingService.LogInformation($"Utilisation du template par défaut {defaultTemplate.Nom} pour la page de garde");
+                        html = await _pageGardeTemplateService.CompileTemplateAsync(defaultTemplate, document, typeDocument);
+                    }
+                    else
+                    {
+                        _loggingService.LogInformation("Aucun template par défaut configuré, utilisation du template interne");
+                        html = await GetDefaultPageGardeHtmlAsync(document, typeDocument);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Erreur lors de la génération de la page de garde avec template : {ex.Message}");
+                _loggingService.LogInformation("Fallback vers le template interne par défaut");
+                html = await GetDefaultPageGardeHtmlAsync(document, typeDocument);
+            }
+
+            // Créer des options spéciales pour la page de garde (sans numérotation)
+            var pageGardeOptions = new PdfGenerationOptions
+            {
+                Format = options?.Format ?? "A4",
+                DisplayHeaderFooter = false, // Pas de header/footer pour la page de garde
+                HeaderTemplate = "", // Template vide
+                FooterTemplate = "", // Template vide
+                PrintBackground = options?.PrintBackground ?? true,
+                MarginTop = options?.MarginTop ?? "10mm",
+                MarginBottom = options?.MarginBottom ?? "10mm",
+                MarginLeft = options?.MarginLeft ?? "10mm",
+                MarginRight = options?.MarginRight ?? "10mm",
+                Scale = options?.Scale ?? 1,
+                WaitForTimeout = options?.WaitForTimeout ?? 30000
+            };
+
+            return await ConvertHtmlToPdfAsync(html, pageGardeOptions);
+        }
+
+        private async Task<string> GetDefaultPageGardeHtmlAsync(DocumentGenere document, string typeDocument)
+        {
+            return $@"
             <!DOCTYPE html>
             <html lang='fr'>
             <head>
                 <meta charset='UTF-8'>
                 <style>
-                    body {{ 
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        margin: 0;
-                        padding: 60px;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        height: 100vh;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        text-align: center;
-                    }}
+                    {CssStylesHelper.GetCoverPageCSS()}
                     .main-title {{
-                        font-size: 3em;
-                        font-weight: 300;
-                        margin-bottom: 40px;
+                        font-size: 2.2em;
+                        font-weight: 600;
+                        margin-bottom: 25px;
                         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                        font-family: Arial, sans-serif;
                     }}
                     .project-info {{
                         background: rgba(255,255,255,0.1);
-                        padding: 40px;
-                        border-radius: 15px;
-                        margin: 40px 0;
+                        padding: 25px;
+                        border-radius: 10px;
+                        margin: 20px 0;
                         backdrop-filter: blur(10px);
+                        border: 1px solid rgba(255,255,255,0.2);
                     }}
                     .info-row {{
                         display: flex;
                         justify-content: space-between;
-                        margin: 15px 0;
-                        font-size: 1.1em;
+                        align-items: center;
+                        margin: 10px 0;
+                        font-size: 1.0em;
+                        font-family: Arial, sans-serif;
                     }}
-                    .label {{ font-weight: 600; }}
+                    .label {{
+                        font-weight: 600;
+                        font-family: Arial, sans-serif;
+                        min-width: 140px;
+                    }}
+                    .value {{
+                        font-family: Arial, sans-serif;
+                        text-align: right;
+                        flex: 1;
+                    }}
                     .company-info {{
-                        margin-top: 60px;
-                        font-size: 1.2em;
+                        margin-top: 30px;
+                        font-size: 1.1em;
                         opacity: 0.9;
+                        font-family: Arial, sans-serif;
+                        font-weight: 500;
                     }}
                     .date {{
                         position: absolute;
-                        bottom: 40px;
+                        bottom: 20px;
                         right: 40px;
-                        font-size: 1em;
+                        font-size: 0.9em;
                         opacity: 0.8;
+                        font-family: Arial, sans-serif;
+                    }}
+                    /* Suppression de marges par défaut pour éviter débordement */
+                    * {{
+                        margin: 0;
+                        padding: 0;
                     }}
                 </style>
             </head>
             <body>
                 <h1 class='main-title'>{typeDocument}</h1>
-                
+
                 <div class='project-info'>
                     <div class='info-row'>
                         <span class='label'>Projet :</span>
-                        <span>{document.Chantier.NomProjet}</span>
+                        <span class='value'>{document.Chantier?.NomProjet ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'œuvre :</span>
-                        <span>{document.Chantier.MaitreOeuvre}</span>
+                        <span class='value'>{document.Chantier?.MaitreOeuvre ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Maître d'ouvrage :</span>
-                        <span>{document.Chantier.MaitreOuvrage}</span>
+                        <span class='value'>{document.Chantier?.MaitreOuvrage ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Adresse :</span>
-                        <span>{document.Chantier.Adresse}</span>
+                        <span class='value'>{document.Chantier?.Adresse ?? "Non défini"}</span>
                     </div>
                     <div class='info-row'>
                         <span class='label'>Lot :</span>
-                        <span>{document.NumeroLot} - {document.IntituleLot}</span>
+                        <span class='value'>{document.NumeroLot} - {document.IntituleLot}</span>
                     </div>
                 </div>
-                
+
                 <div class='company-info'>
                     <strong>{_appSettings.NomSociete}</strong>
                 </div>
-                
+
                 <div class='date'>
                     {DateTime.Now:dd/MM/yyyy}
                 </div>
             </body>
             </html>";
-
-            return await ConvertHtmlToPdfAsync(html, options);
         }
 
         public async Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, PdfGenerationOptions? options = null)
@@ -328,7 +405,11 @@ namespace GenerateurDOE.Services.Implementations
             <head>
                 <meta charset='UTF-8'>
                 <style>
-                    body { 
+                    @page {
+                        size: A4;
+                        margin: 10mm;
+                    }
+                    body {
                         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                         margin: 40px;
                         line-height: 1.6;

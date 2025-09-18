@@ -1,6 +1,7 @@
 using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
+using GenerateurDOE.Services.Shared;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 
@@ -8,12 +9,12 @@ namespace GenerateurDOE.Services.Implementations
 {
     public class PageGardeTemplateService : IPageGardeTemplateService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILoggingService _loggingService;
 
-        public PageGardeTemplateService(ApplicationDbContext context, ILoggingService loggingService)
+        public PageGardeTemplateService(IDbContextFactory<ApplicationDbContext> contextFactory, ILoggingService loggingService)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _loggingService = loggingService;
         }
 
@@ -21,7 +22,8 @@ namespace GenerateurDOE.Services.Implementations
         {
             try
             {
-                return await _context.PageGardeTemplates
+                using var context = _contextFactory.CreateDbContext();
+                return await context.PageGardeTemplates
                     .OrderByDescending(t => t.EstParDefaut)
                     .ThenBy(t => t.Nom)
                     .ToListAsync();
@@ -37,7 +39,8 @@ namespace GenerateurDOE.Services.Implementations
         {
             try
             {
-                return await _context.PageGardeTemplates.FindAsync(id);
+                using var context = _contextFactory.CreateDbContext();
+                return await context.PageGardeTemplates.FindAsync(id);
             }
             catch (Exception ex)
             {
@@ -50,7 +53,8 @@ namespace GenerateurDOE.Services.Implementations
         {
             try
             {
-                return await _context.PageGardeTemplates
+                using var context = _contextFactory.CreateDbContext();
+                return await context.PageGardeTemplates
                     .FirstOrDefaultAsync(t => t.EstParDefaut);
             }
             catch (Exception ex)
@@ -64,19 +68,20 @@ namespace GenerateurDOE.Services.Implementations
         {
             try
             {
+                using var context = _contextFactory.CreateDbContext();
                 template.DateCreation = DateTime.Now;
                 template.DateModification = DateTime.Now;
 
                 // Si c'est le premier template, le marquer comme défaut
-                if (!await _context.PageGardeTemplates.AnyAsync())
+                if (!await context.PageGardeTemplates.AnyAsync())
                 {
                     template.EstParDefaut = true;
                 }
 
-                _context.PageGardeTemplates.Add(template);
-                await _context.SaveChangesAsync();
+                context.PageGardeTemplates.Add(template);
+                await context.SaveChangesAsync();
 
-_loggingService.LogInformation($"Template de page de garde créé : {template.Nom}");
+                _loggingService.LogInformation($"Template de page de garde créé : {template.Nom}");
                 return template;
             }
             catch (Exception ex)
@@ -90,7 +95,8 @@ _loggingService.LogInformation($"Template de page de garde créé : {template.No
         {
             try
             {
-                var existingTemplate = await _context.PageGardeTemplates.FindAsync(template.Id);
+                using var context = _contextFactory.CreateDbContext();
+                var existingTemplate = await context.PageGardeTemplates.FindAsync(template.Id);
                 if (existingTemplate == null)
                 {
                     throw new ArgumentException($"Template avec ID {template.Id} non trouvé");
@@ -102,9 +108,9 @@ _loggingService.LogInformation($"Template de page de garde créé : {template.No
                 existingTemplate.ContenuJson = template.ContenuJson;
                 existingTemplate.DateModification = DateTime.Now;
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
 
-_loggingService.LogInformation($"Template de page de garde mis à jour : {template.Nom}");
+                _loggingService.LogInformation($"Template de page de garde mis à jour : {template.Nom}");
                 return existingTemplate;
             }
             catch (Exception ex)
@@ -118,7 +124,8 @@ _loggingService.LogInformation($"Template de page de garde mis à jour : {templa
         {
             try
             {
-                var template = await _context.PageGardeTemplates.FindAsync(id);
+                using var context = _contextFactory.CreateDbContext();
+                var template = await context.PageGardeTemplates.FindAsync(id);
                 if (template == null)
                 {
                     return false;
@@ -127,7 +134,7 @@ _loggingService.LogInformation($"Template de page de garde mis à jour : {templa
                 // Vérifier si c'est le template par défaut
                 if (template.EstParDefaut)
                 {
-                    var otherTemplate = await _context.PageGardeTemplates
+                    var otherTemplate = await context.PageGardeTemplates
                         .Where(t => t.Id != id)
                         .FirstOrDefaultAsync();
 
@@ -137,10 +144,10 @@ _loggingService.LogInformation($"Template de page de garde mis à jour : {templa
                     }
                 }
 
-                _context.PageGardeTemplates.Remove(template);
-                await _context.SaveChangesAsync();
+                context.PageGardeTemplates.Remove(template);
+                await context.SaveChangesAsync();
 
-_loggingService.LogInformation($"Template de page de garde supprimé : {template.Nom}");
+                _loggingService.LogInformation($"Template de page de garde supprimé : {template.Nom}");
                 return true;
             }
             catch (Exception ex)
@@ -154,14 +161,15 @@ _loggingService.LogInformation($"Template de page de garde supprimé : {template
         {
             try
             {
-                var template = await _context.PageGardeTemplates.FindAsync(id);
+                using var context = _contextFactory.CreateDbContext();
+                var template = await context.PageGardeTemplates.FindAsync(id);
                 if (template == null)
                 {
                     return false;
                 }
 
                 // Retirer le défaut de tous les autres templates
-                var currentDefault = await _context.PageGardeTemplates
+                var currentDefault = await context.PageGardeTemplates
                     .Where(t => t.EstParDefaut && t.Id != id)
                     .ToListAsync();
 
@@ -172,9 +180,9 @@ _loggingService.LogInformation($"Template de page de garde supprimé : {template
 
                 // Définir le nouveau défaut
                 template.EstParDefaut = true;
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
 
-_loggingService.LogInformation($"Template défini comme défaut : {template.Nom}");
+                _loggingService.LogInformation($"Template défini comme défaut : {template.Nom}");
                 return true;
             }
             catch (Exception ex)
@@ -192,21 +200,24 @@ _loggingService.LogInformation($"Template défini comme défaut : {template.Nom}
 
                 // Remplacer les variables du document
                 html = Regex.Replace(html, @"\{\{document\.type\}\}", typeDocument, RegexOptions.IgnoreCase);
-                html = Regex.Replace(html, @"\{\{document\.numeroLot\}\}", document.NumeroLot, RegexOptions.IgnoreCase);
-                html = Regex.Replace(html, @"\{\{document\.intituleLot\}\}", document.IntituleLot, RegexOptions.IgnoreCase);
+                html = Regex.Replace(html, @"\{\{document\.numeroLot\}\}", document.NumeroLot ?? "", RegexOptions.IgnoreCase);
+                html = Regex.Replace(html, @"\{\{document\.intituleLot\}\}", document.IntituleLot ?? "", RegexOptions.IgnoreCase);
 
                 // Remplacer les variables du chantier
                 if (document.Chantier != null)
                 {
-                    html = Regex.Replace(html, @"\{\{chantier\.nomProjet\}\}", document.Chantier.NomProjet, RegexOptions.IgnoreCase);
-                    html = Regex.Replace(html, @"\{\{chantier\.maitreOeuvre\}\}", document.Chantier.MaitreOeuvre, RegexOptions.IgnoreCase);
-                    html = Regex.Replace(html, @"\{\{chantier\.maitreOuvrage\}\}", document.Chantier.MaitreOuvrage, RegexOptions.IgnoreCase);
-                    html = Regex.Replace(html, @"\{\{chantier\.adresse\}\}", document.Chantier.Adresse, RegexOptions.IgnoreCase);
+                    html = Regex.Replace(html, @"\{\{chantier\.nomProjet\}\}", document.Chantier.NomProjet ?? "", RegexOptions.IgnoreCase);
+                    html = Regex.Replace(html, @"\{\{chantier\.maitreOeuvre\}\}", document.Chantier.MaitreOeuvre ?? "", RegexOptions.IgnoreCase);
+                    html = Regex.Replace(html, @"\{\{chantier\.maitreOuvrage\}\}", document.Chantier.MaitreOuvrage ?? "", RegexOptions.IgnoreCase);
+                    html = Regex.Replace(html, @"\{\{chantier\.adresse\}\}", document.Chantier.Adresse ?? "", RegexOptions.IgnoreCase);
                 }
 
                 // Remplacer les variables système
                 html = Regex.Replace(html, @"\{\{system\.date\}\}", DateTime.Now.ToString("dd/MM/yyyy"), RegexOptions.IgnoreCase);
                 html = Regex.Replace(html, @"\{\{system\.nomEntreprise\}\}", "Réalisé par notre société", RegexOptions.IgnoreCase);
+
+                // Encapsuler dans une structure HTML complète avec les styles corrigés
+                html = WrapWithPageStructure(html);
 
                 await Task.CompletedTask;
                 return html;
@@ -237,6 +248,9 @@ _loggingService.LogInformation($"Template défini comme défaut : {template.Nom}
                 html = Regex.Replace(html, @"\{\{system\.date\}\}", DateTime.Now.ToString("dd/MM/yyyy"), RegexOptions.IgnoreCase);
                 html = Regex.Replace(html, @"\{\{system\.nomEntreprise\}\}", "Notre Entreprise SARL", RegexOptions.IgnoreCase);
 
+                // Encapsuler dans une structure HTML complète avec les styles corrigés
+                html = WrapWithPageStructure(html);
+
                 await Task.CompletedTask;
                 return html;
             }
@@ -266,6 +280,25 @@ _loggingService.LogInformation($"Template défini comme défaut : {template.Nom}
                 new TemplateVariable { Name = "Date actuelle", Placeholder = "{{system.date}}", Description = "Date de génération du document", Category = "Système", ExampleValue = DateTime.Now.ToString("dd/MM/yyyy") },
                 new TemplateVariable { Name = "Nom de l'entreprise", Placeholder = "{{system.nomEntreprise}}", Description = "Nom de votre entreprise", Category = "Système", ExampleValue = "Notre Entreprise SARL" }
             };
+        }
+
+        private string WrapWithPageStructure(string bodyContent)
+        {
+            return $@"<!DOCTYPE html>
+<html lang=""fr"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <base href=""http://localhost:5282/"">
+    <title>Page de Garde</title>
+    <style>
+        {CssStylesHelper.GetCoverPageCSS()}
+    </style>
+</head>
+<body>
+    {bodyContent}
+</body>
+</html>";
         }
     }
 }

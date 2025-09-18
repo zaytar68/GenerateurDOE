@@ -1,6 +1,8 @@
 @using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
 @using System.ComponentModel.DataAnnotations
 @inject Radzen.NotificationService NotificationService
+@inject IPageGardeTemplateService PageGardeTemplateService
 
 <EditForm Model="@DocumentGenere" OnValidSubmit="@OnValidSubmit">
     <DataAnnotationsValidator />
@@ -74,6 +76,29 @@
         </div>
     </div>
 
+    @if (DocumentGenere.IncludePageDeGarde)
+    {
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <label for="pageGardeTemplate" class="form-label">Template de Page de Garde</label>
+                <InputSelect @bind-Value="DocumentGenere.PageGardeTemplateId" class="form-select" id="pageGardeTemplate">
+                    <option value="">-- Utiliser le template par défaut --</option>
+                    @foreach (var template in availableTemplates)
+                    {
+                        <option value="@template.Id">@template.Nom</option>
+                    }
+                </InputSelect>
+                <small class="form-text text-muted">Choisissez un template personnalisé ou laissez vide pour utiliser le template par défaut</small>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-primary" @onclick="OpenPageGardeEditor">
+                    <span class="oi oi-pencil"></span>
+                    Éditer Template
+                </button>
+            </div>
+        </div>
+    }
+
     <div class="row mb-3">
         <div class="col-12">
             <label for="parametres" class="form-label">Paramètres Avancés (optionnel)</label>
@@ -116,16 +141,21 @@
     [Parameter] public EventCallback OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public EventCallback<int?> OnPageGardeEditorOpen { get; set; }
 
     private bool isSaving = false;
+    private List<PageGardeTemplate> availableTemplates = new();
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         // Générer un nom de fichier par défaut si nouveau document
         if (!IsEditMode && string.IsNullOrWhiteSpace(DocumentGenere.NomFichier))
         {
             GenerateDefaultFileName();
         }
+
+        // Charger les templates disponibles
+        await LoadAvailableTemplatesAsync();
     }
 
     private async Task OnValidSubmit()
@@ -203,6 +233,28 @@
             TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
             _ => type.ToString()
         };
+    }
+
+    private async Task LoadAvailableTemplatesAsync()
+    {
+        try
+        {
+            var templates = await PageGardeTemplateService.GetAllTemplatesAsync();
+            availableTemplates = templates.ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Attention",
+                $"Impossible de charger les templates : {ex.Message}");
+            availableTemplates = new List<PageGardeTemplate>();
+        }
+    }
+
+    private async Task OpenPageGardeEditor()
+    {
+        // Ouvrir l'éditeur de page de garde pour le template sélectionné ou créer un nouveau
+        var templateId = DocumentGenere.PageGardeTemplateId;
+        await OnPageGardeEditorOpen.InvokeAsync(templateId);
     }
 }
 

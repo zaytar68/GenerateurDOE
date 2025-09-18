@@ -8,6 +8,7 @@
 @inject ISectionConteneurService sectionConteneurService
 @inject IFTConteneurService ftConteneurService
 @inject ITypeSectionService typeSectionService
+@inject IPageGardeTemplateService pageGardeTemplateService
 @inject NavigationManager Navigation
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
@@ -227,6 +228,29 @@
                                     </div>
                                 </div>
 
+                                @if (document.IncludePageDeGarde)
+                                {
+                                    <div class="row mb-3">
+                                        <div class="col-md-8">
+                                            <label for="pageGardeTemplate" class="form-label">Template de Page de Garde</label>
+                                            <select class="form-select" id="pageGardeTemplate" @bind="document.PageGardeTemplateId">
+                                                <option value="">-- Utiliser le template par défaut --</option>
+                                                @foreach (var template in availableTemplates)
+                                                {
+                                                    <option value="@template.Id">@template.Nom</option>
+                                                }
+                                            </select>
+                                            <small class="form-text text-muted">Choisissez un template personnalisé ou laissez vide pour utiliser le template par défaut</small>
+                                        </div>
+                                        <div class="col-md-4 d-flex align-items-end">
+                                            <button type="button" class="btn btn-outline-primary" @onclick="OpenPageGardeEditor">
+                                                <span class="oi oi-pencil"></span>
+                                                Éditer Template
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+
                                 <div class="row mb-3">
                                     <div class="col-12">
                                         <label for="parametres" class="form-label">Paramètres Avancés (optionnel)</label>
@@ -313,6 +337,7 @@
     private List<SectionConteneur> sectionsConteneurs = new();
     private FTConteneur? ftConteneur;
     private List<TypeSection> typesSection = new();
+    private List<PageGardeTemplate> availableTemplates = new();
     
     private bool isLoading = true;
     private bool isSaving = false;
@@ -354,6 +379,9 @@
 
             // Charger les types de section
             typesSection = (await typeSectionService.GetAllAsync()).ToList();
+
+            // Charger les templates de page de garde disponibles
+            await LoadAvailableTemplatesAsync();
 
             if (IsEditMode && DocumentId.HasValue)
             {
@@ -643,6 +671,52 @@
             // TODO: Ajouter confirmation pour les modifications non sauvées
         }
         Navigation.NavigateTo($"/chantier/{CurrentChantierId}");
+    }
+
+    private async Task LoadAvailableTemplatesAsync()
+    {
+        try
+        {
+            var templates = await pageGardeTemplateService.GetAllTemplatesAsync();
+            availableTemplates = templates.ToList();
+        }
+        catch (Exception ex)
+        {
+            // Masquer les erreurs de concurrence DbContext (temporaire)
+            if (!ex.Message.Contains("A second operation was started on this context") &&
+                !ex.Message.Contains("context instance"))
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Attention",
+                    $"Impossible de charger les templates : {ex.Message}");
+            }
+            Console.WriteLine($"[DEBUG] LoadAvailableTemplates error (masqué): {ex.Message}");
+            availableTemplates = new List<PageGardeTemplate>();
+        }
+    }
+
+    private async Task OpenPageGardeEditor()
+    {
+        try
+        {
+            // Ouvrir l'éditeur de page de garde dans une nouvelle fenêtre/onglet
+            var templateId = document?.PageGardeTemplateId;
+            var url = templateId.HasValue ?
+                $"/pageGarde/edit/{templateId}" :
+                "/pageGarde/nouveau";
+
+            Navigation.NavigateTo(url);
+        }
+        catch (Exception ex)
+        {
+            // Masquer les erreurs de concurrence DbContext (temporaire)
+            if (!ex.Message.Contains("A second operation was started on this context") &&
+                !ex.Message.Contains("context instance"))
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                    $"Erreur lors de l'ouverture de l'éditeur : {ex.Message}");
+            }
+            Console.WriteLine($"[DEBUG] OpenPageGardeEditor error (masqué): {ex.Message}");
+        }
     }
 
     private string GetTypeDisplayName(TypeDocumentGenere type)

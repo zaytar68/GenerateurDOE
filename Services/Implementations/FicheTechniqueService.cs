@@ -8,18 +8,19 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class FicheTechniqueService : IFicheTechniqueService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly AppSettings _appSettings;
 
-    public FicheTechniqueService(ApplicationDbContext context, IOptions<AppSettings> appSettings)
+    public FicheTechniqueService(IDbContextFactory<ApplicationDbContext> contextFactory, IOptions<AppSettings> appSettings)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _appSettings = appSettings.Value;
     }
 
     public async Task<IEnumerable<FicheTechnique>> GetAllAsync()
     {
-        return await _context.FichesTechniques
+        using var context = _contextFactory.CreateDbContext();
+        return await context.FichesTechniques
             .Include(f => f.ImportsPDF)
             .OrderBy(f => f.NomProduit)
             .ToListAsync();
@@ -27,7 +28,8 @@ public class FicheTechniqueService : IFicheTechniqueService
 
     public async Task<FicheTechnique?> GetByIdAsync(int id)
     {
-        return await _context.FichesTechniques
+        using var context = _contextFactory.CreateDbContext();
+        return await context.FichesTechniques
             .Include(f => f.ImportsPDF)
             .FirstOrDefaultAsync(f => f.Id == id);
     }
@@ -35,17 +37,19 @@ public class FicheTechniqueService : IFicheTechniqueService
 
     public async Task<FicheTechnique> CreateAsync(FicheTechnique ficheTechnique)
     {
+        using var context = _contextFactory.CreateDbContext();
         ficheTechnique.DateCreation = DateTime.Now;
         ficheTechnique.DateModification = DateTime.Now;
 
-        _context.FichesTechniques.Add(ficheTechnique);
-        await _context.SaveChangesAsync();
+        context.FichesTechniques.Add(ficheTechnique);
+        await context.SaveChangesAsync();
         return ficheTechnique;
     }
 
     public async Task<FicheTechnique> UpdateAsync(FicheTechnique ficheTechnique)
     {
-        var existingFiche = await _context.FichesTechniques.FindAsync(ficheTechnique.Id);
+        using var context = _contextFactory.CreateDbContext();
+        var existingFiche = await context.FichesTechniques.FindAsync(ficheTechnique.Id);
         if (existingFiche == null)
         {
             throw new InvalidOperationException($"FicheTechnique avec l'ID {ficheTechnique.Id} n'existe pas.");
@@ -58,13 +62,14 @@ public class FicheTechniqueService : IFicheTechniqueService
         existingFiche.Description = ficheTechnique.Description;
         existingFiche.DateModification = DateTime.Now;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return existingFiche;
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var ficheTechnique = await _context.FichesTechniques
+        using var context = _contextFactory.CreateDbContext();
+        var ficheTechnique = await context.FichesTechniques
             .Include(f => f.ImportsPDF)
             .FirstOrDefaultAsync(f => f.Id == id);
 
@@ -79,24 +84,26 @@ public class FicheTechniqueService : IFicheTechniqueService
             }
         }
 
-        _context.FichesTechniques.Remove(ficheTechnique);
-        await _context.SaveChangesAsync();
+        context.FichesTechniques.Remove(ficheTechnique);
+        await context.SaveChangesAsync();
         return true;
     }
 
     public async Task<ImportPDF> AddPDFAsync(int ficheTechniqueId, ImportPDF importPDF)
     {
+        using var context = _contextFactory.CreateDbContext();
         importPDF.FicheTechniqueId = ficheTechniqueId;
         importPDF.DateImport = DateTime.Now;
 
-        _context.ImportsPDF.Add(importPDF);
-        await _context.SaveChangesAsync();
+        context.ImportsPDF.Add(importPDF);
+        await context.SaveChangesAsync();
         return importPDF;
     }
 
     public async Task<bool> RemovePDFAsync(int importPDFId)
     {
-        var importPDF = await _context.ImportsPDF.FindAsync(importPDFId);
+        using var context = _contextFactory.CreateDbContext();
+        var importPDF = await context.ImportsPDF.FindAsync(importPDFId);
         if (importPDF == null)
             return false;
 
@@ -105,8 +112,8 @@ public class FicheTechniqueService : IFicheTechniqueService
             File.Delete(importPDF.CheminFichier);
         }
 
-        _context.ImportsPDF.Remove(importPDF);
-        await _context.SaveChangesAsync();
+        context.ImportsPDF.Remove(importPDF);
+        await context.SaveChangesAsync();
         return true;
     }
 
@@ -145,6 +152,7 @@ public class FicheTechniqueService : IFicheTechniqueService
 
     public async Task<ImportPDF?> GetPDFFileAsync(int importPDFId)
     {
-        return await _context.ImportsPDF.FindAsync(importPDFId);
+        using var context = _contextFactory.CreateDbContext();
+        return await context.ImportsPDF.FindAsync(importPDFId);
     }
 }

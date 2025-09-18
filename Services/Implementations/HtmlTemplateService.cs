@@ -1,5 +1,6 @@
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
+using GenerateurDOE.Services.Shared;
 using System.Text;
 using System.Text.Json;
 using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
@@ -59,8 +60,22 @@ namespace GenerateurDOE.Services.Implementations
                 <meta charset='UTF-8'>
                 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
                 <style>
+                    @page {{
+                        size: A4;
+                        margin: 10mm;
+                        @bottom-center {{ content: ''; }}
+                        @bottom-left {{ content: ''; }}
+                        @bottom-right {{ content: ''; }}
+                        @top-center {{ content: ''; }}
+                        @top-left {{ content: ''; }}
+                        @top-right {{ content: ''; }}
+                    }}
+                    * {{
+                        -webkit-print-color-adjust: exact;
+                        color-adjust: exact;
+                    }}
                     body {{
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
                         margin: 0;
                         padding: 60px;
                         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -571,68 +586,7 @@ namespace GenerateurDOE.Services.Implementations
 
         public string GetDefaultDocumentCSS()
         {
-            return @"
-                * {
-                    box-sizing: border-box;
-                }
-                
-                body { 
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    line-height: 1.6;
-                    color: #333;
-                    font-size: 14px;
-                    background-color: white;
-                }
-                
-                h1, h2, h3, h4, h5, h6 {
-                    color: #2c3e50;
-                    margin-top: 0;
-                    margin-bottom: 0.5em;
-                    font-weight: 600;
-                    line-height: 1.3;
-                }
-                
-                h1 { font-size: 2.5em; }
-                h2 { font-size: 2em; }
-                h3 { font-size: 1.5em; }
-                h4 { font-size: 1.3em; }
-                h5 { font-size: 1.1em; }
-                h6 { font-size: 1em; }
-                
-                p {
-                    margin: 0 0 1em 0;
-                    text-align: justify;
-                }
-                
-                a {
-                    color: #3498db;
-                    text-decoration: none;
-                }
-                
-                a:hover {
-                    text-decoration: underline;
-                }
-                
-                @media print {
-                    body {
-                        font-size: 12px;
-                    }
-                    
-                    h1, h2, h3 {
-                        page-break-after: avoid;
-                    }
-                    
-                    img {
-                        max-width: 100% !important;
-                        page-break-inside: avoid;
-                    }
-                    
-                    table {
-                        page-break-inside: avoid;
-                    }
-                }";
+            return CssStylesHelper.GetBaseDocumentCSS();
         }
 
         private async Task AppendTocEntryHtmlAsync(StringBuilder html, TocEntry entry, int level)

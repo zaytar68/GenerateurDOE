@@ -26,6 +26,9 @@ public class DocumentGenere
     
     public bool IncludePageDeGarde { get; set; } = true;
     public bool IncludeTableMatieres { get; set; } = true;
+
+    public int? PageGardeTemplateId { get; set; }
+    public virtual PageGardeTemplate? PageGardeTemplate { get; set; }
     
     public bool EnCours { get; set; } = true;
     
