@@ -15,17 +15,20 @@ namespace GenerateurDOE.Services.Implementations
         private readonly AppSettings _appSettings;
         private readonly ILoggingService _loggingService;
         private readonly IPageGardeTemplateService _pageGardeTemplateService;
+        private readonly IHtmlTemplateService _htmlTemplateService;
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
 
         public PdfGenerationService(
             IOptions<AppSettings> appSettings,
             ILoggingService loggingService,
-            IPageGardeTemplateService pageGardeTemplateService)
+            IPageGardeTemplateService pageGardeTemplateService,
+            IHtmlTemplateService htmlTemplateService)
         {
             _appSettings = appSettings.Value;
             _loggingService = loggingService;
             _pageGardeTemplateService = pageGardeTemplateService;
+            _htmlTemplateService = htmlTemplateService;
         }
 
         private async Task<IBrowser> GetBrowserAsync()
@@ -103,7 +106,20 @@ namespace GenerateurDOE.Services.Implementations
                     }
                 }
 
-                // 4. Fiches techniques (PDFs existants)
+                // 4. Tableau de synthèse des produits (si activé) - juste avant les fiches techniques
+                if (document.FTConteneur?.AfficherTableauRecapitulatif == true &&
+                    document.FTConteneur?.Elements?.Any() == true)
+                {
+                    _loggingService.LogInformation("Génération du tableau de synthèse des produits");
+
+                    var tableauHtml = await _htmlTemplateService.GenerateTableauSyntheseProduits(document.FTConteneur);
+                    var tableauPdf = await ConvertHtmlToPdfAsync(tableauHtml, options);
+                    pdfParts.Add(tableauPdf);
+
+                    _loggingService.LogInformation("Tableau de synthèse ajouté avant les fiches techniques");
+                }
+
+                // 5. Fiches techniques (PDFs existants)
                 if (document.FTConteneur?.Elements?.Any() == true)
                 {
                     foreach (var element in document.FTConteneur.Elements.OrderBy(e => e.Ordre))
@@ -116,14 +132,14 @@ namespace GenerateurDOE.Services.Implementations
                     }
                 }
 
-                // 5. Insertion de la table des matières si nécessaire
+                // 6. Insertion de la table des matières si nécessaire
                 if (tocData != null && document.IncludeTableMatieres)
                 {
                     var tocPdf = await GenerateTableMatieresAsync(tocData, options);
                     pdfParts.Insert(document.IncludePageDeGarde ? 1 : 0, tocPdf);
                 }
 
-                // 6. Assembly final
+                // 7. Assembly final
                 var assemblyOptions = new PdfAssemblyOptions
                 {
                     AddBookmarks = true,
@@ -510,6 +526,20 @@ namespace GenerateurDOE.Services.Implementations
                     tocData.Entries.Add(entry);
                     pageNumber += 2; // Estimation
                 }
+            }
+
+            // Tableau de synthèse des produits (si activé)
+            if (document.FTConteneur?.AfficherTableauRecapitulatif == true &&
+                document.FTConteneur?.Elements?.Any() == true)
+            {
+                var syntheseEntry = new TocEntry
+                {
+                    Title = "Tableau de Synthèse des Produits",
+                    Level = 1,
+                    PageNumber = pageNumber
+                };
+                tocData.Entries.Add(syntheseEntry);
+                pageNumber += 1; // Une page pour le tableau de synthèse
             }
 
             // Fiches techniques

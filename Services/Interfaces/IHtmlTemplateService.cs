@@ -25,6 +25,11 @@ namespace GenerateurDOE.Services.Interfaces
         Task<string> GenerateFTConteneurHtmlAsync(FTConteneur ftConteneur, FTTemplate? template = null);
 
         /// <summary>
+        /// Génère le HTML pour un tableau de synthèse des produits
+        /// </summary>
+        Task<string> GenerateTableauSyntheseProduits(FTConteneur ftConteneur, TableauSyntheseTemplate? template = null);
+
+        /// <summary>
         /// Compile un template HTML avec les données fournies
         /// </summary>
         Task<string> CompileTemplateAsync(string templateHtml, object data);
@@ -67,5 +72,15 @@ namespace GenerateurDOE.Services.Interfaces
         public string BorderColor { get; set; } = "#ddd";
         public bool ShowThumbnails { get; set; } = true;
         public string ThumbnailSize { get; set; } = "150px";
+    }
+
+    public class TableauSyntheseTemplate
+    {
+        public string HeaderBackgroundColor { get; set; } = "#34495e";
+        public string HeaderTextColor { get; set; } = "white";
+        public string BorderColor { get; set; } = "#ddd";
+        public string AlternateRowColor { get; set; } = "#f8f9fa";
+        public string TextColor { get; set; } = "#2c3e50";
+        public bool ShowRowNumbers { get; set; } = false;
     }
 }

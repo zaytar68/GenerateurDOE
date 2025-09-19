@@ -570,6 +570,163 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
+        public async Task<string> GenerateTableauSyntheseProduits(FTConteneur ftConteneur, TableauSyntheseTemplate? template = null)
+        {
+            template ??= new TableauSyntheseTemplate();
+
+            var html = new StringBuilder();
+            html.AppendLine($@"
+            <!DOCTYPE html>
+            <html lang='fr'>
+            <head>
+                <meta charset='UTF-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <style>
+                    {GetDefaultDocumentCSS()}
+
+                    .synthese-container {{
+                        max-width: 100%;
+                        margin: 0 auto;
+                        padding: 40px;
+                    }}
+                    .main-title {{
+                        color: #2c3e50;
+                        border-bottom: 2px solid #3498db;
+                        padding-bottom: 15px;
+                        margin-bottom: 40px;
+                        font-size: 2.2em;
+                        font-weight: 300;
+                        text-align: center;
+                    }}
+                    .synthese-table {{
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 20px 0;
+                        font-size: 0.9em;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        border-radius: 8px;
+                        overflow: hidden;
+                    }}
+                    .synthese-table th {{
+                        background-color: {template.HeaderBackgroundColor};
+                        color: {template.HeaderTextColor};
+                        padding: 15px 12px;
+                        text-align: left;
+                        font-weight: 600;
+                        font-size: 0.95em;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }}
+                    .synthese-table td {{
+                        padding: 12px;
+                        border-bottom: 1px solid {template.BorderColor};
+                        color: {template.TextColor};
+                        vertical-align: top;
+                    }}
+                    .synthese-table tbody tr:nth-child(even) {{
+                        background-color: {template.AlternateRowColor};
+                    }}
+                    .synthese-table tbody tr:hover {{
+                        background-color: #e8f4fd;
+                    }}
+                    .position-cell {{
+                        font-weight: 600;
+                        color: #2980b9;
+                        text-align: center;
+                        white-space: nowrap;
+                    }}
+                    .fabricant-cell {{
+                        font-weight: 500;
+                        color: #34495e;
+                    }}
+                    .produit-cell {{
+                        font-weight: 500;
+                    }}
+                    .type-cell {{
+                        font-style: italic;
+                        color: #7f8c8d;
+                    }}
+                    .specification-cell {{
+                        font-size: 0.85em;
+                        line-height: 1.4;
+                    }}
+                    .no-data {{
+                        text-align: center;
+                        padding: 40px;
+                        color: #95a5a6;
+                        font-style: italic;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class='synthese-container'>
+                    <h1 class='main-title'>Tableau de Synthèse des Produits</h1>");
+
+            if (ftConteneur?.Elements?.Any() == true)
+            {
+                html.AppendLine(@"
+                    <table class='synthese-table'>
+                        <thead>
+                            <tr>
+                                <th style='width: 12%;'>Position Marché</th>
+                                <th style='width: 20%;'>Fabricant</th>
+                                <th style='width: 28%;'>Produit</th>
+                                <th style='width: 18%;'>Type</th>
+                                <th style='width: 22%;'>Spécification</th>
+                            </tr>
+                        </thead>
+                        <tbody>");
+
+                // Trier les éléments par position marché puis par ordre
+                var elementsTriees = ftConteneur.Elements
+                    .OrderBy(e => e.PositionMarche ?? "zzz") // Les positions vides à la fin
+                    .ThenBy(e => e.Ordre)
+                    .ToList();
+
+                foreach (var element in elementsTriees)
+                {
+                    var fiche = element.FicheTechnique;
+                    if (fiche != null)
+                    {
+                        var positionMarche = !string.IsNullOrEmpty(element.PositionMarche)
+                            ? element.PositionMarche
+                            : "-";
+                        var specification = !string.IsNullOrEmpty(element.Commentaire)
+                            ? System.Web.HttpUtility.HtmlEncode(element.Commentaire)
+                            : "-";
+
+                        html.AppendLine($@"
+                            <tr>
+                                <td class='position-cell'>{positionMarche}</td>
+                                <td class='fabricant-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.NomFabricant)}</td>
+                                <td class='produit-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.NomProduit)}</td>
+                                <td class='type-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.TypeProduit)}</td>
+                                <td class='specification-cell'>{specification}</td>
+                            </tr>");
+                    }
+                }
+
+                html.AppendLine(@"
+                        </tbody>
+                    </table>");
+            }
+            else
+            {
+                html.AppendLine(@"
+                    <div class='no-data'>
+                        <p>Aucun produit à afficher dans le tableau de synthèse.</p>
+                    </div>");
+            }
+
+            html.AppendLine(@"
+                </div>
+            </body>
+            </html>");
+
+            await Task.CompletedTask;
+            return html.ToString();
+        }
+
         public async Task<string> CompileTemplateAsync(string templateHtml, object data)
         {
             // Simple template compilation - peut être étendu avec un moteur de template plus sophistiqué

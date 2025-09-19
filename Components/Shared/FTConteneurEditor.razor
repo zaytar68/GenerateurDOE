@@ -185,7 +185,7 @@
                                     <th style="width: 15%;">Fabricant</th>
                                     <th>Produit</th>
                                     <th style="width: 10%;">Type</th>
-                                    <th style="width: 20%;">Commentaire</th>
+                                    <th style="width: 20%;">Spécificités</th>
                                     <th style="width: 10%;">Document</th>
                                     <th style="width: 5%;">Page</th>
                                     <th style="width: 120px;">Actions</th>
@@ -376,7 +376,7 @@
 
     private string GetFicheDisplayText(FicheTechnique fiche)
     {
-        return $"{fiche.NomFabricant} - {fiche.NomProduit}";
+        return $"{fiche.NomFabricant} - {fiche.NomProduit} ({fiche.TypeProduit})";
     }
 
     private async Task OnFicheTechniqueSelected(FicheTechnique fiche)
