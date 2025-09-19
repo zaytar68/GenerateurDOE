@@ -441,3 +441,4 @@ La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Cor
 - "Position marché" non obligatoire\
 - Numéro de lot non obligatoire\
 - Possibilité de modifier le sommaire
+- Use dotnet watch

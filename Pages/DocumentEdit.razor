@@ -237,19 +237,19 @@
                                     </div>
                                 </div>
 
+                                <!-- Sélection du template de page de garde si activé -->
                                 @if (document.IncludePageDeGarde)
                                 {
-                                    <div class="row mb-3">
-                                        <div class="col-md-8">
-                                            <label for="pageGardeTemplate" class="form-label">Template de Page de Garde</label>
+                                    <label for="pageGardeTemplate" class="form-label">Template de Page de Garde</label>
+                                    <div class="row mb-3">                                   
+                                        <div class="col-md-8">                                            
                                             <select class="form-select" id="pageGardeTemplate" @bind="document.PageGardeTemplateId">
                                                 <option value="">-- Utiliser le template par défaut --</option>
                                                 @foreach (var template in availableTemplates)
                                                 {
                                                     <option value="@template.Id">@template.Nom</option>
                                                 }
-                                            </select>
-                                            <small class="form-text text-muted">Choisissez un template personnalisé ou laissez vide pour utiliser le template par défaut</small>
+                                            </select>                                            
                                         </div>
                                         <div class="col-md-4 d-flex align-items-end">
                                             <button type="button" class="btn btn-outline-primary" @onclick="OpenPageGardeEditor">
@@ -257,9 +257,13 @@
                                                 Éditer Template
                                             </button>
                                         </div>
+                                        <div class="col-md-8b d-flex align-items-end align-items-center">
+                                        <small class="form-text text-muted">Choisissez un template personnalisé ou laissez vide pour utiliser le template par défaut</small>
+                                        </div>
                                     </div>
-                                }
 
+                                }
+                                <!-- Paramètres supplémentaires 
                                 <div class="row mb-3">
                                     <div class="col-12">
                                         <label for="parametres" class="form-label">Paramètres Avancés (optionnel)</label>
@@ -269,7 +273,8 @@
                                         <ValidationMessage For="() => document.Parametres" class="text-danger" />
                                         <small class="form-text text-muted">Configuration JSON pour des options avancées de génération</small>
                                     </div>
-                                </div>
+                                </div> -->
+
                             </EditForm>
                         }
                     </div>

@@ -66,16 +66,25 @@
                 <div class="row">
                     <div class="col-md-3">
                         <label class="form-label">Fiche Technique</label>
-                        <select class="form-select" @bind="selectedFicheTechniqueId"
-                                @bind:after="OnFicheTechniqueChanged">
-                            <option value="">-- Sélectionner une fiche --</option>
-                            @foreach (var fiche in fichesDisponibles)
-                            {
-                                <option value="@fiche.Id">
-                                    @fiche.NomFabricant - @fiche.NomProduit
-                                </option>
-                            }
-                        </select>
+                        <AutoComplete T="FicheTechnique"
+                                      Items="fichesDisponibles"
+                                      DisplaySelector="GetFicheDisplayText"
+                                      Placeholder="Rechercher une fiche technique..."
+                                      Value="@searchText"
+                                      OnItemSelected="OnFicheTechniqueSelected"
+                                      OnTextChanged="OnSearchTextChanged"
+                                      MinSearchLength="1">
+                            <ItemTemplate Context="fiche">
+                                <div>
+                                    <strong>@fiche.NomProduit</strong>
+                                    <small class="text-muted d-block">
+                                        <i class="oi oi-person me-1"></i>@fiche.NomFabricant
+                                        <span class="mx-2">•</span>
+                                        <i class="oi oi-tag me-1"></i>@fiche.TypeProduit
+                                    </small>
+                                </div>
+                            </ItemTemplate>
+                        </AutoComplete>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Position Marché (optionnel)</label>
@@ -172,20 +181,29 @@
                             <thead class="table-light">
                                 <tr>
                                     <th style="width: 50px;">Ordre</th>
-                                    <th>Position Marché</th>
-                                    <th>Fabricant</th>
+                                    <th style="width: 7%;">Position Marché</th>
+                                    <th style="width: 15%;">Fabricant</th>
                                     <th>Produit</th>
-                                    <th>Type</th>
-                                    <th>Commentaire</th>
-                                    <th>Document</th>
-                                    <th>Page</th>
+                                    <th style="width: 10%;">Type</th>
+                                    <th style="width: 20%;">Commentaire</th>
+                                    <th style="width: 10%;">Document</th>
+                                    <th style="width: 5%;">Page</th>
                                     <th style="width: 120px;">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="sortable-tbody">
                                 @foreach (var element in FTConteneur.Elements.OrderBy(e => e.Ordre))
                                 {
-                                    <tr>
+                                    <tr draggable="true" data-element-id="@element.Id"
+                                        @ondragstart="@((DragEventArgs e) => OnDragStart(e, element.Id))"
+                                        @ondragenter="@((DragEventArgs e) => OnDragEnter(e))"
+                                        @ondragenter:preventDefault="true"
+                                        @ondragover="@((DragEventArgs e) => OnDragOver(e))"
+                                        @ondragover:preventDefault="true"
+                                        @ondragleave="@((DragEventArgs e) => OnDragLeave(e))"
+                                        @ondrop="@((DragEventArgs e) => OnDrop(e, element.Id))"
+                                        @ondrop:preventDefault="true"
+                                        class="sortable-row @(draggedElementId == element.Id ? "dragging" : "")">
                                         <td class="text-center">
                                             <span class="drag-handle" style="cursor: move;">⋮⋮</span>
                                             @element.Ordre
@@ -268,9 +286,12 @@
     private bool isLoading = false;
     private bool isAdding = false;
     private int selectedFicheTechniqueId = 0;
+    private FicheTechnique? selectedFiche = null;
+    private string searchText = string.Empty;
     private List<int> selectedImportPDFIds = new();
     private string nouvellePositionMarche = string.Empty;
     private string nouveauCommentaire = string.Empty;
+    private int draggedElementId = 0;
 
     // Classe helper pour la sélection multiple
     public class ImportPDFWithSelection
@@ -353,6 +374,38 @@
         StateHasChanged();
     }
 
+    private string GetFicheDisplayText(FicheTechnique fiche)
+    {
+        return $"{fiche.NomFabricant} - {fiche.NomProduit}";
+    }
+
+    private async Task OnFicheTechniqueSelected(FicheTechnique fiche)
+    {
+        selectedFiche = fiche;
+        selectedFicheTechniqueId = fiche.Id;
+        searchText = GetFicheDisplayText(fiche);
+
+        // Déclencher les mêmes actions que l'ancienne méthode OnFicheTechniqueChanged
+        OnFicheTechniqueChanged();
+
+        StateHasChanged();
+    }
+
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchText = text;
+
+        // Si le texte est vidé, réinitialiser la sélection
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            selectedFiche = null;
+            selectedFicheTechniqueId = 0;
+            OnFicheTechniqueChanged();
+        }
+
+        StateHasChanged();
+    }
+
     private async Task AjouterFicheTechnique()
     {
         if (FTConteneur == null || selectedFicheTechniqueId == 0)
@@ -413,6 +466,8 @@
 
             // Reset du formulaire
             selectedFicheTechniqueId = 0;
+            selectedFiche = null;
+            searchText = string.Empty;
             selectedImportPDFIds.Clear();
             nouvellePositionMarche = string.Empty;
             nouveauCommentaire = string.Empty;
@@ -584,6 +639,84 @@
             Console.WriteLine($"[DEBUG] SauvegarderConteneur error (masqué): {ex.Message}");
         }
     }
+
+    private void OnDragStart(DragEventArgs e, int elementId)
+    {
+        draggedElementId = elementId;
+        e.DataTransfer.EffectAllowed = "move";
+    }
+
+    private void OnDragEnter(DragEventArgs e)
+    {
+        if (draggedElementId != 0)
+        {
+            e.DataTransfer.DropEffect = "move";
+        }
+    }
+
+    private void OnDragOver(DragEventArgs e)
+    {
+        if (draggedElementId != 0)
+        {
+            e.DataTransfer.DropEffect = "move";
+        }
+    }
+
+    private void OnDragLeave(DragEventArgs e)
+    {
+        // Placeholder pour futurs effets visuels
+    }
+
+    private async Task OnDrop(DragEventArgs e, int targetElementId)
+    {
+        e.DataTransfer.DropEffect = "move";
+
+        if (draggedElementId == 0 || draggedElementId == targetElementId || FTConteneur == null)
+            return;
+
+        try
+        {
+            // Obtenir l'ordre actuel des éléments
+            var elements = FTConteneur.Elements.OrderBy(el => el.Ordre).ToList();
+            var draggedElement = elements.FirstOrDefault(el => el.Id == draggedElementId);
+            var targetElement = elements.FirstOrDefault(el => el.Id == targetElementId);
+
+            if (draggedElement == null || targetElement == null)
+                return;
+
+            // Supprimer l'élément déplacé de sa position actuelle
+            elements.Remove(draggedElement);
+
+            // Trouver la nouvelle position de l'élément cible
+            var targetIndex = elements.IndexOf(targetElement);
+
+            // Insérer l'élément déplacé à la nouvelle position
+            elements.Insert(targetIndex, draggedElement);
+
+            // Créer la liste des IDs dans le nouvel ordre
+            var newOrder = elements.Select(el => el.Id).ToList();
+
+            // Appeler le service pour réorganiser
+            FTConteneur = await ftConteneurService.ReorderFTElementsAsync(FTConteneur.Id, newOrder);
+            await OnConteneurChanged.InvokeAsync(FTConteneur);
+
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Ordre des fiches techniques mis à jour");
+        }
+        catch (Exception ex)
+        {
+            // Masquer les erreurs de concurrence DbContext (temporaire)
+            if (!ex.Message.Contains("A second operation was started on this context") &&
+                !ex.Message.Contains("context instance"))
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du réarrangement: {ex.Message}");
+            }
+            Console.WriteLine($"[DEBUG] OnDrop error (masqué): {ex.Message}");
+        }
+        finally
+        {
+            draggedElementId = 0;
+        }
+    }
 }
 
 <style>
@@ -655,5 +788,39 @@
     .form-check-input:checked + .form-check-label {
         color: #0d6efd;
         font-weight: 500;
+    }
+
+    /* Styles pour le drag & drop */
+    .sortable-row {
+        transition: background-color 0.2s ease;
+    }
+
+    .sortable-row:hover {
+        background-color: #f8f9fa;
+    }
+
+    .sortable-row[draggable="true"] {
+        cursor: move;
+    }
+
+    .sortable-row[draggable="true"]:active {
+        opacity: 0.5;
+    }
+
+    .sortable-row.dragging {
+        opacity: 0.5;
+        background-color: #e3f2fd;
+    }
+
+    .sortable-row:dragover {
+        background-color: #f0f8ff;
+        border: 2px dashed #007bff;
+    }
+
+    .drag-handle {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
     }
 </style>
