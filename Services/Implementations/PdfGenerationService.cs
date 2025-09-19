@@ -16,6 +16,7 @@ namespace GenerateurDOE.Services.Implementations
         private readonly ILoggingService _loggingService;
         private readonly IPageGardeTemplateService _pageGardeTemplateService;
         private readonly IHtmlTemplateService _htmlTemplateService;
+        private readonly IPdfProgressService _progressService;
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
 
@@ -23,12 +24,14 @@ namespace GenerateurDOE.Services.Implementations
             IOptions<AppSettings> appSettings,
             ILoggingService loggingService,
             IPageGardeTemplateService pageGardeTemplateService,
-            IHtmlTemplateService htmlTemplateService)
+            IHtmlTemplateService htmlTemplateService,
+            IPdfProgressService progressService)
         {
             _appSettings = appSettings.Value;
             _loggingService = loggingService;
             _pageGardeTemplateService = pageGardeTemplateService;
             _htmlTemplateService = htmlTemplateService;
+            _progressService = progressService;
         }
 
         private async Task<IBrowser> GetBrowserAsync()
@@ -72,13 +75,17 @@ namespace GenerateurDOE.Services.Implementations
         public async Task<byte[]> GenerateCompletePdfAsync(DocumentGenere document, PdfGenerationOptions? options = null)
         {
             _loggingService.LogInformation($"Génération PDF complète pour document {document.Id}");
-            
+
             try
             {
+                // Initialiser la progression
+                _progressService.InitializeProgress(document.Id);
+
                 var pdfParts = new List<byte[]>();
                 options ??= new PdfGenerationOptions();
 
                 // 1. Page de garde
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.PageDeGarde);
                 if (document.IncludePageDeGarde && document.Chantier != null)
                 {
                     var pageDeGarde = await GeneratePageDeGardeAsync(document, GetTypeDocumentLabel(document.TypeDocument), options);
@@ -86,6 +93,7 @@ namespace GenerateurDOE.Services.Implementations
                 }
 
                 // 2. Table des matières (sera générée après analyse du contenu)
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.AnalyseTableMatieres);
                 TableOfContentsData? tocData = null;
                 if (document.IncludeTableMatieres)
                 {
@@ -93,6 +101,7 @@ namespace GenerateurDOE.Services.Implementations
                 }
 
                 // 3. Sections libres
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.SectionsLibres);
                 if (document.SectionsConteneurs?.Any() == true)
                 {
                     foreach (var container in document.SectionsConteneurs.OrderBy(sc => sc.Ordre))
@@ -107,6 +116,7 @@ namespace GenerateurDOE.Services.Implementations
                 }
 
                 // 4. Tableau de synthèse des produits (si activé) - juste avant les fiches techniques
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.TableauSynthese);
                 if (document.FTConteneur?.AfficherTableauRecapitulatif == true &&
                     document.FTConteneur?.Elements?.Any() == true)
                 {
@@ -120,8 +130,12 @@ namespace GenerateurDOE.Services.Implementations
                 }
 
                 // 5. Fiches techniques (PDFs existants)
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.FichesTechniques);
                 if (document.FTConteneur?.Elements?.Any() == true)
                 {
+                    var totalElements = document.FTConteneur.Elements.Count;
+                    var processedElements = 0;
+
                     foreach (var element in document.FTConteneur.Elements.OrderBy(e => e.Ordre))
                     {
                         if (element.ImportPDF?.CheminFichier != null && File.Exists(element.ImportPDF.CheminFichier))
@@ -129,10 +143,16 @@ namespace GenerateurDOE.Services.Implementations
                             var existingPdfBytes = await File.ReadAllBytesAsync(element.ImportPDF.CheminFichier);
                             pdfParts.Add(existingPdfBytes);
                         }
+
+                        processedElements++;
+                        // Mise à jour du message avec le nombre de fiches traitées
+                        _progressService.UpdateProgress(document.Id, PdfGenerationStep.FichesTechniques,
+                            $"Intégration des fiches techniques ({processedElements}/{totalElements})");
                     }
                 }
 
                 // 6. Insertion de la table des matières si nécessaire
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.InsertionTableMatieres);
                 if (tocData != null && document.IncludeTableMatieres)
                 {
                     var tocPdf = await GenerateTableMatieresAsync(tocData, options);
@@ -140,6 +160,7 @@ namespace GenerateurDOE.Services.Implementations
                 }
 
                 // 7. Assembly final
+                _progressService.UpdateProgress(document.Id, PdfGenerationStep.AssemblyFinal);
                 var assemblyOptions = new PdfAssemblyOptions
                 {
                     AddBookmarks = true,
@@ -149,7 +170,7 @@ namespace GenerateurDOE.Services.Implementations
 
                 var finalPdf = await AssemblePdfsAsync(pdfParts, assemblyOptions);
 
-                // 7. Optimisation
+                // 8. Optimisation
                 var optimizationOptions = new PdfOptimizationOptions
                 {
                     CompressImages = true,
@@ -160,10 +181,18 @@ namespace GenerateurDOE.Services.Implementations
                     Keywords = "DOE, Technique, Construction"
                 };
 
-                return await OptimizePdfAsync(finalPdf, optimizationOptions);
+                var optimizedPdf = await OptimizePdfAsync(finalPdf, optimizationOptions);
+
+                // Marquer comme terminé
+                _progressService.CompleteProgress(document.Id, "PDF généré avec succès !");
+
+                return optimizedPdf;
             }
             catch (Exception ex)
             {
+                // Marquer la progression comme échouée
+                _progressService.SetError(document.Id, ex.Message);
+
                 _loggingService.LogError(ex, $"Erreur génération PDF: {ex.Message}");
                 throw;
             }

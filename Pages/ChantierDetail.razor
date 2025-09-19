@@ -4,6 +4,7 @@
 @inject IChantierService chantierService
 @inject IDocumentGenereService documentGenereService
 @inject IDocumentDownloadService documentDownloadService
+@inject IPdfProgressDialogService pdfProgressDialogService
 @inject NavigationManager Navigation
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
@@ -310,35 +311,14 @@
 
     private async Task TelechargerDocument(DocumentGenere document)
     {
-        try
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Info, "Génération", "Génération du document en cours...");
-
-            // Utilisation du service factorisé pour la génération
-            var result = await documentDownloadService.PrepareDocumentForDownloadAsync(document.Id);
-
-            if (!result.Success)
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", result.ErrorMessage);
-                return;
-            }
-
-            // Téléchargement automatique du fichier
-            var base64 = Convert.ToBase64String(result.FileBytes);
-            await JSRuntime.InvokeVoidAsync("downloadFile", result.FileName, base64, result.MimeType);
-
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement", $"Téléchargement de {result.FileName} démarré");
-        }
-        catch (Exception ex)
-        {
-            // Masquer les erreurs de concurrence DbContext (temporaire)
-            if (!ex.Message.Contains("A second operation was started on this context") &&
-                !ex.Message.Contains("context instance"))
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors de la génération: {ex.Message}");
-            }
-            Console.WriteLine($"[DEBUG] TelechargerDocument error (masqué): {ex.Message}");
-        }
+        await pdfProgressDialogService.StartPdfGenerationWithProgressAsync(
+            document.Id,
+            document.NomFichier ?? "Document",
+            DialogService,
+            documentDownloadService,
+            this,
+            JSRuntime,
+            NotificationService);
     }
 
 

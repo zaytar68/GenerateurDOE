@@ -320,9 +320,9 @@
         try
         {
             isLoading = true;
-            
+
             // Charger les fiches techniques disponibles
-            fichesDisponibles = (await ftConteneurService.GetAvailableFichesTechniquesAsync(FTConteneur?.DocumentGenereId ?? 0)).ToList();
+            fichesDisponibles = (await ftConteneurService.GetAvailableFichesTechniquesAsync(FTConteneur?.DocumentGenereId ?? 0).ConfigureAwait(false)).ToList();
         }
         catch (Exception ex)
         {

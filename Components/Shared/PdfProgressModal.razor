@@ -1,0 +1,292 @@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IPdfProgressService ProgressService
+@inject Radzen.DialogService DialogService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="pdf-progress-modal">
+    <div class="dialog-header">
+        <h5 class="mb-3">
+            <span class="oi oi-document" aria-hidden="true"></span>
+            Génération PDF en cours
+        </h5>
+        <p class="text-muted mb-0">
+            Document : <strong>@DocumentName</strong>
+        </p>
+    </div>
+
+    <div class="dialog-body">
+        @if (currentProgress != null)
+        {
+            <!-- Barre de progression principale -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold text-primary">Progression générale</span>
+                    <span class="badge bg-primary">@(currentProgress.ProgressPercentage)%</span>
+                </div>
+
+                <RadzenProgressBar Value="@currentProgress.ProgressPercentage"
+                                 Max="100"
+                                 ShowValue="false"
+                                 Style="height: 12px;" />
+            </div>
+
+            <!-- Étape courante -->
+            <div class="current-step mb-4">
+                <div class="d-flex align-items-center mb-2">
+                    @if (currentProgress.HasError)
+                    {
+                        <span class="oi oi-warning text-danger me-2"></span>
+                        <span class="fw-bold text-danger">Erreur de génération</span>
+                    }
+                    else if (currentProgress.IsCompleted)
+                    {
+                        <span class="oi oi-check text-success me-2"></span>
+                        <span class="fw-bold text-success">Génération terminée</span>
+                    }
+                    else
+                    {
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                            <span class="visually-hidden">Traitement...</span>
+                        </div>
+                        <span class="fw-bold text-primary">Étape en cours</span>
+                    }
+                </div>
+
+                <div class="step-message p-3 bg-light rounded">
+                    <span class="text-dark">@currentProgress.StepMessage</span>
+                </div>
+            </div>
+
+            <!-- Liste des étapes -->
+            <div class="steps-list">
+                <h6 class="fw-bold mb-3">Détail des étapes</h6>
+
+                @foreach (var step in GetAllSteps())
+                {
+                    var stepProgress = GetStepProgress(step);
+                    var isActive = currentProgress.CurrentStep == step;
+                    var isCompleted = (int)currentProgress.CurrentStep > (int)step;
+                    var hasError = currentProgress.HasError && isActive;
+
+                    <div class="step-item d-flex align-items-center mb-2 @(isActive ? "active" : "") @(isCompleted ? "completed" : "") @(hasError ? "error" : "")">
+                        <div class="step-icon me-3">
+                            @if (hasError)
+                            {
+                                <span class="oi oi-warning text-danger"></span>
+                            }
+                            else if (isCompleted)
+                            {
+                                <span class="oi oi-check text-success"></span>
+                            }
+                            else if (isActive)
+                            {
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">En cours...</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="oi oi-clock text-muted"></span>
+                            }
+                        </div>
+
+                        <div class="step-content flex-grow-1">
+                            <span class="step-label @(isActive ? "fw-bold" : "")">
+                                @PdfGenerationProgress.GetStepLabel(step)
+                            </span>
+                            <small class="text-muted ms-2">(@(stepProgress)%)</small>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Informations techniques -->
+            <div class="technical-info mt-4 pt-3 border-top">
+                <small class="text-muted">
+                    <span class="oi oi-clock me-1"></span>
+                    Dernière mise à jour : @currentProgress.LastUpdate.ToString("HH:mm:ss")
+                </small>
+            </div>
+        }
+        else
+        {
+            <!-- État de chargement initial -->
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Initialisation...</span>
+                </div>
+                <p class="text-muted">Initialisation de la génération PDF...</p>
+            </div>
+        }
+    </div>
+
+    <div class="dialog-footer">
+        @if (currentProgress?.HasError == true)
+        {
+            <button class="btn btn-danger" @onclick="CloseModal">
+                <span class="oi oi-x me-1"></span>
+                Fermer
+            </button>
+        }
+        else if (currentProgress?.IsCompleted == true)
+        {
+            <button class="btn btn-success" @onclick="CloseModal">
+                <span class="oi oi-check me-1"></span>
+                Terminé
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" @onclick="CloseModal" disabled="@isClosing">
+                @if (isClosing)
+                {
+                    <div class="spinner-border spinner-border-sm me-1" role="status"></div>
+                }
+                Annuler
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int DocumentId { get; set; }
+    [Parameter] public string DocumentName { get; set; } = "Document";
+
+    private PdfGenerationProgress? currentProgress;
+    private Timer? pollingTimer;
+    private bool isClosing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Démarrer le polling toutes les 500ms
+        pollingTimer = new Timer(async _ => await PollProgress(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
+    }
+
+    private async Task PollProgress()
+    {
+        try
+        {
+            var progress = ProgressService.GetProgress(DocumentId);
+
+            if (progress != null)
+            {
+                currentProgress = progress;
+
+                // Forcer la mise à jour de l'UI sur le thread principal
+                await InvokeAsync(StateHasChanged);
+
+                // Fermer automatiquement si terminé avec succès (après 2 secondes)
+                if (progress.IsCompleted && !progress.HasError)
+                {
+                    await Task.Delay(2000);
+                    await InvokeAsync(async () => await CloseModal());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log silencieux de l'erreur de polling (ne pas interrompre l'UI)
+            Console.WriteLine($"Erreur polling progression: {ex.Message}");
+        }
+    }
+
+    private PdfGenerationStep[] GetAllSteps()
+    {
+        return new[]
+        {
+            PdfGenerationStep.Initialisation,
+            PdfGenerationStep.PageDeGarde,
+            PdfGenerationStep.AnalyseTableMatieres,
+            PdfGenerationStep.SectionsLibres,
+            PdfGenerationStep.TableauSynthese,
+            PdfGenerationStep.FichesTechniques,
+            PdfGenerationStep.InsertionTableMatieres,
+            PdfGenerationStep.AssemblyFinal,
+            PdfGenerationStep.Termine
+        };
+    }
+
+    private int GetStepProgress(PdfGenerationStep step)
+    {
+        return PdfGenerationProgress.GetStepPercentage(step);
+    }
+
+    private async Task CloseModal()
+    {
+        isClosing = true;
+
+        // Nettoyage de la progression
+        ProgressService.ClearProgress(DocumentId);
+
+        // Fermer la modal
+        DialogService.Close(currentProgress?.IsCompleted == true);
+    }
+
+    public void Dispose()
+    {
+        pollingTimer?.Dispose();
+        ProgressService.ClearProgress(DocumentId);
+    }
+}
+
+<style>
+    .pdf-progress-modal {
+        min-width: 500px;
+        max-width: 600px;
+        padding: 1.5rem;
+    }
+
+    .dialog-header {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .dialog-body {
+        margin-bottom: 1.5rem;
+    }
+
+    .dialog-footer {
+        border-top: 1px solid #dee2e6;
+        padding-top: 1rem;
+        text-align: right;
+    }
+
+    .step-item {
+        padding: 0.5rem 0;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+    }
+
+    .step-item.active {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-left: 3px solid #0d6efd;
+        padding-left: 0.75rem;
+    }
+
+    .step-item.completed {
+        opacity: 0.7;
+    }
+
+    .step-item.error {
+        background-color: rgba(220, 53, 69, 0.1);
+        border-left: 3px solid #dc3545;
+        padding-left: 0.75rem;
+    }
+
+    .step-icon {
+        width: 24px;
+        text-align: center;
+    }
+
+    .current-step .step-message {
+        border-left: 4px solid #0d6efd;
+        background-color: #f8f9fa !important;
+    }
+
+    .technical-info {
+        font-size: 0.85rem;
+    }
+</style>

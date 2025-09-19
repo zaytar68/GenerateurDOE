@@ -8,21 +8,23 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class FTConteneurService : IFTConteneurService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly ILoggingService _loggingService;
 
-    public FTConteneurService(ApplicationDbContext context, ILoggingService loggingService)
+    public FTConteneurService(IDbContextFactory<ApplicationDbContext> contextFactory, ILoggingService loggingService)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _loggingService = loggingService;
     }
 
     public async Task<FTConteneur> CreateAsync(int documentGenereId, string? titre = null)
     {
+        using var context = _contextFactory.CreateDbContext();
+
         if (!await CanCreateForDocumentAsync(documentGenereId))
             throw new InvalidOperationException("Un conteneur de fiches techniques existe déjà pour ce document");
 
-        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId);
+        var document = await context.DocumentsGeneres.FindAsync(documentGenereId);
         if (document == null)
             throw new ArgumentException("Document non trouvé", nameof(documentGenereId));
 
@@ -35,8 +37,8 @@ public class FTConteneurService : IFTConteneurService
             Ordre = maxOrder + 1
         };
 
-        _context.FTConteneurs.Add(ftConteneur);
-        await _context.SaveChangesAsync();
+        context.FTConteneurs.Add(ftConteneur);
+        await context.SaveChangesAsync();
 
         _loggingService.LogInformation($"FTConteneur créé : {ftConteneur.Titre} pour document {documentGenereId}");
         return ftConteneur;
@@ -44,8 +46,10 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTConteneur> GetByIdAsync(int id)
     {
-        // 🔧 CORRECTION CONCURRENCE: Single Include chain pour éviter conflits
-        var ftConteneur = await _context.FTConteneurs
+        using var context = _contextFactory.CreateDbContext();
+
+        // 🔧 CORRECTION CONCURRENCE: DbContext isolé + Single Include chain pour éviter conflits
+        var ftConteneur = await context.FTConteneurs
             .Include(ftc => ftc.Elements.OrderBy(fte => fte.Ordre))
                 .ThenInclude(fte => fte.FicheTechnique)
             .Include(ftc => ftc.Elements)
@@ -63,8 +67,10 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTConteneur?> GetByDocumentIdAsync(int documentGenereId)
     {
-        // 🔧 CORRECTION CONCURRENCE: Même pattern sécurisé que GetByIdAsync
-        return await _context.FTConteneurs
+        using var context = _contextFactory.CreateDbContext();
+
+        // 🔧 CORRECTION CONCURRENCE: DbContext isolé + même pattern sécurisé que GetByIdAsync
+        return await context.FTConteneurs
             .Include(ftc => ftc.Elements.OrderBy(fte => fte.Ordre))
                 .ThenInclude(fte => fte.FicheTechnique)
             .Include(ftc => ftc.Elements)
@@ -77,8 +83,10 @@ public class FTConteneurService : IFTConteneurService
     public async Task<FTConteneur> UpdateAsync(FTConteneur ftConteneur)
     {
         ftConteneur.DateModification = DateTime.Now;
-        _context.FTConteneurs.Update(ftConteneur);
-        await _context.SaveChangesAsync();
+        using var context = _contextFactory.CreateDbContext();
+
+        context.FTConteneurs.Update(ftConteneur);
+        await context.SaveChangesAsync();
 
         _loggingService.LogInformation($"FTConteneur mis à jour : {ftConteneur.Titre}");
         return ftConteneur;
@@ -86,12 +94,14 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var ftConteneur = await _context.FTConteneurs.FindAsync(id);
+        using var context = _contextFactory.CreateDbContext();
+
+        var ftConteneur = await context.FTConteneurs.FindAsync(id);
         if (ftConteneur == null)
             return false;
 
-        _context.FTConteneurs.Remove(ftConteneur);
-        await _context.SaveChangesAsync();
+        context.FTConteneurs.Remove(ftConteneur);
+        await context.SaveChangesAsync();
 
         _loggingService.LogInformation($"FTConteneur supprimé : ID {id}");
         return true;
@@ -99,20 +109,22 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTElement> AddFTElementAsync(int ftConteneursId, int ficheTechniqueId, string? positionMarche, int? importPDFId = null, string? commentaire = null)
     {
-        var ftConteneur = await _context.FTConteneurs.FindAsync(ftConteneursId);
-        var ficheTechnique = await _context.FichesTechniques.FindAsync(ficheTechniqueId);
+        using var context = _contextFactory.CreateDbContext();
+
+        var ftConteneur = await context.FTConteneurs.FindAsync(ftConteneursId);
+        var ficheTechnique = await context.FichesTechniques.FindAsync(ficheTechniqueId);
 
         if (ftConteneur == null || ficheTechnique == null)
             throw new ArgumentException("FTConteneur ou FicheTechnique non trouvé");
 
         if (importPDFId.HasValue)
         {
-            var importPDF = await _context.ImportsPDF.FindAsync(importPDFId.Value);
+            var importPDF = await context.ImportsPDF.FindAsync(importPDFId.Value);
             if (importPDF == null || importPDF.FicheTechniqueId != ficheTechniqueId)
                 throw new ArgumentException("ImportPDF non valide pour cette fiche technique");
         }
 
-        var maxOrder = await _context.FTElements
+        var maxOrder = await context.FTElements
             .Where(fte => fte.FTConteneursId == ftConteneursId)
             .MaxAsync(fte => (int?)fte.Ordre) ?? 0;
 
@@ -126,8 +138,8 @@ public class FTConteneurService : IFTConteneurService
             Ordre = maxOrder + 1
         };
 
-        _context.FTElements.Add(ftElement);
-        await _context.SaveChangesAsync();
+        context.FTElements.Add(ftElement);
+        await context.SaveChangesAsync();
 
         _loggingService.LogInformation($"FTElement ajouté : {positionMarche} - {ficheTechnique.NomProduit}");
         return ftElement;
@@ -135,12 +147,14 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<bool> RemoveFTElementAsync(int ftElementId)
     {
-        var ftElement = await _context.FTElements.FindAsync(ftElementId);
+        using var context = _contextFactory.CreateDbContext();
+
+        var ftElement = await context.FTElements.FindAsync(ftElementId);
         if (ftElement == null)
             return false;
 
-        _context.FTElements.Remove(ftElement);
-        await _context.SaveChangesAsync();
+        context.FTElements.Remove(ftElement);
+        await context.SaveChangesAsync();
 
         _loggingService.LogInformation($"FTElement supprimé : ID {ftElementId}");
         return true;
@@ -148,16 +162,18 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTConteneur> ReorderFTElementsAsync(int ftConteneursId, List<int> ftElementIds)
     {
+        using var context = _contextFactory.CreateDbContext();
+
         for (int i = 0; i < ftElementIds.Count; i++)
         {
-            var ftElement = await _context.FTElements.FindAsync(ftElementIds[i]);
+            var ftElement = await context.FTElements.FindAsync(ftElementIds[i]);
             if (ftElement != null && ftElement.FTConteneursId == ftConteneursId)
             {
                 ftElement.Ordre = i + 1;
             }
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         _loggingService.LogInformation($"Ordre des FTElements réorganisé pour le conteneur {ftConteneursId}");
         
         return await GetByIdAsync(ftConteneursId);
@@ -165,8 +181,10 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTElement> UpdateFTElementAsync(FTElement ftElement)
     {
-        _context.FTElements.Update(ftElement);
-        await _context.SaveChangesAsync();
+        using var context = _contextFactory.CreateDbContext();
+
+        context.FTElements.Update(ftElement);
+        await context.SaveChangesAsync();
 
         _loggingService.LogInformation($"FTElement mis à jour : {ftElement.PositionMarche}");
         return ftElement;
@@ -215,6 +233,8 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<FTConteneur> CalculatePageNumbersAsync(int ftConteneursId)
     {
+        using var context = _contextFactory.CreateDbContext();
+
         var ftConteneur = await GetByIdAsync(ftConteneursId);
         
         int currentPage = 1;
@@ -233,7 +253,7 @@ public class FTConteneurService : IFTConteneurService
             }
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         _loggingService.LogInformation($"Numéros de pages calculés pour le conteneur {ftConteneursId}");
         
         return ftConteneur;
@@ -241,26 +261,36 @@ public class FTConteneurService : IFTConteneurService
 
     public async Task<bool> CanCreateForDocumentAsync(int documentGenereId)
     {
-        var existing = await _context.FTConteneurs
+        using var context = _contextFactory.CreateDbContext();
+
+        var existing = await context.FTConteneurs
             .AnyAsync(ftc => ftc.DocumentGenereId == documentGenereId);
         return !existing;
     }
 
     public async Task<IEnumerable<FicheTechnique>> GetAvailableFichesTechniquesAsync(int documentGenereId)
     {
-        return await _context.FichesTechniques
+        using var context = _contextFactory.CreateDbContext();
+
+        // 🔧 CORRECTION CONCURRENCE: DbContext isolé pour cette requête critique
+        return await context.FichesTechniques
             .Include(ft => ft.ImportsPDF)
+                .ThenInclude(ip => ip.TypeDocumentImport)
             .Where(ft => ft.ImportsPDF.Any())
-            .ToListAsync();
+            .AsSingleQuery()  // ✅ Single query pour éviter split query concurrentiel
+            .ToListAsync()
+            .ConfigureAwait(false);
     }
 
     private async Task<int> GetMaxOrderForDocument(int documentGenereId)
     {
-        var maxSectionOrder = await _context.SectionsConteneurs
+        using var context = _contextFactory.CreateDbContext();
+
+        var maxSectionOrder = await context.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
             .MaxAsync(sc => (int?)sc.Ordre) ?? 0;
 
-        var maxFTOrder = await _context.FTConteneurs
+        var maxFTOrder = await context.FTConteneurs
             .Where(ftc => ftc.DocumentGenereId == documentGenereId)
             .MaxAsync(ftc => (int?)ftc.Ordre) ?? 0;
 
@@ -269,7 +299,9 @@ public class FTConteneurService : IFTConteneurService
 
     private async Task<IEnumerable<string>> GetTypesDocumentsForFicheTechnique(int ficheTechniqueId)
     {
-        var types = await _context.ImportsPDF
+        using var context = _contextFactory.CreateDbContext();
+
+        var types = await context.ImportsPDF
             .Where(ip => ip.FicheTechniqueId == ficheTechniqueId)
             // TODO(human): Remplacez ip.TypeDocument par ip.TypeDocumentImport?.Nom ?? "Non défini"
             .Select(ip => ip.TypeDocumentImport != null ? ip.TypeDocumentImport.Nom : "Non défini")
