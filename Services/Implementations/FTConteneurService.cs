@@ -97,7 +97,7 @@ public class FTConteneurService : IFTConteneurService
         return true;
     }
 
-    public async Task<FTElement> AddFTElementAsync(int ftConteneursId, int ficheTechniqueId, string positionMarche, int? importPDFId = null)
+    public async Task<FTElement> AddFTElementAsync(int ftConteneursId, int ficheTechniqueId, string? positionMarche, int? importPDFId = null, string? commentaire = null)
     {
         var ftConteneur = await _context.FTConteneurs.FindAsync(ftConteneursId);
         var ficheTechnique = await _context.FichesTechniques.FindAsync(ficheTechniqueId);
@@ -122,6 +122,7 @@ public class FTConteneurService : IFTConteneurService
             FicheTechniqueId = ficheTechniqueId,
             ImportPDFId = importPDFId,
             PositionMarche = positionMarche,
+            Commentaire = commentaire,
             Ordre = maxOrder + 1
         };
 

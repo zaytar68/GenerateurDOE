@@ -6,9 +6,8 @@ public class FTElement
 {
     public int Id { get; set; }
     
-    [Required(ErrorMessage = "La position marché est requise")]
     [StringLength(100, ErrorMessage = "La position marché ne peut pas dépasser 100 caractères")]
-    public string PositionMarche { get; set; } = string.Empty;
+    public string? PositionMarche { get; set; }
     
     [Range(1, int.MaxValue, ErrorMessage = "Le numéro de page doit être un nombre positif")]
     public int? NumeroPage { get; set; }
@@ -16,7 +15,10 @@ public class FTElement
     [Required(ErrorMessage = "L'ordre est requis")]
     [Range(1, int.MaxValue, ErrorMessage = "L'ordre doit être un nombre positif")]
     public int Ordre { get; set; } = 1;
-    
+
+    [StringLength(500, ErrorMessage = "Le commentaire ne peut pas dépasser 500 caractères")]
+    public string? Commentaire { get; set; }
+
     public DateTime DateCreation { get; set; } = DateTime.Now;
     
     [Required(ErrorMessage = "Le conteneur FT est requis")]

@@ -10,7 +10,7 @@ public interface IFTConteneurService
     Task<FTConteneur> UpdateAsync(FTConteneur ftConteneur);
     Task<bool> DeleteAsync(int id);
     
-    Task<FTElement> AddFTElementAsync(int ftConteneursId, int ficheTechniqueId, string positionMarche, int? importPDFId = null);
+    Task<FTElement> AddFTElementAsync(int ftConteneursId, int ficheTechniqueId, string? positionMarche, int? importPDFId = null, string? commentaire = null);
     Task<bool> RemoveFTElementAsync(int ftElementId);
     Task<FTConteneur> ReorderFTElementsAsync(int ftConteneursId, List<int> ftElementIds);
     Task<FTElement> UpdateFTElementAsync(FTElement ftElement);

@@ -64,9 +64,9 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Fiche Technique</label>
-                        <select class="form-select" @bind="selectedFicheTechniqueId" 
+                        <select class="form-select" @bind="selectedFicheTechniqueId"
                                 @bind:after="OnFicheTechniqueChanged">
                             <option value="">-- Sélectionner une fiche --</option>
                             @foreach (var fiche in fichesDisponibles)
@@ -78,11 +78,16 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Position Marché</label>
-                        <input type="text" class="form-control" @bind="nouvellePositionMarche" 
+                        <label class="form-label">Position Marché (optionnel)</label>
+                        <input type="text" class="form-control" @bind="nouvellePositionMarche"
                                placeholder="ex: 1.1" />
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-2">
+                        <label class="form-label">Commentaire (optionnel)</label>
+                        <input type="text" class="form-control" @bind="nouveauCommentaire"
+                               placeholder="Commentaire..." maxlength="500" />
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label">Documents PDF (optionnel)</label>
                         @if (pdfsByCategory.Any())
                         {
@@ -129,8 +134,8 @@
                         }
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
-                        <button class="btn btn-primary w-100" @onclick="AjouterFicheTechnique" 
-                                disabled="@(selectedFicheTechniqueId == 0 || string.IsNullOrWhiteSpace(nouvellePositionMarche) || isAdding)">
+                        <button class="btn btn-primary w-100" @onclick="AjouterFicheTechnique"
+                                disabled="@(selectedFicheTechniqueId == 0 || isAdding)">
                             @if (isAdding)
                             {
                                 <span class="spinner-border spinner-border-sm me-2"></span>
@@ -171,6 +176,7 @@
                                     <th>Fabricant</th>
                                     <th>Produit</th>
                                     <th>Type</th>
+                                    <th>Commentaire</th>
                                     <th>Document</th>
                                     <th>Page</th>
                                     <th style="width: 120px;">Actions</th>
@@ -192,6 +198,13 @@
                                         <td>@element.FicheTechnique.NomFabricant</td>
                                         <td>@element.FicheTechnique.NomProduit</td>
                                         <td>@element.FicheTechnique.TypeProduit</td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm"
+                                                   @bind="element.Commentaire"
+                                                   @bind:after="() => MettreAJourElement(element)"
+                                                   placeholder="Commentaire..."
+                                                   maxlength="500" />
+                                        </td>
                                         <td>
                                             @if (element.ImportPDF != null)
                                             {
@@ -257,6 +270,7 @@
     private int selectedFicheTechniqueId = 0;
     private List<int> selectedImportPDFIds = new();
     private string nouvellePositionMarche = string.Empty;
+    private string nouveauCommentaire = string.Empty;
 
     // Classe helper pour la sélection multiple
     public class ImportPDFWithSelection
@@ -341,7 +355,7 @@
 
     private async Task AjouterFicheTechnique()
     {
-        if (FTConteneur == null || selectedFicheTechniqueId == 0 || string.IsNullOrWhiteSpace(nouvellePositionMarche))
+        if (FTConteneur == null || selectedFicheTechniqueId == 0)
             return;
 
         try
@@ -371,7 +385,8 @@
                         FTConteneur.Id,
                         selectedFicheTechniqueId,
                         positionMarche,
-                        pdfId);
+                        pdfId,
+                        nouveauCommentaire);
 
                     elementsAjoutes.Add(element);
                 }
@@ -386,7 +401,8 @@
                     FTConteneur.Id,
                     selectedFicheTechniqueId,
                     nouvellePositionMarche,
-                    null);
+                    null,
+                    nouveauCommentaire);
 
                 NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
                     $"Fiche technique ajoutée à la position {element.PositionMarche} (tous documents)");
@@ -399,6 +415,7 @@
             selectedFicheTechniqueId = 0;
             selectedImportPDFIds.Clear();
             nouvellePositionMarche = string.Empty;
+            nouveauCommentaire = string.Empty;
             importsDisponibles.Clear();
             pdfsByCategory.Clear();
 
