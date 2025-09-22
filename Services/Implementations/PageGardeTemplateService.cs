@@ -11,11 +11,16 @@ namespace GenerateurDOE.Services.Implementations
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILoggingService _loggingService;
+        private readonly IConfigurationService _configurationService;
 
-        public PageGardeTemplateService(IDbContextFactory<ApplicationDbContext> contextFactory, ILoggingService loggingService)
+        public PageGardeTemplateService(
+            IDbContextFactory<ApplicationDbContext> contextFactory,
+            ILoggingService loggingService,
+            IConfigurationService configurationService)
         {
             _contextFactory = contextFactory;
             _loggingService = loggingService;
+            _configurationService = configurationService;
         }
 
         public async Task<IEnumerable<PageGardeTemplate>> GetAllTemplatesAsync()
@@ -216,6 +221,10 @@ namespace GenerateurDOE.Services.Implementations
                 html = Regex.Replace(html, @"\{\{system\.date\}\}", DateTime.Now.ToString("dd/MM/yyyy"), RegexOptions.IgnoreCase);
                 html = Regex.Replace(html, @"\{\{system\.nomEntreprise\}\}", "Réalisé par notre société", RegexOptions.IgnoreCase);
 
+                // Remplacer la variable logo
+                var logoDataUrl = await GetLogoAsBase64DataUrlAsync();
+                html = Regex.Replace(html, @"\{\{system\.logo\}\}", logoDataUrl, RegexOptions.IgnoreCase);
+
                 // Encapsuler dans une structure HTML complète avec les styles corrigés
                 html = WrapWithPageStructure(html);
 
@@ -248,6 +257,10 @@ namespace GenerateurDOE.Services.Implementations
                 html = Regex.Replace(html, @"\{\{system\.date\}\}", DateTime.Now.ToString("dd/MM/yyyy"), RegexOptions.IgnoreCase);
                 html = Regex.Replace(html, @"\{\{system\.nomEntreprise\}\}", "Notre Entreprise SARL", RegexOptions.IgnoreCase);
 
+                // Remplacer la variable logo
+                var logoDataUrl = await GetLogoAsBase64DataUrlAsync();
+                html = Regex.Replace(html, @"\{\{system\.logo\}\}", logoDataUrl, RegexOptions.IgnoreCase);
+
                 // Encapsuler dans une structure HTML complète avec les styles corrigés
                 html = WrapWithPageStructure(html);
 
@@ -278,8 +291,79 @@ namespace GenerateurDOE.Services.Implementations
 
                 // Variables système
                 new TemplateVariable { Name = "Date actuelle", Placeholder = "{{system.date}}", Description = "Date de génération du document", Category = "Système", ExampleValue = DateTime.Now.ToString("dd/MM/yyyy") },
-                new TemplateVariable { Name = "Nom de l'entreprise", Placeholder = "{{system.nomEntreprise}}", Description = "Nom de votre entreprise", Category = "Système", ExampleValue = "Notre Entreprise SARL" }
+                new TemplateVariable { Name = "Nom de l'entreprise", Placeholder = "{{system.nomEntreprise}}", Description = "Nom de votre entreprise", Category = "Système", ExampleValue = "Notre Entreprise SARL" },
+                new TemplateVariable { Name = "Logo de l'entreprise", Placeholder = "{{system.logo}}", Description = "URL du logo de l'entreprise (automatiquement trouvé)", Category = "Système", ExampleValue = "http://localhost:5283/api/images/logo.png" }
             };
+        }
+
+        private async Task<string> GetLogoAsBase64DataUrlAsync()
+        {
+            try
+            {
+                // Utiliser le répertoire d'images configuré
+                var appSettings = await _configurationService.GetAppSettingsAsync();
+                var imagesDirectory = appSettings.RepertoireStockageImages;
+
+                _loggingService.LogInformation($"Recherche de logo dans le répertoire configuré : {imagesDirectory}");
+
+                if (Directory.Exists(imagesDirectory))
+                {
+                    // Chercher d'abord un fichier "logo" ou "titre" (plus récent en premier)
+                    var logoPatterns = new[] { "*logo*", "*titre*", "*Titre*", "*illustration*" };
+                    var imageExtensions = new[] { "*.png", "*.jpg", "*.jpeg" };
+
+                    foreach (var pattern in logoPatterns)
+                    {
+                        foreach (var extension in imageExtensions)
+                        {
+                            var searchPattern = pattern + Path.GetExtension(extension);
+                            var logoFiles = Directory.GetFiles(imagesDirectory, searchPattern, SearchOption.TopDirectoryOnly)
+                                                   .OrderByDescending(f => File.GetLastWriteTime(f))
+                                                   .ToArray();
+
+                            if (logoFiles.Any())
+                            {
+                                var logoPath = logoFiles.First();
+                                var fileName = Path.GetFileName(logoPath);
+                                _loggingService.LogInformation($"Logo trouvé pour template : {fileName}");
+
+                                // Lire le fichier et convertir en base64
+                                var logoBytes = await File.ReadAllBytesAsync(logoPath);
+                                var base64String = Convert.ToBase64String(logoBytes);
+
+                                // Déterminer le type MIME basé sur l'extension
+                                var extension_lower = Path.GetExtension(logoPath).ToLower();
+                                var mimeType = extension_lower switch
+                                {
+                                    ".png" => "image/png",
+                                    ".jpg" or ".jpeg" => "image/jpeg",
+                                    _ => "image/png"
+                                };
+
+                                // Construire la data URL complète
+                                var dataUrl = $"data:{mimeType};base64,{base64String}";
+                                _loggingService.LogInformation($"Logo converti en base64 pour template - Type: {mimeType} - Taille: {logoBytes.Length / 1024} KB");
+                                return dataUrl;
+                            }
+                        }
+                    }
+
+                    _loggingService.LogWarning($"Aucun fichier logo trouvé dans {imagesDirectory} pour le template");
+                }
+                else
+                {
+                    _loggingService.LogWarning($"Répertoire d'images non trouvé : {imagesDirectory}");
+                }
+
+                // Fallback vers une chaîne vide si aucun logo n'est trouvé
+                _loggingService.LogWarning("Aucun logo disponible pour le template");
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError(ex, $"Erreur lors de la recherche du logo pour template : {ex.Message}");
+                return string.Empty;
+            }
         }
 
         private string WrapWithPageStructure(string bodyContent)

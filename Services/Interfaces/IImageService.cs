@@ -19,3 +19,4 @@ public class ImageUploadResult
     public string ErrorMessage { get; set; } = string.Empty;
     public long FileSize { get; set; }
 }
+

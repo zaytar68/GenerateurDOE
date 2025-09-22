@@ -136,6 +136,7 @@ public class ImageService : IImageService
         }
     }
 
+
     public bool IsValidImageFormat(IFormFile file)
     {
         if (file == null)

@@ -211,8 +211,19 @@ namespace GenerateurDOE.Services.Implementations
             using var page = await browser.NewPageAsync();
             await page.SetContentAsync(htmlContent);
 
-            // Attendre le chargement complet (images, CSS)
-            await page.WaitForTimeoutAsync(2000);
+            // Attendre le chargement complet (images, CSS) - timeout plus long pour les images base64
+            await page.WaitForTimeoutAsync(5000);
+
+            // Attendre spécifiquement que les images soient chargées
+            try
+            {
+                await page.WaitForSelectorAsync("img", new WaitForSelectorOptions { Timeout = 3000 });
+                _loggingService.LogInformation("Images détectées dans le HTML");
+            }
+            catch (Exception)
+            {
+                _loggingService.LogInformation("Aucune image détectée ou timeout d'attente atteint");
+            }
             
             var pdfOptions = new PdfOptions
             {
@@ -347,11 +358,7 @@ namespace GenerateurDOE.Services.Implementations
 
         private async Task<string> GetDefaultPageGardeHtmlAsync(DocumentGenere document, string typeDocument)
         {
-            // Charger le logo en base64
-            var logoBase64 = await GetLogoAsBase64Async();
-            var logoHtml = string.IsNullOrEmpty(logoBase64)
-                ? ""
-                : $"<img src='data:image/png;base64,{logoBase64}' alt='Logo {_appSettings.NomSociete}' style='height: 60px; margin-right: 15px; object-fit: contain;' />";
+            _loggingService.LogInformation("Génération page de garde avec template par défaut intégré (sans gestion logo automatique)");
 
             return $@"
             <!DOCTYPE html>
@@ -443,7 +450,6 @@ namespace GenerateurDOE.Services.Implementations
 
                 <div class='company-info'>
                     <div style='display: flex; align-items: center; justify-content: center; margin-bottom: 15px;'>
-                        {logoHtml}
                         <strong>{_appSettings.NomSociete}</strong>
                     </div>
                 </div>
@@ -455,35 +461,69 @@ namespace GenerateurDOE.Services.Implementations
             </html>";
         }
 
-        private async Task<string> GetLogoAsBase64Async()
+        private async Task<string> GetLogoUrlAsync()
         {
             try
             {
-                // Essayer d'abord le logo d'illustration
-                var logoPath = Path.Combine(_webHostEnvironment.WebRootPath, "images", "illustration.png");
-                if (File.Exists(logoPath))
+                // Utiliser le répertoire d'images configuré
+                var imagesDirectory = _appSettings.RepertoireStockageImages;
+                _loggingService.LogInformation($"Recherche de logo dans le répertoire configuré : {imagesDirectory}");
+
+                if (Directory.Exists(imagesDirectory))
                 {
-                    var logoBytes = await File.ReadAllBytesAsync(logoPath);
-                    return Convert.ToBase64String(logoBytes);
+                    // Chercher d'abord un fichier "logo" ou "titre" (plus récent en premier)
+                    var logoPatterns = new[] { "*logo*", "*titre*", "*Titre*", "*illustration*" };
+                    var imageExtensions = new[] { "*.png", "*.jpg", "*.jpeg" };
+
+                    foreach (var pattern in logoPatterns)
+                    {
+                        foreach (var extension in imageExtensions)
+                        {
+                            var searchPattern = pattern + Path.GetExtension(extension);
+                            var logoFiles = Directory.GetFiles(imagesDirectory, searchPattern, SearchOption.TopDirectoryOnly)
+                                                   .OrderByDescending(f => File.GetLastWriteTime(f))
+                                                   .ToArray();
+
+                            if (logoFiles.Any())
+                            {
+                                var logoPath = logoFiles.First();
+                                var fileName = Path.GetFileName(logoPath);
+                                _loggingService.LogInformation($"Logo trouvé : {fileName}");
+
+                                // Construire l'URL vers l'API d'images
+                                var logoUrl = $"http://localhost:5283/api/images/{fileName}";
+                                _loggingService.LogInformation($"URL logo générée : {logoUrl}");
+                                return logoUrl;
+                            }
+                        }
+                    }
+
+                    _loggingService.LogWarning($"Aucun fichier logo trouvé dans {imagesDirectory} avec les patterns : {string.Join(", ", logoPatterns)}");
+                }
+                else
+                {
+                    _loggingService.LogWarning($"Répertoire d'images non trouvé : {imagesDirectory}");
                 }
 
-                // Fallback vers le favicon si le logo n'existe pas
+                // Fallback vers le favicon depuis wwwroot si aucun logo n'est trouvé
                 var faviconPath = Path.Combine(_webHostEnvironment.WebRootPath, "favicon-32x32.png");
                 if (File.Exists(faviconPath))
                 {
-                    var faviconBytes = await File.ReadAllBytesAsync(faviconPath);
-                    return Convert.ToBase64String(faviconBytes);
+                    var faviconUrl = "http://localhost:5283/favicon-32x32.png";
+                    _loggingService.LogInformation($"Fallback vers favicon : {faviconUrl}");
+                    return faviconUrl;
                 }
 
-                // Si aucun logo n'est trouvé, retourner une chaîne vide
+                _loggingService.LogWarning("Aucun logo disponible - page de garde sans logo");
                 return string.Empty;
             }
             catch (Exception ex)
             {
-                _loggingService.LogWarning($"Erreur lors du chargement du logo : {ex.Message}");
+                _loggingService.LogError(ex, $"Erreur lors de la recherche du logo : {ex.Message}");
                 return string.Empty;
             }
         }
+
 
         public async Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, DocumentGenere document, PdfGenerationOptions? options = null)
         {
