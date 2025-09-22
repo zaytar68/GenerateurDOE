@@ -7,57 +7,67 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class SectionLibreService : ISectionLibreService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-    public SectionLibreService(ApplicationDbContext context)
+    public SectionLibreService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     public async Task<IEnumerable<SectionLibre>> GetAllAsync()
     {
-        return await _context.SectionsLibres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsLibres
             .Include(s => s.TypeSection)
             .OrderBy(s => s.Ordre)
             .ThenBy(s => s.Titre)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
     }
 
     public async Task<IEnumerable<SectionLibre>> GetByTypeSectionAsync(int typeSectionId)
     {
-        return await _context.SectionsLibres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsLibres
             .Include(s => s.TypeSection)
             .Where(s => s.TypeSectionId == typeSectionId)
             .OrderBy(s => s.Ordre)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
     }
 
     public async Task<SectionLibre?> GetByIdAsync(int id)
     {
-        return await _context.SectionsLibres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsLibres
             .Include(s => s.TypeSection)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id).ConfigureAwait(false);
     }
 
     public async Task<SectionLibre> CreateAsync(SectionLibre sectionLibre)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
         sectionLibre.DateCreation = DateTime.Now;
         sectionLibre.DateModification = DateTime.Now;
-        
+
         // Si aucun ordre n'est spécifié, prendre le suivant
         if (sectionLibre.Ordre <= 0)
         {
-            sectionLibre.Ordre = await GetNextOrderAsync();
+            sectionLibre.Ordre = await GetNextOrderAsync(context);
         }
 
-        _context.SectionsLibres.Add(sectionLibre);
-        await _context.SaveChangesAsync();
+        context.SectionsLibres.Add(sectionLibre);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return sectionLibre;
     }
 
     public async Task<SectionLibre> UpdateAsync(SectionLibre sectionLibre)
     {
-        var existingSection = await _context.SectionsLibres.FindAsync(sectionLibre.Id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var existingSection = await context.SectionsLibres.FindAsync(sectionLibre.Id).ConfigureAwait(false);
         if (existingSection == null)
         {
             throw new ArgumentException($"SectionLibre avec l'ID {sectionLibre.Id} introuvable.");
@@ -70,33 +80,39 @@ public class SectionLibreService : ISectionLibreService
         existingSection.TypeSectionId = sectionLibre.TypeSectionId;
         existingSection.DateModification = DateTime.Now;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return existingSection;
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var sectionLibre = await _context.SectionsLibres.FindAsync(id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var sectionLibre = await context.SectionsLibres.FindAsync(id).ConfigureAwait(false);
         if (sectionLibre == null)
             return false;
 
-        _context.SectionsLibres.Remove(sectionLibre);
-        await _context.SaveChangesAsync();
+        context.SectionsLibres.Remove(sectionLibre);
+        await context.SaveChangesAsync().ConfigureAwait(false);
 
         // Réorganiser les ordres après suppression
         await ReorganizeOrdersAsync();
-        
+
         return true;
     }
 
     public async Task<bool> ExistsAsync(int id)
     {
-        return await _context.SectionsLibres.AnyAsync(s => s.Id == id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsLibres.AnyAsync(s => s.Id == id).ConfigureAwait(false);
     }
 
     public async Task<bool> ReorderAsync(int sectionId, int newOrder)
     {
-        var section = await _context.SectionsLibres.FindAsync(sectionId);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var section = await context.SectionsLibres.FindAsync(sectionId).ConfigureAwait(false);
         if (section == null)
             return false;
 
@@ -109,9 +125,9 @@ public class SectionLibreService : ISectionLibreService
         if (newOrder < oldOrder)
         {
             // Monter la section : décaler les sections entre newOrder et oldOrder vers le bas
-            var sectionsToShift = await _context.SectionsLibres
+            var sectionsToShift = await context.SectionsLibres
                 .Where(s => s.Ordre >= newOrder && s.Ordre < oldOrder && s.Id != sectionId)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
 
             foreach (var s in sectionsToShift)
             {
@@ -122,9 +138,9 @@ public class SectionLibreService : ISectionLibreService
         else
         {
             // Descendre la section : décaler les sections entre oldOrder et newOrder vers le haut
-            var sectionsToShift = await _context.SectionsLibres
+            var sectionsToShift = await context.SectionsLibres
                 .Where(s => s.Ordre > oldOrder && s.Ordre <= newOrder && s.Id != sectionId)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
 
             foreach (var s in sectionsToShift)
             {
@@ -137,30 +153,46 @@ public class SectionLibreService : ISectionLibreService
         section.Ordre = newOrder;
         section.DateModification = DateTime.Now;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return true;
     }
 
     public async Task<IEnumerable<SectionLibre>> GetOrderedSectionsAsync()
     {
-        return await _context.SectionsLibres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsLibres
             .Include(s => s.TypeSection)
             .Where(s => s.TypeSection.IsActive) // Seulement les sections avec types actifs
             .OrderBy(s => s.Ordre)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
     }
 
     public async Task<int> GetNextOrderAsync()
     {
-        var maxOrder = await _context.SectionsLibres.MaxAsync(s => (int?)s.Ordre) ?? 0;
-        return maxOrder + 1;
+        return await GetNextOrderAsync(null);
+    }
+
+    private async Task<int> GetNextOrderAsync(ApplicationDbContext? context)
+    {
+        if (context != null)
+        {
+            var maxOrder = await context.SectionsLibres.MaxAsync(s => (int?)s.Ordre).ConfigureAwait(false) ?? 0;
+            return maxOrder + 1;
+        }
+
+        using var localContext = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var maxOrderLocal = await localContext.SectionsLibres.MaxAsync(s => (int?)s.Ordre).ConfigureAwait(false) ?? 0;
+        return maxOrderLocal + 1;
     }
 
     private async Task ReorganizeOrdersAsync()
     {
-        var sections = await _context.SectionsLibres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var sections = await context.SectionsLibres
             .OrderBy(s => s.Ordre)
-            .ToListAsync();
+            .ToListAsync().ConfigureAwait(false);
 
         for (int i = 0; i < sections.Count; i++)
         {
@@ -168,6 +200,6 @@ public class SectionLibreService : ISectionLibreService
             sections[i].DateModification = DateTime.Now;
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync().ConfigureAwait(false);
     }
 }

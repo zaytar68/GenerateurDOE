@@ -8,12 +8,12 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class TypeSectionService : ITypeSectionService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly ICacheService _cache;
 
-    public TypeSectionService(ApplicationDbContext context, ICacheService cache)
+    public TypeSectionService(IDbContextFactory<ApplicationDbContext> contextFactory, ICacheService cache)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _cache = cache;
     }
 
@@ -22,10 +22,11 @@ public class TypeSectionService : ITypeSectionService
         // ⚡ Cache L1 : TypesSections avec expiration 1h
         return await _cache.GetOrCreateAsync(TYPES_SECTIONS_KEY, async () =>
         {
-            return await _context.TypesSections
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            return await context.TypesSections
                 .Include(t => t.SectionsLibres)
                 .OrderBy(t => t.Nom)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
         }, TimeSpan.FromHours(1));
     }
 
@@ -34,38 +35,45 @@ public class TypeSectionService : ITypeSectionService
         // ⚡ Cache L1 : TypesSections actifs avec expiration 1h
         return await _cache.GetOrCreateAsync(TYPES_SECTIONS_ACTIVE_KEY, async () =>
         {
-            return await _context.TypesSections
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            return await context.TypesSections
                 .Where(t => t.IsActive)
                 .Include(t => t.SectionsLibres)
                 .OrderBy(t => t.Nom)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
         }, TimeSpan.FromHours(1));
     }
 
     public async Task<TypeSection?> GetByIdAsync(int id)
     {
-        return await _context.TypesSections
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.TypesSections
             .Include(t => t.SectionsLibres)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id).ConfigureAwait(false);
     }
 
     public async Task<TypeSection> CreateAsync(TypeSection typeSection)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
         typeSection.DateCreation = DateTime.Now;
         typeSection.DateModification = DateTime.Now;
 
-        _context.TypesSections.Add(typeSection);
-        await _context.SaveChangesAsync();
-        
+        context.TypesSections.Add(typeSection);
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
         // ⚡ Invalidation cache après création
         _cache.RemoveByPrefix(TYPES_PREFIX);
-        
+
         return typeSection;
     }
 
     public async Task<TypeSection> UpdateAsync(TypeSection typeSection)
     {
-        var existingType = await _context.TypesSections.FindAsync(typeSection.Id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var existingType = await context.TypesSections.FindAsync(typeSection.Id).ConfigureAwait(false);
         if (existingType == null)
         {
             throw new ArgumentException($"TypeSection avec l'ID {typeSection.Id} introuvable.");
@@ -76,19 +84,21 @@ public class TypeSectionService : ITypeSectionService
         existingType.IsActive = typeSection.IsActive;
         existingType.DateModification = DateTime.Now;
 
-        await _context.SaveChangesAsync();
-        
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
         // ⚡ Invalidation cache après modification
         _cache.RemoveByPrefix(TYPES_PREFIX);
-        
+
         return existingType;
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var typeSection = await _context.TypesSections
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var typeSection = await context.TypesSections
             .Include(t => t.SectionsLibres)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id).ConfigureAwait(false);
 
         if (typeSection == null)
             return false;
@@ -99,45 +109,53 @@ public class TypeSectionService : ITypeSectionService
             throw new InvalidOperationException($"Impossible de supprimer le type de section '{typeSection.Nom}' car il est utilisé par {typeSection.SectionsLibres.Count} section(s).");
         }
 
-        _context.TypesSections.Remove(typeSection);
-        await _context.SaveChangesAsync();
-        
+        context.TypesSections.Remove(typeSection);
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
         // ⚡ Invalidation cache après suppression
         _cache.RemoveByPrefix(TYPES_PREFIX);
-        
+
         return true;
     }
 
     public async Task<bool> ToggleActiveAsync(int id)
     {
-        var typeSection = await _context.TypesSections.FindAsync(id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var typeSection = await context.TypesSections.FindAsync(id).ConfigureAwait(false);
         if (typeSection == null)
             return false;
 
         typeSection.IsActive = !typeSection.IsActive;
         typeSection.DateModification = DateTime.Now;
-        
-        await _context.SaveChangesAsync();
-        
+
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
         // ⚡ Invalidation cache après changement statut
         _cache.RemoveByPrefix(TYPES_PREFIX);
-        
+
         return true;
     }
 
     public async Task<bool> ExistsAsync(int id)
     {
-        return await _context.TypesSections.AnyAsync(t => t.Id == id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.TypesSections.AnyAsync(t => t.Id == id).ConfigureAwait(false);
     }
 
     public async Task<bool> HasSectionsAsync(int id)
     {
-        return await _context.SectionsLibres.AnyAsync(s => s.TypeSectionId == id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsLibres.AnyAsync(s => s.TypeSectionId == id).ConfigureAwait(false);
     }
 
     public async Task InitializeDefaultTypesAsync()
     {
-        if (!await _context.TypesSections.AnyAsync())
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        if (!await context.TypesSections.AnyAsync().ConfigureAwait(false))
         {
             var defaultTypes = new[]
             {
@@ -158,8 +176,8 @@ public class TypeSectionService : ITypeSectionService
                 type.IsActive = true;
             }
 
-            _context.TypesSections.AddRange(defaultTypes);
-            await _context.SaveChangesAsync();
+            context.TypesSections.AddRange(defaultTypes);
+            await context.SaveChangesAsync().ConfigureAwait(false);
         }
         else
         {
@@ -170,6 +188,8 @@ public class TypeSectionService : ITypeSectionService
 
     private async Task AddMissingDefaultTypesAsync()
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
         var newTypes = new[]
         {
             new { Nom = "Références chantier", Description = "Références et expériences sur des chantiers similaires" },
@@ -178,10 +198,10 @@ public class TypeSectionService : ITypeSectionService
 
         foreach (var newType in newTypes)
         {
-            var exists = await _context.TypesSections.AnyAsync(t => t.Nom == newType.Nom);
+            var exists = await context.TypesSections.AnyAsync(t => t.Nom == newType.Nom).ConfigureAwait(false);
             if (!exists)
             {
-                _context.TypesSections.Add(new TypeSection
+                context.TypesSections.Add(new TypeSection
                 {
                     Nom = newType.Nom,
                     Description = newType.Description,
@@ -192,7 +212,7 @@ public class TypeSectionService : ITypeSectionService
             }
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync().ConfigureAwait(false);
 
         // ⚡ Invalidation cache après ajout de nouveaux types
         _cache.RemoveByPrefix(TYPES_PREFIX);

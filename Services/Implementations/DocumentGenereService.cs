@@ -10,7 +10,7 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class DocumentGenereService : IDocumentGenereService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly IDocumentRepositoryService _documentRepository;
     private readonly IDocumentExportService _documentExport;
     private readonly AppSettings _appSettings;
@@ -18,11 +18,11 @@ public class DocumentGenereService : IDocumentGenereService
     private readonly IMemoireTechniqueService _memoireTechniqueService;
     private readonly IPdfGenerationService _pdfGenerationService;
 
-    public DocumentGenereService(ApplicationDbContext context, IDocumentRepositoryService documentRepository,
+    public DocumentGenereService(IDbContextFactory<ApplicationDbContext> contextFactory, IDocumentRepositoryService documentRepository,
         IDocumentExportService documentExport, IOptions<AppSettings> appSettings, IFicheTechniqueService ficheTechniqueService,
         IMemoireTechniqueService memoireTechniqueService, IPdfGenerationService pdfGenerationService)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _documentRepository = documentRepository;
         _documentExport = documentExport;
         _appSettings = appSettings.Value;
@@ -326,15 +326,17 @@ public class DocumentGenereService : IDocumentGenereService
 
     public async Task<SectionConteneur> CreateSectionConteneurAsync(int documentGenereId, int typeSectionId, string? titre = null)
     {
-        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId).ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var document = await context.DocumentsGeneres.FindAsync(documentGenereId).ConfigureAwait(false);
         if (document == null)
             throw new ArgumentException("Document généré non trouvé", nameof(documentGenereId));
 
-        var typeSection = await _context.TypesSections.FindAsync(typeSectionId).ConfigureAwait(false);
+        var typeSection = await context.TypesSections.FindAsync(typeSectionId).ConfigureAwait(false);
         if (typeSection == null)
             throw new ArgumentException("Type de section non trouvé", nameof(typeSectionId));
 
-        var existingConteneur = await _context.SectionsConteneurs
+        var existingConteneur = await context.SectionsConteneurs
             .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId).ConfigureAwait(false);
 
         if (existingConteneur != null)
@@ -345,17 +347,19 @@ public class DocumentGenereService : IDocumentGenereService
             DocumentGenereId = documentGenereId,
             TypeSectionId = typeSectionId,
             Titre = titre ?? typeSection.Nom,
-            Ordre = await GetNextOrderForSectionConteneur(documentGenereId)
+            Ordre = await GetNextOrderForSectionConteneur(documentGenereId, context)
         };
 
-        _context.SectionsConteneurs.Add(sectionConteneur);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        context.SectionsConteneurs.Add(sectionConteneur);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return sectionConteneur;
     }
 
     public async Task<SectionConteneur> GetSectionConteneurAsync(int documentGenereId, int typeSectionId)
     {
-        var sectionConteneur = await _context.SectionsConteneurs
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var sectionConteneur = await context.SectionsConteneurs
             .Include(sc => sc.Items)
             .Include(sc => sc.TypeSection)
             .FirstOrDefaultAsync(sc => sc.DocumentGenereId == documentGenereId && sc.TypeSectionId == typeSectionId).ConfigureAwait(false);
@@ -368,7 +372,9 @@ public class DocumentGenereService : IDocumentGenereService
 
     public async Task<IEnumerable<SectionConteneur>> GetSectionsConteneursByDocumentAsync(int documentGenereId)
     {
-        return await _context.SectionsConteneurs
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
             .Include(sc => sc.Items)
             .Include(sc => sc.TypeSection)
@@ -378,22 +384,26 @@ public class DocumentGenereService : IDocumentGenereService
 
     public async Task<bool> DeleteSectionConteneurAsync(int sectionConteneurId)
     {
-        var sectionConteneur = await _context.SectionsConteneurs.FindAsync(sectionConteneurId);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var sectionConteneur = await context.SectionsConteneurs.FindAsync(sectionConteneurId).ConfigureAwait(false);
         if (sectionConteneur == null)
             return false;
 
-        _context.SectionsConteneurs.Remove(sectionConteneur);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        context.SectionsConteneurs.Remove(sectionConteneur);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return true;
     }
 
     public async Task<FTConteneur> CreateFTConteneurAsync(int documentGenereId, string? titre = null)
     {
-        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId).ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var document = await context.DocumentsGeneres.FindAsync(documentGenereId).ConfigureAwait(false);
         if (document == null)
             throw new ArgumentException("Document généré non trouvé", nameof(documentGenereId));
 
-        var existingFTConteneur = await _context.FTConteneurs
+        var existingFTConteneur = await context.FTConteneurs
             .FirstOrDefaultAsync(ftc => ftc.DocumentGenereId == documentGenereId).ConfigureAwait(false);
 
         if (existingFTConteneur != null)
@@ -403,18 +413,20 @@ public class DocumentGenereService : IDocumentGenereService
         {
             DocumentGenereId = documentGenereId,
             Titre = titre ?? "Fiches Techniques",
-            Ordre = await GetNextOrderForDocument(documentGenereId)
+            Ordre = await GetNextOrderForDocument(documentGenereId, context)
         };
 
-        _context.FTConteneurs.Add(ftConteneur);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        context.FTConteneurs.Add(ftConteneur);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return ftConteneur;
     }
 
     public async Task<FTConteneur?> GetFTConteneurByDocumentAsync(int documentGenereId)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
         // 🔧 CORRECTION CONCURRENCE: Un seul Include avec navigation property multiple
-        return await _context.FTConteneurs
+        return await context.FTConteneurs
             .Include(ftc => ftc.Elements.OrderBy(fte => fte.Ordre))
                 .ThenInclude(fte => fte.FicheTechnique)
             .Include(ftc => ftc.Elements)
@@ -425,25 +437,31 @@ public class DocumentGenereService : IDocumentGenereService
 
     public async Task<FTConteneur> UpdateFTConteneurAsync(FTConteneur ftConteneur)
     {
-        _context.FTConteneurs.Update(ftConteneur);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        context.FTConteneurs.Update(ftConteneur);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return ftConteneur;
     }
 
     public async Task<bool> DeleteFTConteneurAsync(int ftConteneursId)
     {
-        var ftConteneur = await _context.FTConteneurs.FindAsync(ftConteneursId).ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var ftConteneur = await context.FTConteneurs.FindAsync(ftConteneursId).ConfigureAwait(false);
         if (ftConteneur == null)
             return false;
 
-        _context.FTConteneurs.Remove(ftConteneur);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        context.FTConteneurs.Remove(ftConteneur);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return true;
     }
 
     public async Task<DocumentGenere> FinalizeDocumentAsync(int documentGenereId)
     {
-        var document = await _context.DocumentsGeneres.FindAsync(documentGenereId).ConfigureAwait(false);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var document = await context.DocumentsGeneres.FindAsync(documentGenereId).ConfigureAwait(false);
         if (document == null)
             throw new ArgumentException("Document non trouvé", nameof(documentGenereId));
 
@@ -451,7 +469,7 @@ public class DocumentGenereService : IDocumentGenereService
             throw new InvalidOperationException("Le document ne peut pas être finalisé dans son état actuel");
 
         document.EnCours = false;
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        await context.SaveChangesAsync().ConfigureAwait(false);
         return document;
     }
 
@@ -481,8 +499,10 @@ public class DocumentGenereService : IDocumentGenereService
 
     public async Task<bool> CanFinalizeDocumentAsync(int documentGenereId)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
         // 🔧 CORRECTION CONCURRENCE: Requête optimisée sans Include multiple
-        var hasContent = await _context.DocumentsGeneres
+        var hasContent = await context.DocumentsGeneres
             .Where(d => d.Id == documentGenereId)
             .Select(d => new
             {
@@ -497,30 +517,55 @@ public class DocumentGenereService : IDocumentGenereService
         return hasContent.HasSectionsContent || hasContent.HasFTContent;
     }
 
-    private async Task<int> GetNextOrderForSectionConteneur(int documentGenereId)
+    private async Task<int> GetNextOrderForSectionConteneur(int documentGenereId, ApplicationDbContext? context = null)
     {
-        var maxOrder = await _context.SectionsConteneurs
+        if (context != null)
+        {
+            var maxOrder = await context.SectionsConteneurs
+                .Where(sc => sc.DocumentGenereId == documentGenereId)
+                .MaxAsync(sc => (int?)sc.Ordre).ConfigureAwait(false) ?? 0;
+            return maxOrder + 1;
+        }
+
+        using var localContext = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var maxOrderLocal = await localContext.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
             .MaxAsync(sc => (int?)sc.Ordre).ConfigureAwait(false) ?? 0;
-        return maxOrder + 1;
+        return maxOrderLocal + 1;
     }
 
-    private async Task<int> GetNextOrderForDocument(int documentGenereId)
+    private async Task<int> GetNextOrderForDocument(int documentGenereId, ApplicationDbContext? context = null)
     {
-        var maxSectionOrder = await _context.SectionsConteneurs
+        if (context != null)
+        {
+            var maxSectionOrder = await context.SectionsConteneurs
+                .Where(sc => sc.DocumentGenereId == documentGenereId)
+                .MaxAsync(sc => (int?)sc.Ordre).ConfigureAwait(false) ?? 0;
+
+            var ftOrder = await context.FTConteneurs
+                .Where(ftc => ftc.DocumentGenereId == documentGenereId)
+                .MaxAsync(ftc => (int?)ftc.Ordre).ConfigureAwait(false) ?? 0;
+
+            return Math.Max(maxSectionOrder, ftOrder) + 1;
+        }
+
+        using var localContext = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var maxSectionOrderLocal = await localContext.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
             .MaxAsync(sc => (int?)sc.Ordre).ConfigureAwait(false) ?? 0;
 
-        var ftOrder = await _context.FTConteneurs
+        var ftOrderLocal = await localContext.FTConteneurs
             .Where(ftc => ftc.DocumentGenereId == documentGenereId)
             .MaxAsync(ftc => (int?)ftc.Ordre).ConfigureAwait(false) ?? 0;
 
-        return Math.Max(maxSectionOrder, ftOrder) + 1;
+        return Math.Max(maxSectionOrderLocal, ftOrderLocal) + 1;
     }
     
     public async Task<List<DocumentGenere>> GetAllDocumentsEnCoursAsync()
     {
-        return await _context.DocumentsGeneres
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.DocumentsGeneres
             .Where(d => d.EnCours)
             .Include(d => d.Chantier)
             .OrderByDescending(d => d.DateCreation)

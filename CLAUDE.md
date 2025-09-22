@@ -213,8 +213,9 @@ Use entity framework.
 
 ### 🔄 En Cours de Développement
 - [x] **Phase 1 PDF**: Implémentation génération PDF réelle ✅ **TERMINÉ**
-- [x] **Phase 1.5 PDF**: Validation intégration fiches techniques ✅ **TERMINÉ**  
+- [x] **Phase 1.5 PDF**: Validation intégration fiches techniques ✅ **TERMINÉ**
 - [x] **Phase 2 Services**: Migration lots + Repository Pattern ✅ **TERMINÉ**
+- [x] **Phase 2.5 DbContextFactory**: Migration complète vers DbContextFactory ✅ **TERMINÉ**
 - [ ] **Phase 3 Performance**: Optimisations EF et cache ⚡ **EN ANALYSE**
 - [ ] **Phase 4 Tests**: Stratégie de tests complète
 
@@ -222,11 +223,12 @@ Use entity framework.
 1. ~~Migration système PDF (PuppeteerSharp + PDFSharp)~~ ✅ **TERMINÉ**
 2. ~~Migration lots de Chantier vers DocumentGenere~~ ✅ **TERMINÉ**
 3. ~~Repository Pattern avec projections DTO~~ ✅ **TERMINÉ**
-4. Optimisation performances EF Core ⚡ **PRIORITÉ 1**
-5. Tests automatisés et CI/CD
-6. Templates de documents personnalisables
-7. Génération en lot (batch processing)
-8. Support formats additionnels (Word, Excel)
+4. ~~Migration complète vers DbContextFactory~~ ✅ **TERMINÉ**
+5. Optimisation performances EF Core ⚡ **PRIORITÉ 1**
+6. Tests automatisés et CI/CD
+7. Templates de documents personnalisables
+8. Génération en lot (batch processing)
+9. Support formats additionnels (Word, Excel)
 
 ## 🚀 Analyse des Performances - Phase 3 (Septembre 2025)
 
@@ -383,9 +385,47 @@ ON DocumentGenere (ChantierId, EnCours);
 
 ### ✅ **SERVICES REFACTORISÉS**
 - **IPdfGenerationService** : Génération PDF réelle avec PuppeteerSharp + PDFSharp
-- **IHtmlTemplateService** : Templates professionnels pour pages de garde et sections  
+- **IHtmlTemplateService** : Templates professionnels pour pages de garde et sections
 - **IDocumentRepositoryService** : Repository Pattern avec optimisations EF Core
 - **Architecture hybride** : 3 couches (HTML → PDF → Assembly) opérationnelle
+
+## 📈 **ÉTAT PHASE 2.5 - TERMINÉE (Septembre 2025)**
+
+### ✅ **MIGRATION DBCONTEXTFACTORY RÉUSSIE**
+**Problème résolu** : Architecture mixte (5/15 services DbContextFactory, 10/15 services ApplicationDbContext direct) créait des risques de concurrence en Blazor Server
+
+**Services migrés avec succès** :
+- [x] **DocumentGenereService** (550+ lignes) : Service principal avec 20+ méthodes
+- [x] **SectionLibreService** (205 lignes) : Gestion sections avec logique réorganisation
+- [x] **SectionConteneurService** (280+ lignes) : Service le plus complexe avec 15+ méthodes
+- [x] **TypeSectionService** (220 lignes) : Migration avec préservation cache L1
+- [x] **TypeProduitService** (187 lignes) : Pattern similaire TypeSectionService
+- [x] **TypeDocumentImportService** (181 lignes) : Migration + correction cache manquant
+- [x] **MemoireTechniqueService** (177 lignes) : Gestion méthodes et images
+- [x] **ConfigurationService** : Aucune migration nécessaire (pas de DbContext)
+
+**Améliorations techniques** :
+- **Architecture 100% cohérente** : Tous les services DB utilisent DbContextFactory
+- **42+ ConfigureAwait(false)** ajoutés pour éviter les deadlocks
+- **Correction bugs cache** : 3 invalidations manquantes ajoutées dans TypeDocumentImportService
+- **0 erreurs compilation** : Migration sans régression
+- **Interface contract fix** : GetNextOrderAsync() interface/implémentation synchronisée
+
+**Pattern standardisé appliqué** :
+```csharp
+// Avant
+public async Task<Entity> GetByIdAsync(int id)
+{
+    return await _context.Entities.FindAsync(id);
+}
+
+// Après
+public async Task<Entity> GetByIdAsync(int id)
+{
+    using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+    return await context.Entities.FindAsync(id).ConfigureAwait(false);
+}
+```
 
 ### 🎯 **PROCHAINE ÉTAPE : PHASE 3 PERFORMANCE**
 La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Core critiques identifiées :

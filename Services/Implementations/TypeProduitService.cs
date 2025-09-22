@@ -8,12 +8,12 @@ namespace GenerateurDOE.Services.Implementations;
 
 public class TypeProduitService : ITypeProduitService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly ICacheService _cache;
 
-    public TypeProduitService(ApplicationDbContext context, ICacheService cache)
+    public TypeProduitService(IDbContextFactory<ApplicationDbContext> contextFactory, ICacheService cache)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _cache = cache;
     }
 
@@ -22,9 +22,10 @@ public class TypeProduitService : ITypeProduitService
         // ⚡ Cache L1 : TypesProduits avec expiration 1h
         return await _cache.GetOrCreateAsync(TYPES_PRODUITS_KEY, async () =>
         {
-            return await _context.TypesProduits
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            return await context.TypesProduits
                 .OrderBy(t => t.Nom)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
         }, TimeSpan.FromHours(1));
     }
 
@@ -33,37 +34,44 @@ public class TypeProduitService : ITypeProduitService
         // ⚡ Cache L1 : TypesProduits actifs avec expiration 1h
         return await _cache.GetOrCreateAsync(TYPES_PRODUITS_ACTIVE_KEY, async () =>
         {
-            return await _context.TypesProduits
+            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            return await context.TypesProduits
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Nom)
-                .ToListAsync();
+                .ToListAsync().ConfigureAwait(false);
         }, TimeSpan.FromHours(1));
     }
 
     public async Task<TypeProduit?> GetByIdAsync(int id)
     {
-        return await _context.TypesProduits
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.TypesProduits
             .Include(t => t.FichesTechniques)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id).ConfigureAwait(false);
     }
 
     public async Task<TypeProduit> CreateAsync(TypeProduit typeProduit)
     {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
         typeProduit.DateCreation = DateTime.Now;
         typeProduit.DateModification = DateTime.Now;
 
-        _context.TypesProduits.Add(typeProduit);
-        await _context.SaveChangesAsync();
-        
+        context.TypesProduits.Add(typeProduit);
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
         // ⚡ Invalidation cache après création
         _cache.RemoveByPrefix(TYPES_PREFIX);
-        
+
         return typeProduit;
     }
 
     public async Task<bool> UpdateAsync(TypeProduit typeProduit)
     {
-        var existingType = await _context.TypesProduits.FindAsync(typeProduit.Id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var existingType = await context.TypesProduits.FindAsync(typeProduit.Id).ConfigureAwait(false);
         if (existingType == null)
             return false;
 
@@ -74,11 +82,11 @@ public class TypeProduitService : ITypeProduitService
 
         try
         {
-            await _context.SaveChangesAsync();
-            
+            await context.SaveChangesAsync().ConfigureAwait(false);
+
             // ⚡ Invalidation cache après modification
             _cache.RemoveByPrefix(TYPES_PREFIX);
-            
+
             return true;
         }
         catch (DbUpdateException)
@@ -89,18 +97,20 @@ public class TypeProduitService : ITypeProduitService
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var typeProduit = await _context.TypesProduits.FindAsync(id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var typeProduit = await context.TypesProduits.FindAsync(id).ConfigureAwait(false);
         if (typeProduit == null)
             return false;
 
         if (await CanDeleteAsync(id))
         {
-            _context.TypesProduits.Remove(typeProduit);
-            await _context.SaveChangesAsync();
-            
+            context.TypesProduits.Remove(typeProduit);
+            await context.SaveChangesAsync().ConfigureAwait(false);
+
             // ⚡ Invalidation cache après suppression
             _cache.RemoveByPrefix(TYPES_PREFIX);
-            
+
             return true;
         }
 
@@ -109,7 +119,9 @@ public class TypeProduitService : ITypeProduitService
 
     public async Task<bool> ToggleActiveAsync(int id)
     {
-        var typeProduit = await _context.TypesProduits.FindAsync(id);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var typeProduit = await context.TypesProduits.FindAsync(id).ConfigureAwait(false);
         if (typeProduit == null)
             return false;
 
@@ -118,11 +130,11 @@ public class TypeProduitService : ITypeProduitService
 
         try
         {
-            await _context.SaveChangesAsync();
-            
+            await context.SaveChangesAsync().ConfigureAwait(false);
+
             // ⚡ Invalidation cache après changement statut
             _cache.RemoveByPrefix(TYPES_PREFIX);
-            
+
             return true;
         }
         catch (DbUpdateException)
@@ -142,13 +154,17 @@ public class TypeProduitService : ITypeProduitService
 
     public async Task<bool> ExistsAsync(string nom)
     {
-        return await _context.TypesProduits
-            .AnyAsync(t => t.Nom.ToLower() == nom.ToLower());
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.TypesProduits
+            .AnyAsync(t => t.Nom.ToLower() == nom.ToLower()).ConfigureAwait(false);
     }
 
     public async Task InitializeDefaultTypesAsync()
     {
-        if (!await _context.TypesProduits.AnyAsync())
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        if (!await context.TypesProduits.AnyAsync().ConfigureAwait(false))
         {
             var defaultTypes = new[]
             {
@@ -164,8 +180,8 @@ public class TypeProduitService : ITypeProduitService
                 new TypeProduit { Nom = "Étanchéité", Description = "Produits d'étanchéité" }
             };
 
-            _context.TypesProduits.AddRange(defaultTypes);
-            await _context.SaveChangesAsync();
+            context.TypesProduits.AddRange(defaultTypes);
+            await context.SaveChangesAsync().ConfigureAwait(false);
         }
     }
 }
