@@ -27,7 +27,7 @@ namespace GenerateurDOE.Services.Interfaces
         /// <summary>
         /// Génère une table des matières en PDF
         /// </summary>
-        Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, PdfGenerationOptions? options = null);
+        Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, DocumentGenere document, PdfGenerationOptions? options = null);
 
         /// <summary>
         /// Optimise un PDF (compression, métadonnées, PDF/A)

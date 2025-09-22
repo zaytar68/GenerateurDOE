@@ -1,5 +1,6 @@
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
+@using System.Linq
 @inject ISectionConteneurService sectionConteneurService
 @inject ITypeSectionService typeSectionService
 @inject ISectionLibreService sectionLibreService
@@ -99,11 +100,14 @@
                                 else
                                 {
                                     <div class="sections-list">
-                                        @foreach (var item in conteneur.Items.OrderBy(i => i.Ordre))
+                                        @foreach (var item in conteneur.Items?.Where(i => i != null).OrderBy(i => i.Ordre) ?? Enumerable.Empty<SectionConteneurItem>())
                                         {
                                             var section = item.SectionLibre;
-                                            var isFirst = item.Ordre == conteneur.Items.Min(i => i.Ordre);
-                                            var isLast = item.Ordre == conteneur.Items.Max(i => i.Ordre);
+                                            if (section == null) continue;
+
+                                            var validItems = conteneur.Items?.Where(i => i != null) ?? Enumerable.Empty<SectionConteneurItem>();
+                                            var isFirst = validItems.Any() && item.Ordre == validItems.Min(i => i.Ordre);
+                                            var isLast = validItems.Any() && item.Ordre == validItems.Max(i => i.Ordre);
                                             
                                             <div class="section-item d-flex justify-content-between align-items-center p-2 border rounded mb-2" data-item-id="@item.Id">
                                                 <div class="flex-grow-1">

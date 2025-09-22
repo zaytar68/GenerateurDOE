@@ -3,6 +3,7 @@
 @page "/document/edit/nouveau/{chantierId:int}"
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
+@using System.Linq
 @inject IDocumentGenereService documentGenereService
 @inject IDocumentDownloadService documentDownloadService
 @inject IPdfProgressDialogService pdfProgressDialogService
@@ -121,7 +122,14 @@
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link @(activeTab == "sections" ? "active" : "")" 
+                        <button class="nav-link @(activeTab == "tablematieres" ? "active" : "")"
+                                @onclick="@(() => SetActiveTab("tablematieres"))" type="button">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span>
+                            Table des Matières
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeTab == "sections" ? "active" : "")"
                                 @onclick="@(() => SetActiveTab("sections"))" type="button">
                             <span class="oi oi-list" aria-hidden="true"></span>
                             Sections Libres
@@ -269,6 +277,25 @@
                                 </div> -->
 
                             </EditForm>
+                        }
+                    </div>
+
+                    <!-- Onglet Table des Matières -->
+                    <div class="tab-pane fade @(activeTab == "tablematieres" ? "show active" : "")"
+                         id="tablematieres" role="tabpanel">
+                        @if (document != null)
+                        {
+                            <TableMatieresEditor DocumentGenere="@document"
+                                               DocumentGenereChanged="@OnDocumentTableMatieresChanged"
+                                               SectionsCount="@sectionsConteneurs.Sum(sc => sc.Items?.Count ?? 0)"
+                                               FichesCount="@(ftConteneur?.Elements?.Count ?? 0)" />
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                <span class="oi oi-warning" aria-hidden="true"></span>
+                                Document non disponible pour la configuration de la table des matières
+                            </div>
                         }
                     </div>
 
@@ -642,6 +669,18 @@
         sectionsConteneurs = sections;
         hasUnsavedChanges = true;
         StateHasChanged();
+    }
+
+    private void OnDocumentTableMatieresChanged(DocumentGenere updatedDocument)
+    {
+        if (document != null && updatedDocument != null)
+        {
+            // Synchroniser toutes les modifications de la table des matières
+            document.IncludeTableMatieres = updatedDocument.IncludeTableMatieres;
+            document.Parametres = updatedDocument.Parametres; // Synchroniser les paramètres JSON
+            hasUnsavedChanges = true;
+            StateHasChanged();
+        }
     }
 
     private void OnFTConteneurChanged(FTConteneur conteneur)

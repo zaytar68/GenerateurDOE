@@ -1,0 +1,199 @@
+@using GenerateurDOE.Models
+@using System.Text.Json
+@inject Radzen.NotificationService NotificationService
+
+<div class="table-matieres-editor card">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <span class="oi oi-list-rich" aria-hidden="true"></span>
+            Configuration Table des Matières
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-check mb-3">
+                    <InputCheckbox @bind-Value="DocumentGenere.IncludeTableMatieres"
+                                   @bind-Value:after="OnTableMatieresChanged"
+                                   class="form-check-input"
+                                   id="includeTableMatieres" />
+                    <label class="form-check-label" for="includeTableMatieres">
+                        <strong>Inclure une table des matières</strong>
+                    </label>
+                    <div class="form-text">
+                        Génère automatiquement une table des matières basée sur la structure du document
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                @if (DocumentGenere.IncludeTableMatieres)
+                {
+                    <div class="alert alert-info mb-0">
+                        <span class="oi oi-info" aria-hidden="true"></span>
+                        <strong>Aperçu :</strong>
+                        <div class="mt-2">
+                            <small>
+                                1. Page de garde<br>
+                                2. Table des matières<br>
+                                @if (SectionsCount > 0)
+                                {
+                                    <span>3. Sections personnalisées (@SectionsCount)</span><br>
+                                }
+                                @if (FichesCount > 0)
+                                {
+                                    <span>@(SectionsCount > 0 ? "4" : "3"). Fiches techniques (@FichesCount)</span>
+                                }
+                            </small>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (DocumentGenere.IncludeTableMatieres)
+        {
+            <hr class="my-3">
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label for="titreTOC" class="form-label">Titre de la table des matières</label>
+                        <InputText @bind-Value="TitreTableMatieres"
+                                   @bind-Value:after="OnTableMatieresChanged"
+                                   class="form-control"
+                                   id="titreTOC"
+                                   placeholder="Table des matières"
+                                   maxlength="100" />
+                        <div class="form-text">
+                            Personnalisez le titre affiché en haut de la table des matières
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="numeroPages" class="form-label">Numérotation des pages</label>
+                        <InputSelect @bind-Value="IncludeNumeroPages"
+                                     @bind-Value:after="OnTableMatieresChanged"
+                                     class="form-select" id="numeroPages">
+                            <option value="true">Avec numéros de pages</option>
+                            <option value="false">Sans numéros de pages</option>
+                        </InputSelect>
+                        <div class="form-text">
+                            Afficher ou masquer les numéros de pages dans la table
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public DocumentGenere DocumentGenere { get; set; } = new();
+    [Parameter] public EventCallback<DocumentGenere> DocumentGenereChanged { get; set; }
+    [Parameter] public int SectionsCount { get; set; } = 0;
+    [Parameter] public int FichesCount { get; set; } = 0;
+
+    private string TitreTableMatieres { get; set; } = "Table des matières";
+    private bool IncludeNumeroPages { get; set; } = true;
+
+    protected override void OnParametersSet()
+    {
+        LoadTableMatieresSettings();
+    }
+
+    private void LoadTableMatieresSettings()
+    {
+        try
+        {
+            // Charger les paramètres depuis le JSON ou utiliser les valeurs par défaut
+            if (!string.IsNullOrWhiteSpace(DocumentGenere.Parametres))
+            {
+                var settings = JsonSerializer.Deserialize<TableMatieresSettings>(DocumentGenere.Parametres);
+                if (settings?.TableMatieres != null)
+                {
+                    TitreTableMatieres = settings.TableMatieres.Titre ?? "Table des matières";
+                    IncludeNumeroPages = settings.TableMatieres.IncludeNumeroPages;
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Si erreur de désérialisation, utiliser les valeurs par défaut
+        }
+
+        // Valeurs par défaut
+        TitreTableMatieres = "Table des matières";
+        IncludeNumeroPages = true;
+    }
+
+    private async Task OnTableMatieresChanged()
+    {
+        try
+        {
+            // Sauvegarder les paramètres dans le JSON
+            var currentSettings = GetCurrentSettings();
+            currentSettings.TableMatieres = new TableMatieresConfig
+            {
+                Titre = TitreTableMatieres,
+                IncludeNumeroPages = IncludeNumeroPages
+            };
+
+            DocumentGenere.Parametres = JsonSerializer.Serialize(currentSettings, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            await DocumentGenereChanged.InvokeAsync(DocumentGenere);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la configuration : {ex.Message}");
+        }
+    }
+
+    private TableMatieresSettings GetCurrentSettings()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(DocumentGenere.Parametres))
+            {
+                return JsonSerializer.Deserialize<TableMatieresSettings>(DocumentGenere.Parametres) ?? new TableMatieresSettings();
+            }
+        }
+        catch
+        {
+            // Si erreur de désérialisation, retourner nouvelles settings
+        }
+        return new TableMatieresSettings();
+    }
+
+    // Classes pour la sérialisation JSON
+    private class TableMatieresSettings
+    {
+        public TableMatieresConfig? TableMatieres { get; set; }
+    }
+
+    private class TableMatieresConfig
+    {
+        public string Titre { get; set; } = "Table des matières";
+        public bool IncludeNumeroPages { get; set; } = true;
+    }
+}
+
+<style>
+    .table-matieres-editor .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .table-matieres-editor .form-check-label {
+        cursor: pointer;
+    }
+
+    .table-matieres-editor .alert {
+        font-size: 0.9rem;
+    }
+</style>

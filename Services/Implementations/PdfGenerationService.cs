@@ -1,12 +1,14 @@
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using GenerateurDOE.Services.Shared;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using PuppeteerSharp;
 using PuppeteerSharp.Media;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using System.Text;
+using System.Text.Json;
 
 namespace GenerateurDOE.Services.Implementations
 {
@@ -17,6 +19,7 @@ namespace GenerateurDOE.Services.Implementations
         private readonly IPageGardeTemplateService _pageGardeTemplateService;
         private readonly IHtmlTemplateService _htmlTemplateService;
         private readonly IPdfProgressService _progressService;
+        private readonly IWebHostEnvironment _webHostEnvironment;
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
 
@@ -25,13 +28,15 @@ namespace GenerateurDOE.Services.Implementations
             ILoggingService loggingService,
             IPageGardeTemplateService pageGardeTemplateService,
             IHtmlTemplateService htmlTemplateService,
-            IPdfProgressService progressService)
+            IPdfProgressService progressService,
+            IWebHostEnvironment webHostEnvironment)
         {
             _appSettings = appSettings.Value;
             _loggingService = loggingService;
             _pageGardeTemplateService = pageGardeTemplateService;
             _htmlTemplateService = htmlTemplateService;
             _progressService = progressService;
+            _webHostEnvironment = webHostEnvironment;
         }
 
         private async Task<IBrowser> GetBrowserAsync()
@@ -155,7 +160,7 @@ namespace GenerateurDOE.Services.Implementations
                 _progressService.UpdateProgress(document.Id, PdfGenerationStep.InsertionTableMatieres);
                 if (tocData != null && document.IncludeTableMatieres)
                 {
-                    var tocPdf = await GenerateTableMatieresAsync(tocData, options);
+                    var tocPdf = await GenerateTableMatieresAsync(tocData, document, options);
                     pdfParts.Insert(document.IncludePageDeGarde ? 1 : 0, tocPdf);
                 }
 
@@ -342,6 +347,12 @@ namespace GenerateurDOE.Services.Implementations
 
         private async Task<string> GetDefaultPageGardeHtmlAsync(DocumentGenere document, string typeDocument)
         {
+            // Charger le logo en base64
+            var logoBase64 = await GetLogoAsBase64Async();
+            var logoHtml = string.IsNullOrEmpty(logoBase64)
+                ? ""
+                : $"<img src='data:image/png;base64,{logoBase64}' alt='Logo {_appSettings.NomSociete}' style='height: 60px; margin-right: 15px; object-fit: contain;' />";
+
             return $@"
             <!DOCTYPE html>
             <html lang='fr'>
@@ -431,7 +442,10 @@ namespace GenerateurDOE.Services.Implementations
                 </div>
 
                 <div class='company-info'>
-                    <strong>{_appSettings.NomSociete}</strong>
+                    <div style='display: flex; align-items: center; justify-content: center; margin-bottom: 15px;'>
+                        {logoHtml}
+                        <strong>{_appSettings.NomSociete}</strong>
+                    </div>
                 </div>
 
                 <div class='date'>
@@ -441,8 +455,65 @@ namespace GenerateurDOE.Services.Implementations
             </html>";
         }
 
-        public async Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, PdfGenerationOptions? options = null)
+        private async Task<string> GetLogoAsBase64Async()
         {
+            try
+            {
+                // Essayer d'abord le logo d'illustration
+                var logoPath = Path.Combine(_webHostEnvironment.WebRootPath, "images", "illustration.png");
+                if (File.Exists(logoPath))
+                {
+                    var logoBytes = await File.ReadAllBytesAsync(logoPath);
+                    return Convert.ToBase64String(logoBytes);
+                }
+
+                // Fallback vers le favicon si le logo n'existe pas
+                var faviconPath = Path.Combine(_webHostEnvironment.WebRootPath, "favicon-32x32.png");
+                if (File.Exists(faviconPath))
+                {
+                    var faviconBytes = await File.ReadAllBytesAsync(faviconPath);
+                    return Convert.ToBase64String(faviconBytes);
+                }
+
+                // Si aucun logo n'est trouvé, retourner une chaîne vide
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogWarning($"Erreur lors du chargement du logo : {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        public async Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, DocumentGenere document, PdfGenerationOptions? options = null)
+        {
+            // Extraire les paramètres de table des matières depuis le JSON
+            string titreTableMatieres = "Table des matières";
+            bool includeNumeroPages = true;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(document.Parametres))
+                {
+                    var parametres = JsonSerializer.Deserialize<JsonElement>(document.Parametres);
+                    if (parametres.TryGetProperty("TableMatieres", out var tableMatieres))
+                    {
+                        if (tableMatieres.TryGetProperty("Titre", out var titre))
+                        {
+                            titreTableMatieres = titre.GetString() ?? "Table des matières";
+                        }
+                        if (tableMatieres.TryGetProperty("IncludeNumeroPages", out var includePages))
+                        {
+                            includeNumeroPages = includePages.GetBoolean();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogWarning($"Erreur lors de la lecture des paramètres de table des matières : {ex.Message}. Utilisation des valeurs par défaut.");
+            }
+
             var html = new StringBuilder();
             html.AppendLine(@"
             <!DOCTYPE html>
@@ -477,14 +548,15 @@ namespace GenerateurDOE.Services.Implementations
                     .toc-entry.level-2 { margin-left: 20px; }
                     .toc-entry.level-3 { margin-left: 40px; font-size: 0.9em; }
                     .page-number { font-weight: bold; color: #3498db; }
+                    .toc-entry-no-pages { justify-content: flex-start; }
                 </style>
             </head>
             <body>
-                <h1 class='toc-title'>Table des Matières</h1>");
+                <h1 class='toc-title'>" + titreTableMatieres + @"</h1>");
 
             foreach (var entry in tocData.Entries)
             {
-                await AppendTocEntryAsync(html, entry, 1);
+                await AppendTocEntryAsync(html, entry, 1, includeNumeroPages);
             }
 
             html.AppendLine("</body></html>");
@@ -656,17 +728,27 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
-        private async Task AppendTocEntryAsync(StringBuilder html, TocEntry entry, int level)
+        private async Task AppendTocEntryAsync(StringBuilder html, TocEntry entry, int level, bool includeNumeroPages = true)
         {
-            html.AppendLine($@"
+            if (includeNumeroPages)
+            {
+                html.AppendLine($@"
             <div class='toc-entry level-{level}'>
                 <span>{entry.Title}</span>
                 <span class='page-number'>{entry.PageNumber}</span>
             </div>");
+            }
+            else
+            {
+                html.AppendLine($@"
+            <div class='toc-entry toc-entry-no-pages level-{level}'>
+                <span>{entry.Title}</span>
+            </div>");
+            }
 
             foreach (var child in entry.Children)
             {
-                await AppendTocEntryAsync(html, child, level + 1);
+                await AppendTocEntryAsync(html, child, level + 1, includeNumeroPages);
             }
         }
 
