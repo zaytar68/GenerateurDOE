@@ -61,7 +61,7 @@ public class DocumentGenereService : IDocumentGenereService
 
         if (document.IncludeTableMatieres && allSections.Any())
         {
-            content.AppendLine(GenerateTableMatieres(allSections));
+            content.AppendLine(GenerateTableMatieres(allSections, document));
             content.AppendLine();
         }
 
@@ -160,18 +160,118 @@ public class DocumentGenereService : IDocumentGenereService
         };
     }
 
-    private string GenerateTableMatieres(IEnumerable<IDocumentSection> sections)
+    private string GenerateTableMatieres(IEnumerable<IDocumentSection> sections, DocumentGenere document)
     {
+        // Extraire les paramètres de la table des matières depuis le JSON
+        var tocConfig = ExtractTableMatieresConfig(document.Parametres);
+
         var tableDesMatieres = new StringBuilder();
-        tableDesMatieres.AppendLine("## Table des Matières");
+        tableDesMatieres.AppendLine($"## {tocConfig.Titre}");
         tableDesMatieres.AppendLine();
 
+        var currentNumber = 1;
+        var currentPage = 1;
+
+        // Ajouter la page de garde si configurée
+        if (tocConfig.IncludePageGarde && document.IncludePageDeGarde)
+        {
+            var entry = GenerateTableMatieresEntry(
+                "Page de garde",
+                currentNumber++,
+                currentPage++,
+                tocConfig,
+                0);
+            tableDesMatieres.AppendLine(entry);
+        }
+
+        // Ajouter les sections du document
         foreach (var section in sections)
         {
-            tableDesMatieres.AppendLine($"- {section.Titre}");
+            var entry = GenerateTableMatieresEntry(
+                section.Titre,
+                currentNumber++,
+                currentPage++,
+                tocConfig,
+                0);
+            tableDesMatieres.AppendLine(entry);
         }
 
         return tableDesMatieres.ToString();
+    }
+
+    private string GenerateTableMatieresEntry(string titre, int numero, int page, TableMatieresConfig config, int niveau)
+    {
+        var entry = new StringBuilder();
+
+        // Ajouter l'indentation selon le niveau
+        for (int i = 0; i < niveau; i++)
+        {
+            entry.Append("  ");
+        }
+
+        // Ajouter le marqueur selon le style
+        switch (config.StyleAffichage.ToLower())
+        {
+            case "numerote":
+                entry.Append($"{numero}. ");
+                break;
+            case "liste":
+            default:
+                entry.Append("- ");
+                break;
+            case "tableau":
+                // Pour markdown, on utilise le format liste même pour "tableau"
+                entry.Append("- ");
+                break;
+        }
+
+        entry.Append(titre);
+
+        // Ajouter le numéro de page si activé
+        if (config.IncludeNumeroPages)
+        {
+            entry.Append($" .......... {page}");
+        }
+
+        return entry.ToString();
+    }
+
+    private TableMatieresConfig ExtractTableMatieresConfig(string? parametres)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(parametres))
+            {
+                var settings = System.Text.Json.JsonSerializer.Deserialize<TableMatieresSettings>(parametres);
+                if (settings?.TableMatieres != null)
+                {
+                    return settings.TableMatieres;
+                }
+            }
+        }
+        catch
+        {
+            // Si erreur de désérialisation, utiliser les valeurs par défaut
+        }
+
+        // Retourner la configuration par défaut
+        return new TableMatieresConfig();
+    }
+
+    // Classes pour la configuration de la table des matières
+    private class TableMatieresSettings
+    {
+        public TableMatieresConfig? TableMatieres { get; set; }
+    }
+
+    private class TableMatieresConfig
+    {
+        public string Titre { get; set; } = "Table des matières";
+        public bool IncludeNumeroPages { get; set; } = true;
+        public string StyleAffichage { get; set; } = "liste";
+        public int ProfondeurMaximale { get; set; } = 2;
+        public bool IncludePageGarde { get; set; } = true;
+        public bool OrdreSectionsPersonnalise { get; set; } = false;
     }
 
     private string GenerateSectionConteneurContent(SectionConteneur sectionConteneur)

@@ -54,10 +54,14 @@
         {
             <hr class="my-3">
 
+            <!-- Configuration du titre et style -->
             <div class="row">
-                <div class="col-md-8">
+                <div class="col-md-6">
                     <div class="mb-3">
-                        <label for="titreTOC" class="form-label">Titre de la table des matières</label>
+                        <label for="titreTOC" class="form-label">
+                            <span class="oi oi-header" aria-hidden="true"></span>
+                            Titre de la table des matières
+                        </label>
                         <InputText @bind-Value="TitreTableMatieres"
                                    @bind-Value:after="OnTableMatieresChanged"
                                    class="form-control"
@@ -69,9 +73,30 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="mb-3">
-                        <label for="numeroPages" class="form-label">Numérotation des pages</label>
+                        <label for="styleTable" class="form-label">
+                            <span class="oi oi-spreadsheet" aria-hidden="true"></span>
+                            Style d'affichage
+                        </label>
+                        <InputSelect @bind-Value="StyleAffichage"
+                                     @bind-Value:after="OnTableMatieresChanged"
+                                     class="form-select" id="styleTable">
+                            <option value="liste">Liste simple</option>
+                            <option value="numerote">Liste numérotée</option>
+                            <option value="tableau">Tableau avec colonnes</option>
+                        </InputSelect>
+                        <div class="form-text">
+                            Format d'affichage des entrées
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="numeroPages" class="form-label">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span>
+                            Numérotation
+                        </label>
                         <InputSelect @bind-Value="IncludeNumeroPages"
                                      @bind-Value:after="OnTableMatieresChanged"
                                      class="form-select" id="numeroPages">
@@ -79,7 +104,130 @@
                             <option value="false">Sans numéros de pages</option>
                         </InputSelect>
                         <div class="form-text">
-                            Afficher ou masquer les numéros de pages dans la table
+                            Afficher les numéros de pages
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Options avancées -->
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="profondeurToc" class="form-label">
+                            <span class="oi oi-fork" aria-hidden="true"></span>
+                            Profondeur des sections
+                        </label>
+                        <InputSelect @bind-Value="ProfondeurMaximale"
+                                     @bind-Value:after="OnTableMatieresChanged"
+                                     class="form-select" id="profondeurToc">
+                            <option value="1">Titres principaux uniquement</option>
+                            <option value="2">Titres et sous-titres</option>
+                            <option value="3">Tous les niveaux</option>
+                        </InputSelect>
+                        <div class="form-text">
+                            Niveau de détail dans la table
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check mt-4 pt-2">
+                        <InputCheckbox @bind-Value="IncludePageGarde"
+                                       @bind-Value:after="OnTableMatieresChanged"
+                                       class="form-check-input"
+                                       id="includePageGarde" />
+                        <label class="form-check-label" for="includePageGarde">
+                            <strong>Inclure la page de garde</strong>
+                        </label>
+                        <div class="form-text">
+                            Référencer la page de garde dans la table
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check mt-4 pt-2">
+                        <InputCheckbox @bind-Value="OrdreSectionsPersonnalise"
+                                       @bind-Value:after="OnTableMatieresChanged"
+                                       class="form-check-input"
+                                       id="ordrePersonnalise" />
+                        <label class="form-check-label" for="ordrePersonnalise">
+                            <strong>Ordre des sections personnalisable</strong>
+                        </label>
+                        <div class="form-text">
+                            Permettre la réorganisation des sections
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aperçu avancé de la table des matières -->
+            <div class="mt-4">
+                <div class="card bg-light">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <span class="oi oi-eye" aria-hidden="true"></span>
+                            Aperçu de la table des matières
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="toc-preview">
+                            <h5 class="toc-title">@TitreTableMatieres</h5>
+                            <div class="toc-content">
+                                @if (IncludePageGarde)
+                                {
+                                    <div class="toc-entry">
+                                        @if (StyleAffichage == "numerote") { <span class="toc-number">1.</span> }
+                                        @if (StyleAffichage == "liste") { <span class="toc-bullet">•</span> }
+                                        <span class="toc-title-entry">Page de garde</span>
+                                        @if (IncludeNumeroPages) { <span class="toc-page">........ 1</span> }
+                                    </div>
+                                }
+
+                                @{
+                                    int currentNumber = IncludePageGarde ? 2 : 1;
+                                    int currentPage = IncludePageGarde ? 2 : 1;
+                                }
+
+                                @if (SectionsCount > 0)
+                                {
+                                    for(int i = 0; i < Math.Min(SectionsCount, 3); i++)
+                                    {
+                                        <div class="toc-entry">
+                                            @if (StyleAffichage == "numerote") { <span class="toc-number">@(currentNumber++).</span> }
+                                            @if (StyleAffichage == "liste") { <span class="toc-bullet">•</span> }
+                                            <span class="toc-title-entry">Section personnalisée @(i + 1)</span>
+                                            @if (IncludeNumeroPages) { <span class="toc-page">........ @(currentPage++)</span> }
+                                        </div>
+
+                                        @if (ProfondeurMaximale >= 2)
+                                        {
+                                            <div class="toc-entry toc-level-2">
+                                                @if (StyleAffichage == "numerote") { <span class="toc-number">@(currentNumber - 1).1</span> }
+                                                @if (StyleAffichage == "liste") { <span class="toc-bullet">◦</span> }
+                                                <span class="toc-title-entry">Sous-section</span>
+                                                @if (IncludeNumeroPages) { <span class="toc-page">........ @(currentPage)</span> }
+                                            </div>
+                                        }
+                                    }
+
+                                    @if (SectionsCount > 3)
+                                    {
+                                        <div class="toc-entry text-muted">
+                                            <span class="toc-title-entry">... et @(SectionsCount - 3) section(s) supplémentaire(s)</span>
+                                        </div>
+                                    }
+                                }
+
+                                @if (FichesCount > 0)
+                                {
+                                    <div class="toc-entry">
+                                        @if (StyleAffichage == "numerote") { <span class="toc-number">@(currentNumber++).</span> }
+                                        @if (StyleAffichage == "liste") { <span class="toc-bullet">•</span> }
+                                        <span class="toc-title-entry">Fiches techniques (@FichesCount)</span>
+                                        @if (IncludeNumeroPages) { <span class="toc-page">........ @(currentPage++)</span> }
+                                    </div>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -94,8 +242,13 @@
     [Parameter] public int SectionsCount { get; set; } = 0;
     [Parameter] public int FichesCount { get; set; } = 0;
 
-    private string TitreTableMatieres { get; set; } = "Table des matières";
-    private bool IncludeNumeroPages { get; set; } = true;
+    // Propriétés pour la configuration de la table des matières
+    public string TitreTableMatieres { get; set; } = "Table des matières";
+    public bool IncludeNumeroPages { get; set; } = true;
+    public string StyleAffichage { get; set; } = "liste";
+    public int ProfondeurMaximale { get; set; } = 2;
+    public bool IncludePageGarde { get; set; } = true;
+    public bool OrdreSectionsPersonnalise { get; set; } = false;
 
     protected override void OnParametersSet()
     {
@@ -112,8 +265,13 @@
                 var settings = JsonSerializer.Deserialize<TableMatieresSettings>(DocumentGenere.Parametres);
                 if (settings?.TableMatieres != null)
                 {
-                    TitreTableMatieres = settings.TableMatieres.Titre ?? "Table des matières";
-                    IncludeNumeroPages = settings.TableMatieres.IncludeNumeroPages;
+                    var config = settings.TableMatieres;
+                    TitreTableMatieres = config.Titre ?? "Table des matières";
+                    IncludeNumeroPages = config.IncludeNumeroPages;
+                    StyleAffichage = config.StyleAffichage ?? "liste";
+                    ProfondeurMaximale = config.ProfondeurMaximale;
+                    IncludePageGarde = config.IncludePageGarde;
+                    OrdreSectionsPersonnalise = config.OrdreSectionsPersonnalise;
                     return;
                 }
             }
@@ -126,6 +284,10 @@
         // Valeurs par défaut
         TitreTableMatieres = "Table des matières";
         IncludeNumeroPages = true;
+        StyleAffichage = "liste";
+        ProfondeurMaximale = 2;
+        IncludePageGarde = true;
+        OrdreSectionsPersonnalise = false;
     }
 
     private async Task OnTableMatieresChanged()
@@ -137,7 +299,11 @@
             currentSettings.TableMatieres = new TableMatieresConfig
             {
                 Titre = TitreTableMatieres,
-                IncludeNumeroPages = IncludeNumeroPages
+                IncludeNumeroPages = IncludeNumeroPages,
+                StyleAffichage = StyleAffichage,
+                ProfondeurMaximale = ProfondeurMaximale,
+                IncludePageGarde = IncludePageGarde,
+                OrdreSectionsPersonnalise = OrdreSectionsPersonnalise
             };
 
             DocumentGenere.Parametres = JsonSerializer.Serialize(currentSettings, new JsonSerializerOptions
@@ -180,6 +346,10 @@
     {
         public string Titre { get; set; } = "Table des matières";
         public bool IncludeNumeroPages { get; set; } = true;
+        public string StyleAffichage { get; set; } = "liste";
+        public int ProfondeurMaximale { get; set; } = 2;
+        public bool IncludePageGarde { get; set; } = true;
+        public bool OrdreSectionsPersonnalise { get; set; } = false;
     }
 }
 
@@ -195,5 +365,94 @@
 
     .table-matieres-editor .alert {
         font-size: 0.9rem;
+    }
+
+    /* Styles pour l'aperçu de la table des matières */
+    .toc-preview {
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .toc-title {
+        color: #2c3e50;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 0.5rem;
+    }
+
+    .toc-content {
+        line-height: 1.6;
+    }
+
+    .toc-entry {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        padding: 0.25rem 0;
+        border-bottom: 1px dotted #e9ecef;
+    }
+
+    .toc-entry:last-child {
+        border-bottom: none;
+    }
+
+    .toc-level-2 {
+        padding-left: 1.5rem;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .toc-number {
+        font-weight: 600;
+        color: #495057;
+        min-width: 2rem;
+        margin-right: 0.5rem;
+    }
+
+    .toc-bullet {
+        color: #3498db;
+        font-size: 1.2rem;
+        min-width: 1.5rem;
+        margin-right: 0.5rem;
+        text-align: center;
+    }
+
+    .toc-title-entry {
+        flex-grow: 1;
+        color: #2c3e50;
+        font-weight: 500;
+    }
+
+    .toc-page {
+        color: #6c757d;
+        font-size: 0.9rem;
+        font-family: 'Courier New', monospace;
+        margin-left: 0.5rem;
+    }
+
+    .toc-entry.text-muted .toc-title-entry {
+        color: #6c757d;
+        font-style: italic;
+        font-weight: normal;
+    }
+
+    /* Effet hover sur les entrées */
+    .toc-entry:hover .toc-title-entry {
+        color: #3498db;
+        cursor: default;
+    }
+
+    /* Responsivité pour mobile */
+    @@media (max-width: 768px) {
+        .toc-page {
+            display: none;
+        }
+
+        .toc-entry {
+            flex-wrap: wrap;
+        }
     }
 </style>
