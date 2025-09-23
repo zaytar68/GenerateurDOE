@@ -6,17 +6,30 @@ using GenerateurDOE.Services.Interfaces;
 
 namespace GenerateurDOE.Services.Implementations;
 
+/// <summary>
+/// Service de gestion des méthodologies pour mémoires techniques avec images associées
+/// Gère les méthodes de travail avec descriptions, images et ordre d'affichage
+/// </summary>
 public class MemoireTechniqueService : IMemoireTechniqueService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly AppSettings _appSettings;
 
+    /// <summary>
+    /// Initialise une nouvelle instance du service MemoireTechniqueService
+    /// </summary>
+    /// <param name="contextFactory">Factory pour créer les contextes EF thread-safe</param>
+    /// <param name="appSettings">Configuration de l'application</param>
     public MemoireTechniqueService(IDbContextFactory<ApplicationDbContext> contextFactory, IOptions<AppSettings> appSettings)
     {
         _contextFactory = contextFactory;
         _appSettings = appSettings.Value;
     }
 
+    /// <summary>
+    /// Récupère toutes les méthodes avec images triées par ordre d'affichage puis titre
+    /// </summary>
+    /// <returns>Méthodes avec images chargées et ordonnées</returns>
     public async Task<IEnumerable<Methode>> GetAllMethodesAsync()
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -28,6 +41,11 @@ public class MemoireTechniqueService : IMemoireTechniqueService
             .ToListAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Récupère une méthode par son identifiant avec ses images ordonnées
+    /// </summary>
+    /// <param name="id">Identifiant de la méthode</param>
+    /// <returns>Méthode avec images triées par ordre d'affichage ou null</returns>
     public async Task<Methode?> GetMethodeByIdAsync(int id)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -37,6 +55,11 @@ public class MemoireTechniqueService : IMemoireTechniqueService
             .FirstOrDefaultAsync(m => m.Id == id).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Crée une nouvelle méthode avec ordre d'affichage automatique et horodatage
+    /// </summary>
+    /// <param name="methode">Méthode à créer</param>
+    /// <returns>Méthode créée avec ID généré et ordre calculé</returns>
     public async Task<Methode> CreateMethodeAsync(Methode methode)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);

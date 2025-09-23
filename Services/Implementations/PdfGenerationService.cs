@@ -12,6 +12,10 @@ using System.Text.Json;
 
 namespace GenerateurDOE.Services.Implementations
 {
+    /// <summary>
+    /// Service de génération PDF avec architecture hybride PuppeteerSharp + PDFSharp
+    /// Gère la conversion HTML→PDF, l'assembly de multiples PDFs et l'optimisation
+    /// </summary>
     public class PdfGenerationService : IPdfGenerationService, IDisposable
     {
         private readonly AppSettings _appSettings;
@@ -23,6 +27,15 @@ namespace GenerateurDOE.Services.Implementations
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
 
+        /// <summary>
+        /// Initialise une nouvelle instance du service PdfGenerationService
+        /// </summary>
+        /// <param name="appSettings">Configuration de l'application</param>
+        /// <param name="loggingService">Service de logging centralisé</param>
+        /// <param name="pageGardeTemplateService">Service de templates de page de garde</param>
+        /// <param name="htmlTemplateService">Service de templates HTML professionnels</param>
+        /// <param name="progressService">Service de suivi de progression PDF en temps réel</param>
+        /// <param name="webHostEnvironment">Environnement d'hébergement pour accès aux ressources</param>
         public PdfGenerationService(
             IOptions<AppSettings> appSettings,
             ILoggingService loggingService,
@@ -39,6 +52,11 @@ namespace GenerateurDOE.Services.Implementations
             _webHostEnvironment = webHostEnvironment;
         }
 
+        /// <summary>
+        /// Récupère ou crée une instance de navigateur Chromium pour la conversion HTML→PDF
+        /// Utilise un singleton thread-safe avec SemaphoreSlim pour éviter les conflits
+        /// </summary>
+        /// <returns>Instance de navigateur PuppeteerSharp configurée</returns>
         private async Task<IBrowser> GetBrowserAsync()
         {
             if (_browser == null)
@@ -77,6 +95,14 @@ namespace GenerateurDOE.Services.Implementations
             return _browser;
         }
 
+        /// <summary>
+        /// Génère un PDF complet en assemblant page de garde, table des matières, sections libres et fiches techniques
+        /// Architecture hybride : HTML→PDF (PuppeteerSharp) + Assembly (PDFSharp) + Optimisation
+        /// </summary>
+        /// <param name="document">Document avec toutes ses sections chargées</param>
+        /// <param name="options">Options de génération PDF personnalisées</param>
+        /// <returns>PDF final optimisé avec métadonnées et signets</returns>
+        /// <exception cref="Exception">Erreur durant la génération avec tracking dans progressService</exception>
         public async Task<byte[]> GenerateCompletePdfAsync(DocumentGenere document, PdfGenerationOptions? options = null)
         {
             _loggingService.LogInformation($"Génération PDF complète pour document {document.Id}");
@@ -203,6 +229,13 @@ namespace GenerateurDOE.Services.Implementations
             }
         }
 
+        /// <summary>
+        /// Convertit du contenu HTML en PDF via PuppeteerSharp avec gestion des images et CSS
+        /// Configure automatiquement les marges, en-têtes et pieds de page
+        /// </summary>
+        /// <param name="htmlContent">Contenu HTML complet à convertir</param>
+        /// <param name="options">Options de mise en page et de rendu</param>
+        /// <returns>Données binaires du PDF généré</returns>
         public async Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent, PdfGenerationOptions? options = null)
         {
             options ??= new PdfGenerationOptions();
@@ -245,6 +278,13 @@ namespace GenerateurDOE.Services.Implementations
             return await page.PdfDataAsync(pdfOptions);
         }
 
+        /// <summary>
+        /// Assemble plusieurs PDFs en un seul document avec gestion des signets et numérotation
+        /// Utilise PDFSharp pour fusionner les pages et ajouter les métadonnées
+        /// </summary>
+        /// <param name="pdfBytesList">Liste des PDFs à assembler sous forme de bytes</param>
+        /// <param name="options">Options d'assembly (signets, numérotation, optimisation)</param>
+        /// <returns>PDF final assemblé avec toutes les pages et signets</returns>
         public async Task<byte[]> AssemblePdfsAsync(IEnumerable<byte[]> pdfBytesList, PdfAssemblyOptions? options = null)
         {
             options ??= new PdfAssemblyOptions();
@@ -293,6 +333,14 @@ namespace GenerateurDOE.Services.Implementations
             return outputStream.ToArray();
         }
 
+        /// <summary>
+        /// Génère une page de garde personnalisée avec template configurable et gestion automatique du logo
+        /// Supporte les templates personnalisés via PageGardeTemplateService avec fallback vers template par défaut
+        /// </summary>
+        /// <param name="document">Document contenant les informations projet et chantier</param>
+        /// <param name="typeDocument">Type de document (DOE, Dossier Technique, etc.)</param>
+        /// <param name="options">Options de génération PDF (marges, format, etc.)</param>
+        /// <returns>Page de garde en PDF sans numérotation</returns>
         public async Task<byte[]> GeneratePageDeGardeAsync(DocumentGenere document, string typeDocument, PdfGenerationOptions? options = null)
         {
             string html;
@@ -356,6 +404,13 @@ namespace GenerateurDOE.Services.Implementations
             return await ConvertHtmlToPdfAsync(html, pageGardeOptions);
         }
 
+        /// <summary>
+        /// Génère le HTML par défaut pour la page de garde avec styles CSS intégrés
+        /// Template de fallback utilisé quand aucun template personnalisé n'est disponible
+        /// </summary>
+        /// <param name="document">Document avec informations projet</param>
+        /// <param name="typeDocument">Titre du type de document</param>
+        /// <returns>HTML complet de la page de garde avec styles CSS</returns>
         private async Task<string> GetDefaultPageGardeHtmlAsync(DocumentGenere document, string typeDocument)
         {
             _loggingService.LogInformation("Génération page de garde avec template par défaut intégré (sans gestion logo automatique)");
@@ -461,6 +516,11 @@ namespace GenerateurDOE.Services.Implementations
             </html>";
         }
 
+        /// <summary>
+        /// Recherche automatiquement un logo dans le répertoire d'images configuré
+        /// Utilise des patterns de recherche (logo*, titre*, illustration*) avec fallback vers favicon
+        /// </summary>
+        /// <returns>URL du logo trouvé ou chaîne vide si aucun logo disponible</returns>
         private async Task<string> GetLogoUrlAsync()
         {
             try
@@ -525,6 +585,14 @@ namespace GenerateurDOE.Services.Implementations
         }
 
 
+        /// <summary>
+        /// Génère une table des matières formatée avec configuration personnalisable
+        /// Extrait les paramètres depuis le JSON du document (titre, numérotation, style)
+        /// </summary>
+        /// <param name="tocData">Données structurées de la table des matières</param>
+        /// <param name="document">Document contenant la configuration de la table des matières</param>
+        /// <param name="options">Options de génération PDF</param>
+        /// <returns>Table des matières en PDF avec styles et hiérarchie</returns>
         public async Task<byte[]> GenerateTableMatieresAsync(TableOfContentsData tocData, DocumentGenere document, PdfGenerationOptions? options = null)
         {
             // Extraire les paramètres de table des matières depuis le JSON
@@ -604,6 +672,13 @@ namespace GenerateurDOE.Services.Implementations
             return await ConvertHtmlToPdfAsync(html.ToString(), options);
         }
 
+        /// <summary>
+        /// Optimise un PDF en ajoutant les métadonnées et en appliquant les options de compression
+        /// Utilise PDFSharp pour modifier les propriétés du document (titre, auteur, mots-clés)
+        /// </summary>
+        /// <param name="pdfBytes">PDF source à optimiser</param>
+        /// <param name="options">Options d'optimisation (compression, métadonnées, PDF/A)</param>
+        /// <returns>PDF optimisé avec métadonnées mises à jour</returns>
         public async Task<byte[]> OptimizePdfAsync(byte[] pdfBytes, PdfOptimizationOptions? options = null)
         {
             options ??= new PdfOptimizationOptions();
@@ -627,6 +702,12 @@ namespace GenerateurDOE.Services.Implementations
             return outputStream.ToArray();
         }
 
+        /// <summary>
+        /// Construit les données structurées de la table des matières en analysant le document
+        /// Calcule les numéros de page estimés pour chaque section et fiche technique
+        /// </summary>
+        /// <param name="document">Document à analyser pour extraire la structure</param>
+        /// <returns>Données hiérarchisées de la table des matières avec numéros de page</returns>
         private async Task<TableOfContentsData> BuildTableOfContentsAsync(DocumentGenere document)
         {
             var tocData = new TableOfContentsData();
@@ -712,6 +793,12 @@ namespace GenerateurDOE.Services.Implementations
             return tocData;
         }
 
+        /// <summary>
+        /// Construit le HTML d'un conteneur de sections libres avec styles CSS professionnels
+        /// Inclut le titre du conteneur et le contenu HTML de chaque section ordonnée
+        /// </summary>
+        /// <param name="container">Conteneur de sections avec ses éléments ordonnés</param>
+        /// <returns>HTML complet du conteneur avec styles intégrés</returns>
         private async Task<string> BuildSectionHtmlAsync(SectionConteneur container)
         {
             var html = new StringBuilder();
@@ -768,6 +855,14 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
+        /// <summary>
+        /// Ajoute récursivement une entrée de table des matières au HTML avec gestion de la hiérarchie
+        /// Supporte plusieurs niveaux d'indentation et l'affichage optionnel des numéros de page
+        /// </summary>
+        /// <param name="html">StringBuilder pour construire le HTML</param>
+        /// <param name="entry">Entrée à ajouter avec ses enfants potentiels</param>
+        /// <param name="level">Niveau d'indentation (1, 2, 3...)</param>
+        /// <param name="includeNumeroPages">True pour afficher les numéros de page</param>
         private async Task AppendTocEntryAsync(StringBuilder html, TocEntry entry, int level, bool includeNumeroPages = true)
         {
             if (includeNumeroPages)
@@ -792,6 +887,11 @@ namespace GenerateurDOE.Services.Implementations
             }
         }
 
+        /// <summary>
+        /// Génère le template HTML par défaut pour l'en-tête des pages PDF
+        /// Affiche le nom de la société centré avec style minimal
+        /// </summary>
+        /// <returns>Template HTML pour l'en-tête avec styles inline</returns>
         private string GetDefaultHeaderTemplate()
         {
             return $@"
@@ -800,6 +900,11 @@ namespace GenerateurDOE.Services.Implementations
             </div>";
         }
 
+        /// <summary>
+        /// Génère le template HTML par défaut pour le pied de page des PDF
+        /// Affiche la numérotation des pages au format "X / Y"
+        /// </summary>
+        /// <returns>Template HTML pour le pied de page avec numérotation automatique</returns>
         private string GetDefaultFooterTemplate()
         {
             return @"
@@ -808,6 +913,11 @@ namespace GenerateurDOE.Services.Implementations
             </div>";
         }
 
+        /// <summary>
+        /// Convertit le type de document énuméré en libellé lisible pour l'affichage
+        /// </summary>
+        /// <param name="typeDocument">Type de document énuméré</param>
+        /// <returns>Libellé complet du type de document en français</returns>
         private string GetTypeDocumentLabel(TypeDocumentGenere typeDocument)
         {
             return typeDocument switch
@@ -819,6 +929,10 @@ namespace GenerateurDOE.Services.Implementations
             };
         }
 
+        /// <summary>
+        /// Libère les ressources utilisées par le service (navigateur Chromium et semaphore)
+        /// Implémentation de IDisposable pour nettoyage automatique
+        /// </summary>
         public void Dispose()
         {
             _browser?.Dispose();

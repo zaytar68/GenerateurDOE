@@ -7,16 +7,33 @@ using static GenerateurDOE.Services.Implementations.CacheServiceExtensions;
 
 namespace GenerateurDOE.Services.Implementations
 {
+    /// <summary>
+    /// Service de génération de templates HTML professionnels pour la création de documents PDF
+    /// Gère pages de garde, tables des matières, sections libres et tableaux de synthèse
+    /// </summary>
     public class HtmlTemplateService : IHtmlTemplateService
     {
         private readonly ICacheService _cache;
         private readonly IPageGardeTemplateService _pageGardeTemplateService;
 
+        /// <summary>
+        /// Initialise une nouvelle instance du service HtmlTemplateService
+        /// </summary>
+        /// <param name="cache">Service de cache pour optimiser les performances</param>
+        /// <param name="pageGardeTemplateService">Service de gestion des templates de page de garde</param>
         public HtmlTemplateService(ICacheService cache, IPageGardeTemplateService pageGardeTemplateService)
         {
             _cache = cache;
             _pageGardeTemplateService = pageGardeTemplateService;
         }
+        /// <summary>
+        /// Génère le HTML d'une page de garde avec template personnalisable et fallback automatique
+        /// Utilise le service PageGardeTemplateService pour les templates avancés
+        /// </summary>
+        /// <param name="document">Document contenant les informations projet</param>
+        /// <param name="typeDocument">Type de document (DOE, Dossier Technique, etc.)</param>
+        /// <param name="legacyTemplate">Template hérité (optionnel, déprécié)</param>
+        /// <returns>HTML complet de la page de garde avec styles CSS intégrés</returns>
         public async Task<string> GeneratePageDeGardeHtmlAsync(DocumentGenere document, string typeDocument, PageDeGardeTemplate? legacyTemplate = null)
         {
             try
@@ -51,6 +68,13 @@ namespace GenerateurDOE.Services.Implementations
             }
         }
 
+        /// <summary>
+        /// Génère une page de garde de fallback avec design gradient moderne
+        /// Utilisée quand aucun template personnalisé n'est disponible ou en cas d'erreur
+        /// </summary>
+        /// <param name="document">Document avec informations projet</param>
+        /// <param name="typeDocument">Type de document pour le titre</param>
+        /// <returns>HTML de page de garde avec design moderne et responsive</returns>
         private string GenerateFallbackPageDeGarde(DocumentGenere document, string typeDocument)
         {
             return $@"
@@ -185,6 +209,13 @@ namespace GenerateurDOE.Services.Implementations
             </html>";
         }
 
+        /// <summary>
+        /// Génère le HTML d'une table des matières avec design professionnel et hiérarchie visuelle
+        /// Supporte plusieurs niveaux d'indentation et personnalisation via TocTemplate
+        /// </summary>
+        /// <param name="tocData">Données structurées de la table des matières</param>
+        /// <param name="template">Template de style personnalisé (couleurs, police, etc.)</param>
+        /// <returns>HTML complet de la table des matières avec styles CSS avancés</returns>
         public async Task<string> GenerateTableMatieresHtmlAsync(TableOfContentsData tocData, TocTemplate? template = null)
         {
             template ??= new TocTemplate();
@@ -262,6 +293,13 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
+        /// <summary>
+        /// Génère le HTML d'un conteneur de sections libres avec mise en page professionnelle
+        /// Inclut gestion des images, tableaux, listes et formatage du contenu HTML éditeur
+        /// </summary>
+        /// <param name="sectionConteneur">Conteneur avec sections ordonnées</param>
+        /// <param name="template">Template de style pour personnaliser l'apparence</param>
+        /// <returns>HTML formaté avec styles CSS pour impression PDF optimisée</returns>
         public async Task<string> GenerateSectionLibreHtmlAsync(SectionConteneur sectionConteneur, SectionTemplate? template = null)
         {
             template ??= new SectionTemplate();
@@ -374,6 +412,13 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
+        /// <summary>
+        /// Génère le HTML d'un conteneur de fiches techniques avec design en cartes
+        /// Affiche produits, fabricants, descriptions et documents associés de manière structurée
+        /// </summary>
+        /// <param name="ftConteneur">Conteneur de fiches techniques avec éléments ordonnés</param>
+        /// <param name="template">Template pour personnaliser couleurs et layout</param>
+        /// <returns>HTML avec design en cartes pour fiches techniques</returns>
         public async Task<string> GenerateFTConteneurHtmlAsync(FTConteneur ftConteneur, FTTemplate? template = null)
         {
             template ??= new FTTemplate();
@@ -570,6 +615,13 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
+        /// <summary>
+        /// Génère un tableau de synthèse des produits avec tri automatique par position marché
+        /// Présente fabricants, produits, types et spécifications dans un tableau responsive
+        /// </summary>
+        /// <param name="ftConteneur">Conteneur avec les fiches techniques à synthétiser</param>
+        /// <param name="template">Template pour styles du tableau (couleurs, tailles)</param>
+        /// <returns>HTML de tableau professionnel avec tri et formatage optimisé</returns>
         public async Task<string> GenerateTableauSyntheseProduits(FTConteneur ftConteneur, TableauSyntheseTemplate? template = null)
         {
             template ??= new TableauSyntheseTemplate();
@@ -727,6 +779,13 @@ namespace GenerateurDOE.Services.Implementations
             return html.ToString();
         }
 
+        /// <summary>
+        /// Compile un template HTML en remplaçant les placeholders par les données fournies
+        /// Implémentation simple avec sérialisation JSON - extensible vers moteur plus sophistiqué
+        /// </summary>
+        /// <param name="templateHtml">Template HTML avec placeholders {{DATA}}</param>
+        /// <param name="data">Données à injecter dans le template</param>
+        /// <returns>HTML compilé avec données injectées</returns>
         public async Task<string> CompileTemplateAsync(string templateHtml, object data)
         {
             // Simple template compilation - peut être étendu avec un moteur de template plus sophistiqué
@@ -741,11 +800,23 @@ namespace GenerateurDOE.Services.Implementations
             return compiledHtml;
         }
 
+        /// <summary>
+        /// Récupère les styles CSS de base pour tous les documents générés
+        /// Utilise CssStylesHelper pour garantir la cohérence visuelle
+        /// </summary>
+        /// <returns>CSS de base commun à tous les templates</returns>
         public string GetDefaultDocumentCSS()
         {
             return CssStylesHelper.GetBaseDocumentCSS();
         }
 
+        /// <summary>
+        /// Ajoute récursivement une entrée de table des matières au HTML avec gestion de hiérarchie
+        /// Gère l'indentation automatique selon le niveau et affichage des numéros de page
+        /// </summary>
+        /// <param name="html">StringBuilder pour construire le HTML</param>
+        /// <param name="entry">Entrée avec titre, page et enfants potentiels</param>
+        /// <param name="level">Niveau d'indentation (1, 2, 3...)</param>
         private async Task AppendTocEntryHtmlAsync(StringBuilder html, TocEntry entry, int level)
         {
             html.AppendLine($@"

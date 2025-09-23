@@ -7,18 +7,34 @@ using GenerateurDOE.Services.Interfaces;
 
 namespace GenerateurDOE.Services.Implementations;
 
+/// <summary>
+/// Service repository optimisé pour l'accès aux documents avec pattern Repository et projections DTO
+/// Implémente cache en mémoire, pagination intelligente et requêtes optimisées EF Core
+/// Performance : +30-50% vs accès direct aux entités
+/// </summary>
 public class DocumentRepositoryService : IDocumentRepositoryService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly IMemoryCache _cache;
     private const string CACHE_KEY_PREFIX = "DocumentRepo_";
 
+    /// <summary>
+    /// Initialise une nouvelle instance du service DocumentRepositoryService
+    /// </summary>
+    /// <param name="contextFactory">Factory pour créer les contextes EF thread-safe</param>
+    /// <param name="cache">Cache en mémoire pour optimiser les requêtes fréquentes</param>
     public DocumentRepositoryService(IDbContextFactory<ApplicationDbContext> contextFactory, IMemoryCache cache)
     {
         _contextFactory = contextFactory;
         _cache = cache;
     }
 
+    /// <summary>
+    /// Récupère un document par son identifiant avec chantier associé
+    /// </summary>
+    /// <param name="documentId">Identifiant unique du document</param>
+    /// <returns>Document avec chantier chargé</returns>
+    /// <exception cref="InvalidOperationException">Si le document n'existe pas</exception>
     public async Task<DocumentGenere> GetByIdAsync(int documentId)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -33,6 +49,13 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return document;
     }
 
+    /// <summary>
+    /// Récupère un document avec toutes ses sections et fiches techniques chargées
+    /// Utilise AsSplitQuery() pour éviter les erreurs de concurrence EF Core sur collections multiples
+    /// </summary>
+    /// <param name="documentId">Identifiant du document</param>
+    /// <returns>Document complet avec sections, fiches techniques et PDFs</returns>
+    /// <exception cref="InvalidOperationException">Si le document n'existe pas</exception>
     public async Task<DocumentGenere> GetWithCompleteContentAsync(int documentId)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -58,6 +81,13 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return document;
     }
 
+    /// <summary>
+    /// Récupère un résumé optimisé d'un document via projection DTO avec cache (5 min)
+    /// Évite le chargement des collections complètes pour améliorer les performances
+    /// </summary>
+    /// <param name="documentId">Identifiant du document</param>
+    /// <returns>Résumé DTO avec métriques calculées</returns>
+    /// <exception cref="InvalidOperationException">Si le document n'existe pas</exception>
     public async Task<DocumentSummaryDto> GetSummaryAsync(int documentId)
     {
         var cacheKey = $"{CACHE_KEY_PREFIX}Summary_{documentId}";
@@ -96,6 +126,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return summary ?? throw new InvalidOperationException($"Document avec l'ID {documentId} introuvable");
     }
 
+    /// <summary>
+    /// Récupère tous les résumés de documents avec cache (10 min) et projection DTO
+    /// Optimisé pour l'affichage de listes sans charger les entités complètes
+    /// </summary>
+    /// <returns>Liste des résumés triés par date de création décroissante</returns>
     public async Task<List<DocumentSummaryDto>> GetDocumentSummariesAsync()
     {
         const string cacheKey = CACHE_KEY_PREFIX + "AllSummaries";
@@ -132,6 +167,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return summaries!;
     }
 
+    /// <summary>
+    /// Récupère les résumés de documents d'un chantier spécifique avec cache (15 min)
+    /// </summary>
+    /// <param name="chantierId">Identifiant du chantier</param>
+    /// <returns>Liste des résumés du chantier triés par date</returns>
     public async Task<List<DocumentSummaryDto>> GetDocumentSummariesByChantierId(int chantierId)
     {
         var cacheKey = $"{CACHE_KEY_PREFIX}Chantier_{chantierId}";
@@ -168,6 +208,14 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return summaries!;
     }
 
+    /// <summary>
+    /// Récupère une page de documents avec recherche optionnelle et projection DTO
+    /// Exécution séquentielle pour éviter les conflits de concurrence EF Core
+    /// </summary>
+    /// <param name="page">Numéro de page (1-based)</param>
+    /// <param name="pageSize">Taille de page</param>
+    /// <param name="searchTerm">Terme de recherche optionnel (nom fichier, nom projet)</param>
+    /// <returns>Résultat paginé avec total et items</returns>
     public async Task<PagedResult<DocumentSummaryDto>> GetPagedDocumentsAsync(int page, int pageSize, string? searchTerm = null)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -212,6 +260,13 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         };
     }
 
+    /// <summary>
+    /// Récupère une page de documents pour un chantier spécifique
+    /// </summary>
+    /// <param name="chantierId">Identifiant du chantier</param>
+    /// <param name="page">Numéro de page (1-based)</param>
+    /// <param name="pageSize">Taille de page</param>
+    /// <returns>Résultat paginé des documents du chantier</returns>
     public async Task<PagedResult<DocumentSummaryDto>> GetPagedDocumentsByChantierId(int chantierId, int page, int pageSize)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -251,6 +306,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         };
     }
 
+    /// <summary>
+    /// Crée un nouveau document en base avec invalidation automatique du cache
+    /// </summary>
+    /// <param name="document">Document à créer</param>
+    /// <returns>Document créé avec ID généré</returns>
     public async Task<DocumentGenere> CreateAsync(DocumentGenere document)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -264,6 +324,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return document;
     }
 
+    /// <summary>
+    /// Met à jour un document existant avec invalidation du cache associé
+    /// </summary>
+    /// <param name="document">Document avec modifications</param>
+    /// <returns>Document mis à jour</returns>
     public async Task<DocumentGenere> UpdateAsync(DocumentGenere document)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -277,6 +342,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return document;
     }
 
+    /// <summary>
+    /// Supprime un document et son fichier associé avec nettoyage du cache
+    /// </summary>
+    /// <param name="documentId">Identifiant du document à supprimer</param>
+    /// <returns>True si suppression réussie, False si document inexistant</returns>
     public async Task<bool> DeleteAsync(int documentId)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -299,6 +369,12 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return true;
     }
 
+    /// <summary>
+    /// Duplique un document dans le même chantier avec un nouveau nom
+    /// </summary>
+    /// <param name="documentId">Identifiant du document source</param>
+    /// <param name="newName">Nouveau nom pour la copie</param>
+    /// <returns>Document dupliqué</returns>
     public async Task<DocumentGenere> DuplicateAsync(int documentId, string newName)
     {
         var originalDocument = await GetByIdAsync(documentId);
@@ -318,6 +394,17 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return await CreateAsync(duplicatedDocument);
     }
 
+    /// <summary>
+    /// Duplique un document vers un autre chantier avec nouvelles informations de lot
+    /// Vérifie l'existence et l'accessibilité du chantier de destination
+    /// </summary>
+    /// <param name="documentId">Identifiant du document source</param>
+    /// <param name="newName">Nouveau nom</param>
+    /// <param name="newChantierId">Identifiant du chantier de destination</param>
+    /// <param name="numeroLot">Numéro du lot</param>
+    /// <param name="intituleLot">Intitulé du lot</param>
+    /// <returns>Document dupliqué dans le nouveau chantier</returns>
+    /// <exception cref="ArgumentException">Si le chantier de destination n'existe pas ou est archivé</exception>
     public async Task<DocumentGenere> DuplicateToChantierAsync(int documentId, string newName, int newChantierId, string numeroLot, string intituleLot)
     {
         var originalDocument = await GetByIdAsync(documentId);
@@ -348,6 +435,10 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return await CreateAsync(duplicatedDocument);
     }
 
+    /// <summary>
+    /// Récupère tous les documents en cours de création avec leurs chantiers
+    /// </summary>
+    /// <returns>Liste des documents en cours triés par date de création décroissante</returns>
     public async Task<List<DocumentGenere>> GetDocumentsEnCoursAsync()
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -358,6 +449,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             .ToListAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Vérifie l'existence d'un document par son identifiant
+    /// </summary>
+    /// <param name="documentId">Identifiant à vérifier</param>
+    /// <returns>True si le document existe</returns>
     public async Task<bool> ExistsAsync(int documentId)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -365,6 +461,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             .AnyAsync(d => d.Id == documentId).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Vérifie si un document peut être finalisé (contient du contenu dans ses sections ou fiches)
+    /// </summary>
+    /// <param name="documentId">Identifiant du document</param>
+    /// <returns>True si le document a du contenu et peut être finalisé</returns>
     public async Task<bool> CanFinalizeAsync(int documentId)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -383,6 +484,14 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// Obtient une liste paginée de documents avec projections DTO optimisées
     /// Performance: +30-50% vs chargement entités complètes
     /// </summary>
+    /// <summary>
+    /// Obtient une liste paginée de documents avec projections DTO optimisées (Phase 3 Performance)
+    /// Performance: +30-50% vs chargement entités complètes grâce aux projections
+    /// </summary>
+    /// <param name="page">Numéro de page (défaut 1)</param>
+    /// <param name="pageSize">Taille de page (défaut 20)</param>
+    /// <param name="chantierId">Filtre optionnel par chantier</param>
+    /// <returns>Résultat paginé avec DTO optimisés et cache intelligent</returns>
     public async Task<PagedResult<DocumentListDto>> GetPagedDocumentsAsync(int page = 1, int pageSize = 20, int? chantierId = null)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -431,6 +540,14 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// Obtient une liste paginée de chantiers avec métriques calculées
     /// Performance: +30-50% vs chargement avec relations complètes
     /// </summary>
+    /// <summary>
+    /// Obtient une liste paginée de chantiers avec métriques calculées (Phase 3 Performance)
+    /// Performance: +30-50% vs chargement avec relations complètes
+    /// </summary>
+    /// <param name="page">Numéro de page (défaut 1)</param>
+    /// <param name="pageSize">Taille de page (défaut 20)</param>
+    /// <param name="includeArchived">Inclure les chantiers archivés</param>
+    /// <returns>Résultat paginé avec métriques (nb documents, derniers créés, etc.)</returns>
     public async Task<PagedResult<ChantierSummaryDto>> GetPagedChantierSummariesAsync(int page = 1, int pageSize = 20, bool includeArchived = false)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -485,6 +602,14 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// Obtient une liste paginée de fiches techniques avec métriques d'utilisation
     /// Performance: +30-50% vs chargement avec ImportsPDF complets
     /// </summary>
+    /// <summary>
+    /// Obtient une liste paginée de fiches techniques avec métriques d'utilisation (Phase 3 Performance)
+    /// Performance: +30-50% vs chargement avec ImportsPDF complets
+    /// </summary>
+    /// <param name="page">Numéro de page (défaut 1)</param>
+    /// <param name="pageSize">Taille de page (défaut 20)</param>
+    /// <param name="searchTerm">Terme de recherche (produit, fabricant, type)</param>
+    /// <returns>Résultat paginé avec métriques calculées (nb PDFs, taille totale)</returns>
     public async Task<PagedResult<FicheTechniqueSummaryDto>> GetPagedFicheTechniquesSummariesAsync(int page = 1, int pageSize = 20, string searchTerm = "")
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -532,6 +657,10 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         return PagedResult<FicheTechniqueSummaryDto>.Create(items, totalCount, page, pageSize);
     }
 
+    /// <summary>
+    /// Récupère le premier document de la base pour les tests et démonstrations
+    /// </summary>
+    /// <returns>Premier document avec chantier ou null si aucun document</returns>
     public async Task<DocumentGenere?> GetFirstDocumentAsync()
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -541,6 +670,11 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Récupère le premier document ayant un conteneur FT avec PDFs pour les tests
+    /// Utilise AsSplitQuery() pour les relations multiples
+    /// </summary>
+    /// <returns>Document avec FTConteneur et PDFs ou null</returns>
     public async Task<DocumentGenere?> GetDocumentWithFTContainerAsync()
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -558,6 +692,10 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Invalide les caches liés aux documents après modifications
+    /// Stratégie conservative : invalide les caches globaux pour assurer la cohérence
+    /// </summary>
     private void InvalidateDocumentCaches()
     {
         _cache.Remove(CACHE_KEY_PREFIX + "AllSummaries");

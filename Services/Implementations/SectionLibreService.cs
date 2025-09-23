@@ -5,15 +5,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GenerateurDOE.Services.Implementations;
 
+/// <summary>
+/// Service de gestion des sections libres personnalisables avec éditeur HTML
+/// Gère les sections avec types, ordre et contenu HTML enrichi
+/// </summary>
 public class SectionLibreService : ISectionLibreService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
+    /// <summary>
+    /// Initialise une nouvelle instance du service SectionLibreService
+    /// </summary>
+    /// <param name="contextFactory">Factory pour créer les contextes EF thread-safe</param>
     public SectionLibreService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
         _contextFactory = contextFactory;
     }
 
+    /// <summary>
+    /// Récupère toutes les sections libres avec types triées par ordre puis titre
+    /// </summary>
+    /// <returns>Sections libres avec TypeSection chargé</returns>
     public async Task<IEnumerable<SectionLibre>> GetAllAsync()
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -25,6 +37,11 @@ public class SectionLibreService : ISectionLibreService
             .ToListAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Récupère les sections libres d'un type spécifique triées par ordre
+    /// </summary>
+    /// <param name="typeSectionId">Identifiant du type de section</param>
+    /// <returns>Sections du type spécifié</returns>
     public async Task<IEnumerable<SectionLibre>> GetByTypeSectionAsync(int typeSectionId)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -36,6 +53,11 @@ public class SectionLibreService : ISectionLibreService
             .ToListAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Récupère une section libre par son identifiant avec son type
+    /// </summary>
+    /// <param name="id">Identifiant de la section</param>
+    /// <returns>Section avec TypeSection chargé ou null</returns>
     public async Task<SectionLibre?> GetByIdAsync(int id)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
@@ -45,6 +67,11 @@ public class SectionLibreService : ISectionLibreService
             .FirstOrDefaultAsync(s => s.Id == id).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Crée une nouvelle section libre avec ordre automatique
+    /// </summary>
+    /// <param name="sectionLibre">Section à créer</param>
+    /// <returns>Section créée avec ID généré et ordre calculé</returns>
     public async Task<SectionLibre> CreateAsync(SectionLibre sectionLibre)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
