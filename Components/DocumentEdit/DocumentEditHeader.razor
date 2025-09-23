@@ -1,0 +1,192 @@
+@using GenerateurDOE.Models
+
+<!-- En-tête avec navigation et actions principales -->
+<div class="d-flex align-items-center mb-4">
+    <button class="btn btn-outline-secondary me-3" @onclick="OnRetourClick">
+        <span class="oi oi-arrow-left" aria-hidden="true"></span>
+        Retour @(ChantierNom ?? "au chantier")
+    </button>
+    <h1 class="mb-0">
+        <span class="oi oi-document" aria-hidden="true"></span>
+        @Title
+    </h1>
+
+    @if (ShowFinaliseBadge)
+    {
+        <span class="badge bg-success ms-3 fs-6">Finalisé</span>
+    }
+    else if (HasUnsavedChanges)
+    {
+        <span class="badge bg-warning ms-3 fs-6">Modifications en cours</span>
+    }
+</div>
+
+<!-- Barre d'actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="OnSaveClick" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            <span class="oi oi-check" aria-hidden="true"></span>
+                            Sauvegarder
+                        </button>
+
+                        @if (ShowFinalizeButton)
+                        {
+                            <button class="btn btn-success" @onclick="OnFinalizeClick" disabled="@IsSaving">
+                                <span class="oi oi-task" aria-hidden="true"></span>
+                                Finaliser
+                            </button>
+                        }
+
+                        @if (ShowGenerateButton)
+                        {
+                            <button class="btn btn-outline-success" @onclick="OnGenerateClick" disabled="@IsGenerating">
+                                @if (IsGenerating)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                }
+                                else
+                                {
+                                    <span class="oi oi-cloud-download" aria-hidden="true"></span>
+                                }
+                                Générer
+                            </button>
+                        }
+                    </div>
+
+                    @if (ShowDuplicateButton)
+                    {
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary" @onclick="OnDuplicateClick">
+                                <span class="oi oi-layers" aria-hidden="true"></span>
+                                Dupliquer
+                            </button>
+
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="oi oi-cog" aria-hidden="true"></span>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" @onclick="OnExportHtmlClick">
+                                        <span class="oi oi-browser me-2"></span>Export HTML
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" @onclick="OnExportMarkdownClick">
+                                        <span class="oi oi-text me-2"></span>Export Markdown
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" @onclick="OnDeleteClick">
+                                        <span class="oi oi-trash me-2"></span>Supprimer
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Titre principal affiché dans l'en-tête
+    /// </summary>
+    [Parameter] public string Title { get; set; } = "";
+
+    /// <summary>
+    /// Nom du chantier pour le bouton retour
+    /// </summary>
+    [Parameter] public string? ChantierNom { get; set; }
+
+    /// <summary>
+    /// Indique si le document est finalisé (affiche badge vert)
+    /// </summary>
+    [Parameter] public bool ShowFinaliseBadge { get; set; }
+
+    /// <summary>
+    /// Indique s'il y a des modifications non sauvées (affiche badge orange)
+    /// </summary>
+    [Parameter] public bool HasUnsavedChanges { get; set; }
+
+    /// <summary>
+    /// Indique si une sauvegarde est en cours
+    /// </summary>
+    [Parameter] public bool IsSaving { get; set; }
+
+    /// <summary>
+    /// Indique si une génération PDF est en cours
+    /// </summary>
+    [Parameter] public bool IsGenerating { get; set; }
+
+    /// <summary>
+    /// Affiche le bouton Finaliser (document en cours)
+    /// </summary>
+    [Parameter] public bool ShowFinalizeButton { get; set; }
+
+    /// <summary>
+    /// Affiche le bouton Générer (document existant)
+    /// </summary>
+    [Parameter] public bool ShowGenerateButton { get; set; }
+
+    /// <summary>
+    /// Affiche les boutons Dupliquer et actions secondaires
+    /// </summary>
+    [Parameter] public bool ShowDuplicateButton { get; set; }
+
+    #region Callbacks
+
+    /// <summary>
+    /// Callback pour le bouton retour
+    /// </summary>
+    [Parameter] public EventCallback OnRetourClick { get; set; }
+
+    /// <summary>
+    /// Callback pour le bouton sauvegarder
+    /// </summary>
+    [Parameter] public EventCallback OnSaveClick { get; set; }
+
+    /// <summary>
+    /// Callback pour le bouton finaliser
+    /// </summary>
+    [Parameter] public EventCallback OnFinalizeClick { get; set; }
+
+    /// <summary>
+    /// Callback pour le bouton générer
+    /// </summary>
+    [Parameter] public EventCallback OnGenerateClick { get; set; }
+
+    /// <summary>
+    /// Callback pour le bouton dupliquer
+    /// </summary>
+    [Parameter] public EventCallback OnDuplicateClick { get; set; }
+
+    /// <summary>
+    /// Callback pour l'export HTML
+    /// </summary>
+    [Parameter] public EventCallback OnExportHtmlClick { get; set; }
+
+    /// <summary>
+    /// Callback pour l'export Markdown
+    /// </summary>
+    [Parameter] public EventCallback OnExportMarkdownClick { get; set; }
+
+    /// <summary>
+    /// Callback pour la suppression
+    /// </summary>
+    [Parameter] public EventCallback OnDeleteClick { get; set; }
+
+    /// <summary>
+    /// Callback pour l'édition du template de page de garde
+    /// </summary>
+    [Parameter] public EventCallback OnEditTemplateClick { get; set; }
+
+    #endregion
+}

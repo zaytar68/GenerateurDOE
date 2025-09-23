@@ -1,0 +1,153 @@
+<!-- Conteneur de navigation par onglets pour l'édition de document -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "general" ? "active" : "")"
+                                type="button"
+                                @onclick='() => SetActiveTab("general")'>
+                            <span class="oi oi-cog me-2" aria-hidden="true"></span>
+                            Général
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "tablematieres" ? "active" : "")"
+                                type="button"
+                                @onclick='() => SetActiveTab("tablematieres")'>
+                            <span class="oi oi-list me-2" aria-hidden="true"></span>
+                            Table des Matières
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "sections" ? "active" : "")"
+                                type="button"
+                                @onclick='() => SetActiveTab("sections")'>
+                            <span class="oi oi-document me-2" aria-hidden="true"></span>
+                            Sections Libres
+                            @if (SectionsCount > 0)
+                            {
+                                <span class="badge bg-primary ms-1">@SectionsCount</span>
+                            }
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "fiches" ? "active" : "")"
+                                type="button"
+                                @onclick='() => SetActiveTab("fiches")'>
+                            <span class="oi oi-file me-2" aria-hidden="true"></span>
+                            Fiches Techniques
+                            @if (FichesCount > 0)
+                            {
+                                <span class="badge bg-primary ms-1">@FichesCount</span>
+                            }
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card-body">
+                <div class="tab-content">
+                    <!-- Onglet Général -->
+                    <div class="tab-pane fade @(ActiveTab == "general" ? "show active" : "")"
+                         id="general" role="tabpanel">
+                        @GeneralTabContent
+                    </div>
+
+                    <!-- Onglet Table des Matières -->
+                    <div class="tab-pane fade @(ActiveTab == "tablematieres" ? "show active" : "")"
+                         id="tablematieres" role="tabpanel">
+                        @TableMatieresTabContent
+                    </div>
+
+                    <!-- Onglet Sections Libres -->
+                    <div class="tab-pane fade @(ActiveTab == "sections" ? "show active" : "")"
+                         id="sections" role="tabpanel">
+                        @SectionsTabContent
+                    </div>
+
+                    <!-- Onglet Fiches Techniques -->
+                    <div class="tab-pane fade @(ActiveTab == "fiches" ? "show active" : "")"
+                         id="fiches" role="tabpanel">
+                        @FichesTabContent
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-tabs .nav-link {
+        border-bottom: 2px solid transparent;
+        color: #6c757d;
+    }
+
+    .nav-tabs .nav-link.active {
+        background-color: transparent;
+        border-bottom-color: #007bff;
+        color: #007bff;
+        font-weight: 500;
+    }
+
+    .tab-content {
+        min-height: 400px;
+    }
+
+    .badge {
+        font-size: 0.75em;
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Onglet actuellement actif
+    /// </summary>
+    [Parameter] public string ActiveTab { get; set; } = "general";
+
+    /// <summary>
+    /// Callback pour le changement d'onglet actif
+    /// </summary>
+    [Parameter] public EventCallback<string> ActiveTabChanged { get; set; }
+
+    /// <summary>
+    /// Nombre de sections libres pour affichage du badge
+    /// </summary>
+    [Parameter] public int SectionsCount { get; set; }
+
+    /// <summary>
+    /// Nombre de fiches techniques pour affichage du badge
+    /// </summary>
+    [Parameter] public int FichesCount { get; set; }
+
+    /// <summary>
+    /// Contenu de l'onglet Général
+    /// </summary>
+    [Parameter] public RenderFragment? GeneralTabContent { get; set; }
+
+    /// <summary>
+    /// Contenu de l'onglet Table des Matières
+    /// </summary>
+    [Parameter] public RenderFragment? TableMatieresTabContent { get; set; }
+
+    /// <summary>
+    /// Contenu de l'onglet Sections Libres
+    /// </summary>
+    [Parameter] public RenderFragment? SectionsTabContent { get; set; }
+
+    /// <summary>
+    /// Contenu de l'onglet Fiches Techniques
+    /// </summary>
+    [Parameter] public RenderFragment? FichesTabContent { get; set; }
+
+    /// <summary>
+    /// Change l'onglet actif et notifie le parent
+    /// </summary>
+    private async Task SetActiveTab(string tabName)
+    {
+        ActiveTab = tabName;
+        await ActiveTabChanged.InvokeAsync(tabName);
+        StateHasChanged();
+    }
+}

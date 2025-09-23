@@ -1,0 +1,213 @@
+@using GenerateurDOE.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+<!-- Formulaire général de configuration du document -->
+@if (Document != null)
+{
+    <EditForm Model="@Document">
+        <DataAnnotationsValidator />
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="typeDocument" class="form-label">Type de Document *</label>
+                <select class="form-select @(TypeDocumentError ? "is-invalid" : "")"
+                        id="typeDocument"
+                        value="@SelectedTypeDocumentString"
+                        @onchange="OnTypeDocumentChanged">
+                    <option value="">-- Sélectionner un type --</option>
+                    @foreach (var type in Enum.GetValues<TypeDocumentGenere>())
+                    {
+                        <option value="@type.ToString()">@GetTypeDisplayName(type)</option>
+                    }
+                </select>
+                @if (TypeDocumentError)
+                {
+                    <div class="invalid-feedback">Le type de document est requis</div>
+                }
+            </div>
+            <div class="col-md-6">
+                <label for="formatExport" class="form-label">Format d'Export *</label>
+                <select class="form-select @(FormatExportError ? "is-invalid" : "")"
+                        id="formatExport"
+                        value="@SelectedFormatExportString"
+                        @onchange="OnFormatExportChanged">
+                    <option value="">-- Sélectionner un format --</option>
+                    @foreach (var format in Enum.GetValues<FormatExport>())
+                    {
+                        <option value="@format.ToString()">@format.ToString()</option>
+                    }
+                </select>
+                @if (FormatExportError)
+                {
+                    <div class="invalid-feedback">Le format d'export est requis</div>
+                }
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="nomFichier" class="form-label">Nom du Fichier *</label>
+                <InputText @bind-Value="Document.NomFichier"
+                          class="form-control"
+                          id="nomFichier"
+                          placeholder="ex: DOE_Tour_Europe_2025"
+                          maxlength="255" />
+                <ValidationMessage For="() => Document.NomFichier" class="text-danger" />
+                <small class="form-text text-muted">Le nom du fichier sera automatiquement complété avec l'extension selon le format choisi</small>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label for="numeroLot" class="form-label">Numéro de Lot *</label>
+                <InputText @bind-Value="Document.NumeroLot"
+                          class="form-control"
+                          id="numeroLot"
+                          placeholder="ex: 01"
+                          maxlength="50" />
+                <ValidationMessage For="() => Document.NumeroLot" class="text-danger" />
+            </div>
+            <div class="col-md-8">
+                <label for="intituleLot" class="form-label">Intitulé du Lot *</label>
+                <InputText @bind-Value="Document.IntituleLot"
+                          class="form-control"
+                          id="intituleLot"
+                          placeholder="ex: Gros œuvre - Structure béton"
+                          maxlength="300" />
+                <ValidationMessage For="() => Document.IntituleLot" class="text-danger" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="form-check">
+                    <InputCheckbox @bind-Value="Document.IncludePageDeGarde"
+                                  class="form-check-input"
+                                  id="includePageDeGarde" />
+                    <label class="form-check-label" for="includePageDeGarde">
+                        Inclure une page de garde
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <InputCheckbox @bind-Value="Document.IncludeTableMatieres"
+                                  class="form-check-input"
+                                  id="includeTableMatieres" />
+                    <label class="form-check-label" for="includeTableMatieres">
+                        Inclure une table des matières
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sélection du template de page de garde si activé -->
+        @if (Document.IncludePageDeGarde)
+        {
+            <label for="pageGardeTemplate" class="form-label">Template de Page de Garde</label>
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <select class="form-select" id="pageGardeTemplate" @bind="Document.PageGardeTemplateId">
+                        <option value="">-- Utiliser le template par défaut --</option>
+                        @foreach (var template in Templates)
+                        {
+                            <option value="@template.Id">@template.Nom</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-primary" @onclick="OnEditTemplateClick">
+                        <span class="oi oi-pencil"></span>
+                        Éditer Template
+                    </button>
+                </div>
+                <div class="col-12 mt-2">
+                    <small class="form-text text-muted">Choisissez un template personnalisé ou laissez vide pour utiliser le template par défaut</small>
+                </div>
+            </div>
+        }
+    </EditForm>
+}
+else
+{
+    <div class="alert alert-warning">
+        <span class="oi oi-warning" aria-hidden="true"></span>
+        Document non disponible pour l'édition
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// Document à éditer
+    /// </summary>
+    [Parameter] public DocumentGenere? Document { get; set; }
+
+    /// <summary>
+    /// Callback pour les changements du document
+    /// </summary>
+    [Parameter] public EventCallback<DocumentGenere> DocumentChanged { get; set; }
+
+    /// <summary>
+    /// Templates de page de garde disponibles
+    /// </summary>
+    [Parameter] public List<PageGardeTemplate> Templates { get; set; } = new();
+
+    /// <summary>
+    /// Valeur sélectionnée pour le type de document
+    /// </summary>
+    [Parameter] public string SelectedTypeDocumentString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Callback pour le changement de type de document
+    /// </summary>
+    [Parameter] public EventCallback<string> SelectedTypeDocumentStringChanged { get; set; }
+
+    /// <summary>
+    /// Valeur sélectionnée pour le format d'export
+    /// </summary>
+    [Parameter] public string SelectedFormatExportString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Callback pour le changement de format d'export
+    /// </summary>
+    [Parameter] public EventCallback<string> SelectedFormatExportStringChanged { get; set; }
+
+    /// <summary>
+    /// Indique une erreur de validation sur le type de document
+    /// </summary>
+    [Parameter] public bool TypeDocumentError { get; set; }
+
+    /// <summary>
+    /// Indique une erreur de validation sur le format d'export
+    /// </summary>
+    [Parameter] public bool FormatExportError { get; set; }
+
+    /// <summary>
+    /// Callback pour le changement de type de document
+    /// </summary>
+    [Parameter] public EventCallback OnTypeDocumentChanged { get; set; }
+
+    /// <summary>
+    /// Callback pour le changement de format d'export
+    /// </summary>
+    [Parameter] public EventCallback OnFormatExportChanged { get; set; }
+
+    /// <summary>
+    /// Callback pour l'édition du template de page de garde
+    /// </summary>
+    [Parameter] public EventCallback OnEditTemplateClick { get; set; }
+
+    /// <summary>
+    /// Retourne le libellé d'affichage pour un type de document
+    /// </summary>
+    private string GetTypeDisplayName(TypeDocumentGenere type)
+    {
+        return type switch
+        {
+            TypeDocumentGenere.DOE => "DOE (Dossier d'Ouvrages Exécutés)",
+            TypeDocumentGenere.DossierTechnique => "Dossier Technique",
+            TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
+            _ => type.ToString()
+        };
+    }
+}
