@@ -67,11 +67,48 @@
                     <div class="col-12 mb-3">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-0">
-                                        <span class="badge bg-primary me-2">@conteneur.TypeSection.Nom</span>
-                                        @conteneur.Titre
-                                    </h6>
+                                <div class="flex-grow-1">
+                                    @if (conteneurEnCoursEdition == conteneur.Id)
+                                    {
+                                        <!-- Mode édition inline -->
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-primary me-2">@conteneur.TypeSection.Nom</span>
+                                            <div class="flex-grow-1 me-2">
+                                                <input type="text" class="form-control form-control-sm"
+                                                       @bind="titreEnCoursEdition"
+                                                       @onkeypress="@((e) => OnTitreKeyPress(e, conteneur))"
+                                                       placeholder="Titre du conteneur"
+                                                       disabled="@isSavingTitle" />
+                                            </div>
+                                            <div class="btn-group">
+                                                <button class="btn btn-outline-success btn-sm"
+                                                        @onclick="() => SauvegarderTitre(conteneur)"
+                                                        disabled="@(isSavingTitle || string.IsNullOrWhiteSpace(titreEnCoursEdition))">
+                                                    @if (isSavingTitle)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="oi oi-check"></span>
+                                                    }
+                                                </button>
+                                                <button class="btn btn-outline-secondary btn-sm"
+                                                        @onclick="AnnulerEditionTitre"
+                                                        disabled="@isSavingTitle">
+                                                    <span class="oi oi-x"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <!-- Mode affichage normal -->
+                                        <h6 class="mb-0">
+                                            <span class="badge bg-primary me-2">@conteneur.TypeSection.Nom</span>
+                                            @conteneur.Titre
+                                        </h6>
+                                    }
                                     <small class="text-muted">@conteneur.Items.Count section(s)</small>
                                 </div>
                                 <div class="btn-group">
@@ -193,6 +230,11 @@
     private bool isCreating = false;
     private int selectedTypeSection = 0;
     private string nouveauTitre = string.Empty;
+
+    // Variables pour l'édition inline des titres
+    private int conteneurEnCoursEdition = 0;
+    private string titreEnCoursEdition = string.Empty;
+    private bool isSavingTitle = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -331,9 +373,10 @@
 
     private void EditerConteneur(SectionConteneur conteneur)
     {
-        // TODO: Implémenter l'édition du conteneur (titre, ordre, etc.)
-        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", 
-            "Édition des propriétés du conteneur en cours de développement");
+        // Démarrer l'édition inline du titre
+        conteneurEnCoursEdition = conteneur.Id;
+        titreEnCoursEdition = conteneur.Titre;
+        StateHasChanged();
     }
 
     private async Task AjouterSection(SectionConteneur conteneur)
@@ -593,6 +636,86 @@ new Radzen.DialogOptions
         }
 
         return tronque + "...";
+    }
+
+    // Méthodes pour l'édition inline des titres
+    private async Task SauvegarderTitre(SectionConteneur conteneur)
+    {
+        if (string.IsNullOrWhiteSpace(titreEnCoursEdition))
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Validation",
+                "Le titre ne peut pas être vide");
+            return;
+        }
+
+        try
+        {
+            isSavingTitle = true;
+            StateHasChanged();
+
+            // 🔧 CORRECTION CONCURRENCE: Protection mise à jour titre
+            var operationKey = $"update-title-{conteneur.Id}";
+            var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
+            {
+                // Mettre à jour le titre dans l'objet
+                conteneur.Titre = titreEnCoursEdition.Trim();
+
+                // Sauvegarder via le service
+                await sectionConteneurService.UpdateAsync(conteneur);
+
+                // Mettre à jour la liste locale
+                var index = SectionsConteneurs.FindIndex(sc => sc.Id == conteneur.Id);
+                if (index >= 0)
+                {
+                    SectionsConteneurs[index] = conteneur;
+                }
+
+                // Notifier le parent du changement
+                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"Titre du conteneur mis à jour : '{conteneur.Titre}'");
+            });
+
+            if (!executed)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                    "Une opération de mise à jour est déjà en cours");
+                return;
+            }
+
+            // Sortir du mode édition
+            AnnulerEditionTitre();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la mise à jour : {ex.Message}");
+        }
+        finally
+        {
+            isSavingTitle = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AnnulerEditionTitre()
+    {
+        conteneurEnCoursEdition = 0;
+        titreEnCoursEdition = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task OnTitreKeyPress(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, SectionConteneur conteneur)
+    {
+        if (e.Key == "Enter")
+        {
+            await SauvegarderTitre(conteneur);
+        }
+        else if (e.Key == "Escape")
+        {
+            AnnulerEditionTitre();
+        }
     }
 }
 

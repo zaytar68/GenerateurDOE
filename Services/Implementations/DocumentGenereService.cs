@@ -637,6 +637,7 @@ public class DocumentGenereService : IDocumentGenereService
         return await context.SectionsConteneurs
             .Where(sc => sc.DocumentGenereId == documentGenereId)
             .Include(sc => sc.Items)
+                .ThenInclude(item => item.SectionLibre)
             .Include(sc => sc.TypeSection)
             .OrderBy(sc => sc.Ordre)
             .ToListAsync().ConfigureAwait(false);
