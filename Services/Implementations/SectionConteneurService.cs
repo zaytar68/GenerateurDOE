@@ -311,4 +311,62 @@ public class SectionConteneurService : ISectionConteneurService
             .OrderBy(sl => sl.Titre)
             .ToListAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Réorganise l'ordre d'un conteneur de sections
+    /// </summary>
+    /// <param name="conteneurId">ID du conteneur à déplacer</param>
+    /// <param name="nouvelOrdre">Nouvel ordre souhaité</param>
+    /// <returns>True si la réorganisation a réussi</returns>
+    public async Task<bool> ReorderConteneurAsync(int conteneurId, int nouvelOrdre)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var conteneur = await context.SectionsConteneurs.FindAsync(conteneurId).ConfigureAwait(false);
+        if (conteneur == null)
+        {
+            _loggingService.LogWarning($"Conteneur {conteneurId} introuvable pour réorganisation");
+            return false;
+        }
+
+        var ancienOrdre = conteneur.Ordre;
+        if (ancienOrdre == nouvelOrdre)
+        {
+            return true; // Aucun changement nécessaire
+        }
+
+        // Récupérer tous les conteneurs du même document pour réorganiser
+        var autresConteneurs = await context.SectionsConteneurs
+            .Where(sc => sc.DocumentGenereId == conteneur.DocumentGenereId && sc.Id != conteneurId)
+            .ToListAsync().ConfigureAwait(false);
+
+        // Décaler les autres conteneurs
+        if (nouvelOrdre < ancienOrdre)
+        {
+            // Monter le conteneur : décaler vers le bas ceux entre nouvelOrdre et ancienOrdre
+            foreach (var autreCont in autresConteneurs.Where(sc => sc.Ordre >= nouvelOrdre && sc.Ordre < ancienOrdre))
+            {
+                autreCont.Ordre += 1;
+                autreCont.DateModification = DateTime.Now;
+            }
+        }
+        else
+        {
+            // Descendre le conteneur : décaler vers le haut ceux entre ancienOrdre et nouvelOrdre
+            foreach (var autreCont in autresConteneurs.Where(sc => sc.Ordre > ancienOrdre && sc.Ordre <= nouvelOrdre))
+            {
+                autreCont.Ordre -= 1;
+                autreCont.DateModification = DateTime.Now;
+            }
+        }
+
+        // Mettre à jour l'ordre du conteneur déplacé
+        conteneur.Ordre = nouvelOrdre;
+        conteneur.DateModification = DateTime.Now;
+
+        await context.SaveChangesAsync().ConfigureAwait(false);
+        _loggingService.LogInformation($"Conteneur {conteneurId} réorganisé de l'ordre {ancienOrdre} vers {nouvelOrdre}");
+
+        return true;
+    }
 }

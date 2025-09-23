@@ -28,4 +28,7 @@ public interface ISectionConteneurService
     
     Task<bool> CanCreateForTypeAsync(int documentGenereId, int typeSectionId);
     Task<bool> ValidateTypeConsistencyAsync(int sectionConteneursId, int sectionLibreId);
+
+    // Méthode pour réorganiser les conteneurs
+    Task<bool> ReorderConteneurAsync(int conteneurId, int nouvelOrdre);
 }

@@ -11,6 +11,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Documentation XML complète pour tous les services et modèles
 - Commentaires IntelliSense pour améliorer l'expérience développeur
 
+### Corrigé
+- **Drag & Drop conteneurs** : Correction de la mise à jour UI après réorganisation des conteneurs de sections
+- **SectionConteneurEditor** : Rafraîchissement automatique de l'interface après opérations drag & drop
+- **StateHasChanged()** : Synchronisation correcte entre base de données et affichage visuel
+- **Hot reload** : Compatibilité avec les modifications en temps réel via dotnet watch
+
 ## [1.5.0] - 2025-09-23
 
 ### Ajouté

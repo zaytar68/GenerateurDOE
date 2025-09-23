@@ -67,9 +67,22 @@
                 @foreach (var conteneur in SectionsConteneurs.OrderBy(sc => sc.Ordre))
                 {
                     <div class="col-12 mb-3">
-                        <div class="card">
+                        <div class="card conteneur-card @GetConteneurCssClass(conteneur)"
+                             draggable="true"
+                             @ondragstart="@(e => OnConteneurDragStart(e, conteneur))"
+                             @ondragover:preventDefault="true"
+                             @ondragover="@(e => OnConteneurDragOver(e))"
+                             @ondrop:preventDefault="true"
+                             @ondrop="@(async e => await OnConteneurDrop(e, conteneur))"
+                             @ondragenter="@(e => OnConteneurDragEnter(e, conteneur))"
+                             @ondragleave="@(e => OnConteneurDragLeave(e, conteneur))"
+                             @ondragend="@(e => OnConteneurDragEnd(e))">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <div class="flex-grow-1">
+                                <div class="flex-grow-1 d-flex align-items-center">
+                                    <span class="conteneur-drag-handle me-2" title="Glisser pour réorganiser les conteneurs">
+                                        <span class="oi oi-menu text-muted"></span>
+                                    </span>
+                                    <div class="flex-grow-1">
                                     @if (conteneurEnCoursEdition == conteneur.Id)
                                     {
                                         <!-- Mode édition inline -->
@@ -112,6 +125,7 @@
                                         </h6>
                                     }
                                     <small class="text-muted">@conteneur.Items.Count section(s)</small>
+                                    </div>
                                 </div>
                                 <div class="btn-group">
                                     <button class="btn btn-outline-info btn-sm" 
@@ -240,9 +254,13 @@
     private string titreEnCoursEdition = string.Empty;
     private bool isSavingTitle = false;
 
-    // Variables pour le drag & drop
+    // Variables pour le drag & drop des sections
     private DotNetObjectReference<SectionConteneurEditor>? dotNetRef;
     private bool isDragDropInitialized = false;
+
+    // Variables pour le drag & drop des conteneurs
+    private SectionConteneur? conteneurDragge = null;
+    private SectionConteneur? conteneurCible = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -729,6 +747,124 @@ new Radzen.DialogOptions
         }
     }
 
+    // Méthodes pour le drag & drop des conteneurs
+    private void OnConteneurDragStart(DragEventArgs e, SectionConteneur conteneur)
+    {
+        conteneurDragge = conteneur;
+        e.DataTransfer.EffectAllowed = "move";
+        StateHasChanged();
+    }
+
+    private void OnConteneurDragOver(DragEventArgs e)
+    {
+        // CRITIQUE: Cet événement doit être appelé constamment pour maintenir la zone de drop active
+        e.DataTransfer.DropEffect = "move";
+    }
+
+    private void OnConteneurDragEnter(DragEventArgs e, SectionConteneur conteneur)
+    {
+        if (conteneurDragge != null && conteneurDragge.Id != conteneur.Id)
+        {
+            conteneurCible = conteneur;
+            StateHasChanged();
+        }
+    }
+
+    private void OnConteneurDragLeave(DragEventArgs e, SectionConteneur conteneur)
+    {
+        if (conteneurCible?.Id == conteneur.Id)
+        {
+            conteneurCible = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnConteneurDrop(DragEventArgs e, SectionConteneur conteneurCible)
+    {
+        // Vérifier qu'on a un conteneur en cours de drag
+        if (conteneurDragge == null)
+        {
+            Console.WriteLine("[DEBUG] Aucun conteneur en cours de drag");
+            return;
+        }
+
+        // Vérifier qu'on ne se déplace pas sur soi-même
+        if (conteneurDragge.Id == conteneurCible.Id)
+        {
+            Console.WriteLine("[DEBUG] Tentative de drop sur soi-même - ignoré");
+            return;
+        }
+
+        // Sauvegarder les informations avant manipulation pour éviter les NullReference
+        var conteneurDraggeId = conteneurDragge.Id;
+        var conteneurDraggeTitle = conteneurDragge?.Titre ?? "Conteneur inconnu";
+        var targetOrder = conteneurCible?.Ordre ?? 0;
+
+        try
+        {
+            Console.WriteLine($"[DEBUG] Déplacement conteneur {conteneurDraggeTitle} vers position {targetOrder}");
+
+            var success = await sectionConteneurService.ReorderConteneurAsync(conteneurDraggeId, targetOrder);
+
+            if (success)
+            {
+                // Recharger tous les conteneurs depuis la base de données
+                var sectinosConteneursUpdated = await sectionConteneurService.GetByDocumentIdAsync(DocumentId);
+                SectionsConteneurs.Clear();
+                SectionsConteneurs.AddRange(sectinosConteneursUpdated);
+
+                // Notifier les changements
+                await OnSectionsChanged.InvokeAsync(SectionsConteneurs);
+                StateHasChanged();
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"Conteneur '{conteneurDraggeTitle}' déplacé avec succès !");
+            }
+            else
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                    "Erreur lors du déplacement du conteneur.");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors du déplacement : {ex.Message}");
+            Console.WriteLine($"[DEBUG] Erreur OnConteneurDrop: {ex.Message}");
+            Console.WriteLine($"[DEBUG] Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            // Réinitialiser l'état du drag & drop
+            OnConteneurDragEnd(e);
+        }
+    }
+
+    private void OnConteneurDragEnd(DragEventArgs e)
+    {
+        conteneurDragge = null;
+        conteneurCible = null;
+        StateHasChanged();
+    }
+
+    private string GetConteneurCssClass(SectionConteneur conteneur)
+    {
+        var cssClass = "";
+
+        // Classes pour le drag & drop
+        if (conteneurDragge?.Id == conteneur.Id)
+        {
+            cssClass += "conteneur-dragging ";
+        }
+
+        if (conteneurCible?.Id == conteneur.Id)
+        {
+            cssClass += "conteneur-drop-target ";
+        }
+
+        return cssClass.Trim();
+    }
+
     /// <summary>
     /// Nettoie les ressources du drag & drop
     /// </summary>
@@ -908,5 +1044,52 @@ new Radzen.DialogOptions
     /* Améliorer l'indicateur visuel pendant le drag */
     .sections-list.sortable-enabled .section-item {
         position: relative;
+    }
+
+    /* Styles pour le drag & drop des conteneurs */
+    .conteneur-card[draggable="true"] {
+        cursor: move;
+        transition: all 0.2s ease;
+    }
+
+    .conteneur-card[draggable="true"]:hover {
+        background-color: #f8f9fa !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .conteneur-drag-handle {
+        cursor: grab;
+        padding: 4px;
+        border-radius: 3px;
+        transition: all 0.2s ease;
+    }
+
+    .conteneur-drag-handle:hover {
+        background-color: #e9ecef;
+        color: #495057 !important;
+    }
+
+    .conteneur-dragging {
+        opacity: 0.6;
+        background-color: #fff3cd !important;
+        transform: rotate(1deg);
+        border: 2px dashed #f0ad4e;
+    }
+
+    .conteneur-drop-target {
+        background-color: #d1ecf1 !important;
+        border: 2px dashed #17a2b8;
+        animation: conteneur-pulse 1s infinite;
+    }
+
+    @@keyframes conteneur-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(23, 162, 184, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(23, 162, 184, 0); }
+    }
+
+    .conteneur-drop-target .card-header {
+        background-color: #bee5eb !important;
     }
 </style>
