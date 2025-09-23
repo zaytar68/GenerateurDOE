@@ -7,6 +7,8 @@
 @inject IOperationLockService operationLockService
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <div class="section-conteneur-editor">
     @if (isLoading)
@@ -136,7 +138,7 @@
                                 }
                                 else
                                 {
-                                    <div class="sections-list">
+                                    <div class="sections-list" id="conteneur-@conteneur.Id">
                                         @foreach (var item in conteneur.Items?.Where(i => i != null).OrderBy(i => i.Ordre) ?? Enumerable.Empty<SectionConteneurItem>())
                                         {
                                             var section = item.SectionLibre;
@@ -149,7 +151,9 @@
                                             <div class="section-item d-flex justify-content-between align-items-center p-2 border rounded mb-2" data-item-id="@item.Id">
                                                 <div class="flex-grow-1">
                                                     <div class="d-flex align-items-center">
-                                                        <span class="drag-handle me-2" style="cursor: move;" title="Glisser pour réorganiser">⋮⋮</span>
+                                                        <span class="drag-handle me-2" title="Glisser pour réorganiser">
+                                                            ⋮⋮
+                                                        </span>
                                                         <div class="flex-grow-1">
                                                             <div class="d-flex justify-content-between align-items-start">
                                                                 <div>
@@ -236,9 +240,24 @@
     private string titreEnCoursEdition = string.Empty;
     private bool isSavingTitle = false;
 
+    // Variables pour le drag & drop
+    private DotNetObjectReference<SectionConteneurEditor>? dotNetRef;
+    private bool isDragDropInitialized = false;
+
     protected override async Task OnInitializedAsync()
     {
         await ChargerDonnees();
+    }
+
+    /// <summary>
+    /// Méthode appelée après le rendu du composant pour initialiser le drag & drop
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || (!isDragDropInitialized && SectionsConteneurs.Any()))
+        {
+            await InitializeDragDrop();
+        }
     }
 
     private async Task ChargerDonnees()
@@ -638,6 +657,101 @@ new Radzen.DialogOptions
         return tronque + "...";
     }
 
+    #region Drag & Drop Methods
+
+    /// <summary>
+    /// Initialise le drag & drop pour tous les conteneurs avec des sections
+    /// </summary>
+    private async Task InitializeDragDrop()
+    {
+        try
+        {
+            // Créer la référence .NET pour les callbacks JavaScript
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            // Initialiser le drag & drop pour chaque conteneur ayant des sections
+            foreach (var conteneur in SectionsConteneurs.Where(sc => sc.Items.Any()))
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "sectionDragDrop.initialize",
+                    dotNetRef,
+                    $"conteneur-{conteneur.Id}");
+            }
+
+            isDragDropInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DEBUG] InitializeDragDrop error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Méthode appelée par JavaScript quand l'ordre des sections change
+    /// </summary>
+    [JSInvokable]
+    public async Task OnItemsReorderedJS(string containerId, int[] itemIds)
+    {
+        try
+        {
+            // Extraire l'ID du conteneur depuis le string "conteneur-123"
+            var id = int.Parse(containerId.Replace("conteneur-", ""));
+            var conteneur = SectionsConteneurs.FirstOrDefault(sc => sc.Id == id);
+
+            if (conteneur != null && itemIds?.Length > 0)
+            {
+                // Utiliser la protection anti-concurrence existante
+                var operationKey = $"reorder-drag-{id}";
+                var executed = await operationLockService.ExecuteWithLockAsync(operationKey, async () =>
+                {
+                    // Utiliser la méthode existante pour réorganiser
+                    await sectionConteneurService.ReorderItemsAsync(id, itemIds.ToList());
+
+                    // Recharger le conteneur pour avoir les données à jour
+                    await RechargerConteneur(conteneur);
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success,
+                        "Succès", "Ordre des sections mis à jour par glisser-déposer");
+                });
+
+                if (!executed)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Opération ignorée",
+                        "Une réorganisation est déjà en cours");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la réorganisation : {ex.Message}");
+            Console.WriteLine($"[DEBUG] OnItemsReorderedJS error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Nettoie les ressources du drag & drop
+    /// </summary>
+    public void Dispose()
+    {
+        try
+        {
+            if (dotNetRef != null)
+            {
+                // Détruire toutes les instances de drag & drop
+                JSRuntime.InvokeVoidAsync("sectionDragDrop.destroyAll");
+                dotNetRef.Dispose();
+                dotNetRef = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DEBUG] Dispose error: {ex.Message}");
+        }
+    }
+
+    #endregion
+
     // Méthodes pour l'édition inline des titres
     private async Task SauvegarderTitre(SectionConteneur conteneur)
     {
@@ -733,12 +847,28 @@ new Radzen.DialogOptions
     }
     
     .drag-handle {
-        color: #6c757d;
+        cursor: grab;
+        user-select: none;
+        padding: 4px;
+        border-radius: 3px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.2s;
+        font-weight: bold;
         font-size: 1.2em;
+        line-height: 1;
+        color: #6c757d;
     }
-    
+
     .drag-handle:hover {
+        background-color: #f8f9fa;
         color: #495057;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+        background-color: #e9ecef;
     }
     
     .sections-list {
@@ -752,5 +882,31 @@ new Radzen.DialogOptions
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
+    }
+
+    /* Styles pour SortableJS drag & drop */
+    .sortable-ghost {
+        opacity: 0.4;
+        background-color: #f0f0f0;
+        border: 2px dashed #007bff;
+    }
+
+    .sortable-chosen {
+        background-color: #f9f9f9;
+        border: 2px solid #007bff;
+    }
+
+    .sortable-drag {
+        opacity: 0;
+    }
+
+    /* Animation de transition après drop */
+    .sections-list .section-item {
+        transition: all 0.15s ease;
+    }
+
+    /* Améliorer l'indicateur visuel pendant le drag */
+    .sections-list.sortable-enabled .section-item {
+        position: relative;
     }
 </style>
