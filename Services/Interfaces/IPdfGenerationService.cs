@@ -69,16 +69,4 @@ namespace GenerateurDOE.Services.Interfaces
         public string Keywords { get; set; } = "";
     }
 
-    public class TableOfContentsData
-    {
-        public List<TocEntry> Entries { get; set; } = new();
-    }
-
-    public class TocEntry
-    {
-        public string Title { get; set; } = "";
-        public int Level { get; set; }
-        public int PageNumber { get; set; }
-        public List<TocEntry> Children { get; set; } = new();
-    }
 }

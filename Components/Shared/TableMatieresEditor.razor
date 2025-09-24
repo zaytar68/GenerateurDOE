@@ -1,174 +1,279 @@
-@using GenerateurDOE.Models
 @using System.Text.Json
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
 @inject Radzen.NotificationService NotificationService
 
-<div class="table-matieres-editor card">
-    <div class="card-header">
-        <h6 class="mb-0">
-            <span class="oi oi-list-rich" aria-hidden="true"></span>
-            Configuration Table des Matières
-        </h6>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="form-check mb-3">
-                    <InputCheckbox @bind-Value="DocumentGenere.IncludeTableMatieres"
+<div class="table-matieres-editor">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <span class="oi oi-list" aria-hidden="true"></span>
+                Configuration de la table des matières
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Configuration générale -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="titreTableMatieres" class="form-label">Titre de la table des matières</label>
+                    <RadzenTextBox @bind-Value="TitreTableMatieres"
                                    @bind-Value:after="OnTableMatieresChanged"
-                                   class="form-check-input"
-                                   id="includeTableMatieres" />
-                    <label class="form-check-label" for="includeTableMatieres">
-                        <strong>Inclure une table des matières</strong>
-                    </label>
-                    <div class="form-text">
-                        Génère automatiquement une table des matières basée sur la structure du document
+                                   id="titreTableMatieres"
+                                   class="form-control"
+                                   placeholder="Table des matières" />
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <RadzenCheckBox @bind-Value="IncludeNumeroPages"
+                                        @bind-Value:after="OnTableMatieresChanged"
+                                        id="includeNumeroPages" />
+                        <label class="form-check-label" for="includeNumeroPages">
+                            Inclure les numéros de pages
+                        </label>
+                    </div>
+                    <div class="form-check mt-2">
+                        <RadzenCheckBox @bind-Value="IncludePageGarde"
+                                        @bind-Value:after="OnTableMatieresChanged"
+                                        id="includePageGarde" />
+                        <label class="form-check-label" for="includePageGarde">
+                            Inclure la page de garde dans la numérotation
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode de génération -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <label class="form-label">Mode de génération</label>
+                    <div class="btn-group w-100" role="group">
+                        <RadzenRadioButtonList @bind-Value="ModeGeneration"
+                                               @bind-Value:after="OnModeGenerationChanged"
+                                               TValue="TocModeGeneration"
+                                               Orientation="Radzen.Orientation.Horizontal"
+                                               class="d-flex">
+                            <Items>
+                                <RadzenRadioButtonListItem Text="Automatique" Value="TocModeGeneration.Automatique" />
+                                <RadzenRadioButtonListItem Text="Personnalisable" Value="TocModeGeneration.Personnalisable" />
+                            </Items>
+                        </RadzenRadioButtonList>
+                    </div>
+                    <small class="text-muted">
+                        @if (ModeGeneration == TocModeGeneration.Automatique)
+                        {
+                            <text>La table des matières sera générée automatiquement basée sur le contenu du document.</text>
+                        }
+                        else
+                        {
+                            <text>Vous pouvez personnaliser les entrées de la table des matières manuellement.</text>
+                        }
+                    </small>
+                </div>
+            </div>
+
+            <!-- Section personnalisable -->
+            @if (ModeGeneration == TocModeGeneration.Personnalisable)
+            {
+                <div class="alert alert-info">
+                    <span class="oi oi-info" aria-hidden="true"></span>
+                    <strong>Mode personnalisable activé</strong><br />
+                    Vous pouvez charger la structure par défaut puis la modifier selon vos besoins.
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <RadzenButton Text="Charger la structure par défaut"
+                                      Click="LoadDefaultStructure"
+                                      ButtonStyle="Radzen.ButtonStyle.Secondary"
+                                      Icon="refresh"
+                                      Size="Radzen.ButtonSize.Small"
+                                      Disabled="IsLoadingStructure" />
+                    </div>
+                    <div class="col-md-6">
+                        <RadzenButton Text="Ajouter une entrée personnalisée"
+                                      Click="AddCustomEntry"
+                                      ButtonStyle="Radzen.ButtonStyle.Primary"
+                                      Icon="add"
+                                      Size="Radzen.ButtonSize.Small" />
                     </div>
                 </div>
 
-                @if (DocumentGenere.IncludeTableMatieres)
-                {
-                    <div class="form-check mb-3 ms-4">
-                        <InputCheckbox @bind-Value="IncludePageGarde"
-                                       @bind-Value:after="OnTableMatieresChanged"
-                                       class="form-check-input"
-                                       id="includePageGarde" />
-                        <label class="form-check-label" for="includePageGarde">
-                            <strong>Inclure la page de garde</strong>
-                        </label>
-                        <div class="form-text">
-                            Référencer la page de garde dans la table
+                <!-- Options pour les numéros de pages -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="form-check">
+                            <RadzenCheckBox @bind-Value="UseAutoPageNumbers"
+                                            @bind-Value:after="OnTableMatieresChanged"
+                                            id="useAutoPageNumbers" />
+                            <label class="form-check-label" for="useAutoPageNumbers">
+                                Numérotation automatique des pages
+                            </label>
                         </div>
+                        <small class="text-muted">
+                            Si désactivé, vous pourrez saisir manuellement les numéros de pages pour chaque entrée.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Liste des entrées personnalisées -->
+                @if (EntriesCustom.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 120px;">Ordre</th>
+                                    <th>Titre</th>
+                                    <th style="width: 100px;">Niveau</th>
+                                    <th style="width: 100px;">N° Page</th>
+                                    <th style="width: 120px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var (entry, index) in EntriesCustom.Select((e, i) => (e, i)))
+                                {
+                                    <tr class="@(entry.IsModified ? "table-warning" : "")" data-index="@index">
+                                        <td>
+                                            <div class="d-flex">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                                        @onclick="() => MoveEntryUp(index)" disabled="@(index == 0)">
+                                                    <span class="oi oi-arrow-top"></span>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                        @onclick="() => MoveEntryDown(index)" disabled="@(index == EntriesCustom.Count - 1)">
+                                                    <span class="oi oi-arrow-bottom"></span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <InputText @bind-Value="entry.Title"
+                                                       @bind-Value:after="() => OnEntryChanged(entry)"
+                                                       class="form-control form-control-sm"
+                                                       placeholder="Titre de l'entrée" />
+                                            @if (entry.IsModified && !entry.IsManualEntry)
+                                            {
+                                                <small class="text-muted">Original: @entry.OriginalTitle</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            <InputSelect @bind-Value="entry.Level"
+                                                         @bind-Value:after="() => OnEntryChanged(entry)"
+                                                         class="form-select form-select-sm">
+                                                <option value="1">1</option>
+                                                <option value="2">2</option>
+                                                <option value="3">3</option>
+                                            </InputSelect>
+                                        </td>
+                                        <td>
+                                            @if (UseAutoPageNumbers)
+                                            {
+                                                <span class="badge bg-secondary">Auto</span>
+                                            }
+                                            else
+                                            {
+                                                <InputNumber @bind-Value="entry.PageNumber"
+                                                             @bind-Value:after="() => OnEntryChanged(entry)"
+                                                             class="form-control form-control-sm"
+                                                             min="1" />
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (!entry.IsManualEntry && entry.IsModified)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-warning me-1"
+                                                        @onclick="() => ResetEntry(entry)" title="Restaurer l'original">
+                                                    <span class="oi oi-action-undo"></span>
+                                                </button>
+                                            }
+                                            <button type="button" class="btn btn-sm btn-danger"
+                                                    @onclick="() => RemoveEntry(index)" title="Supprimer">
+                                                <span class="oi oi-trash"></span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 }
-            </div>
-            <div class="col-md-6">
-                @if (DocumentGenere.IncludeTableMatieres)
+                else
                 {
-                    <div class="alert alert-info mb-0">
-                        <span class="oi oi-info" aria-hidden="true"></span>
-                        <strong>Aperçu :</strong>
-                        <div class="mt-2">
-                            <small>
-                                1. Page de garde<br>
-                                2. Table des matières<br>
-                                @if (SectionsCount > 0)
-                                {
-                                    <span>3. Sections personnalisées (@SectionsCount)</span><br>
-                                }
-                                @if (FichesCount > 0)
-                                {
-                                    <span>@(SectionsCount > 0 ? "4" : "3"). Fiches techniques (@FichesCount)</span>
-                                }
-                            </small>
-                        </div>
+                    <div class="alert alert-secondary text-center">
+                        <span class="oi oi-document" aria-hidden="true"></span>
+                        <p class="mb-0">Aucune entrée personnalisée définie.</p>
+                        <small>Utilisez les boutons ci-dessus pour charger la structure par défaut ou ajouter des entrées manuellement.</small>
                     </div>
                 }
+            }
+
+            <!-- Aperçu de la table des matières -->
+            <div class="mt-4">
+                <h6>Aperçu de la table des matières</h6>
+                <div class="toc-preview border rounded p-3 bg-light">
+                    <div class="toc-title">@TitreTableMatieres</div>
+                    <div class="toc-content">
+                        @if (ModeGeneration == TocModeGeneration.Automatique)
+                        {
+                            <!-- Aperçu automatique basé sur le contenu du document -->
+                            @if (SectionsCount > 0)
+                            {
+                                <div class="toc-entry">
+                                    <span class="toc-bullet">•</span>
+                                    <span class="toc-title-entry">Sections libres</span>
+                                    @if (IncludeNumeroPages)
+                                    {
+                                        <span class="toc-page">3</span>
+                                    }
+                                </div>
+                            }
+                            @if (FichesCount > 0)
+                            {
+                                <div class="toc-entry">
+                                    <span class="toc-bullet">•</span>
+                                    <span class="toc-title-entry">Fiches techniques</span>
+                                    @if (IncludeNumeroPages)
+                                    {
+                                        <span class="toc-page">@(SectionsCount > 0 ? 5 : 3)</span>
+                                    }
+                                </div>
+                            }
+                            @if (SectionsCount == 0 && FichesCount == 0)
+                            {
+                                <div class="toc-entry text-muted">
+                                    <span class="toc-bullet">•</span>
+                                    <span class="toc-title-entry">Aucun contenu défini</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <!-- Aperçu personnalisé -->
+                            @if (EntriesCustom.Any())
+                            {
+                                @foreach (var entry in EntriesCustom.OrderBy(e => e.Order))
+                                {
+                                    <div class="toc-entry @(entry.Level == 2 ? "toc-level-2" : "")">
+                                        <span class="toc-bullet">@(entry.Level == 1 ? "•" : "‣")</span>
+                                        <span class="toc-title-entry">@entry.Title</span>
+                                        @if (IncludeNumeroPages)
+                                        {
+                                            <span class="toc-page">@(UseAutoPageNumbers ? "Auto" : entry.PageNumber.ToString())</span>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="toc-entry text-muted">
+                                    <span class="toc-bullet">•</span>
+                                    <span class="toc-title-entry">Aucune entrée définie</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
             </div>
         </div>
-
-        @if (DocumentGenere.IncludeTableMatieres)
-        {
-            <hr class="my-3">
-
-            <!-- Configuration du titre et style -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label for="titreTOC" class="form-label">
-                            <span class="oi oi-header" aria-hidden="true"></span>
-                            Titre de la table des matières
-                        </label>
-                        <InputText @bind-Value="TitreTableMatieres"
-                                   @bind-Value:after="OnTableMatieresChanged"
-                                   class="form-control"
-                                   id="titreTOC"
-                                   placeholder="Table des matières"
-                                   maxlength="100" />
-                        <div class="form-text">
-                            Personnalisez le titre affiché en haut de la table des matières
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label for="numeroPages" class="form-label">
-                            <span class="oi oi-list-rich" aria-hidden="true"></span>
-                            Numérotation
-                        </label>
-                        <InputSelect @bind-Value="IncludeNumeroPages"
-                                     @bind-Value:after="OnTableMatieresChanged"
-                                     class="form-select" id="numeroPages">
-                            <option value="true">Avec numéros de pages</option>
-                            <option value="false">Sans numéros de pages</option>
-                        </InputSelect>
-                        <div class="form-text">
-                            Afficher les numéros de pages
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-
-            <!-- Aperçu avancé de la table des matières -->
-            <div class="mt-4">
-                <div class="card bg-light">
-                    <div class="card-header">
-                        <h6 class="mb-0">
-                            <span class="oi oi-eye" aria-hidden="true"></span>
-                            Aperçu de la table des matières
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="toc-preview">
-                            <h5 class="toc-title">@TitreTableMatieres</h5>
-                            <div class="toc-content">
-                                @if (IncludePageGarde)
-                                {
-                                    <div class="toc-entry">
-                                        <span class="toc-bullet">•</span>
-                                        <span class="toc-title-entry">Page de garde</span>
-                                        @if (IncludeNumeroPages) { <span class="toc-page">........ 1</span> }
-                                    </div>
-                                }
-
-                                @{
-                                    int currentNumber = IncludePageGarde ? 2 : 1;
-                                    int currentPage = IncludePageGarde ? 2 : 1;
-                                }
-
-                                @if (SectionsCount > 0)
-                                {
-                                    for(int i = 0; i < Math.Min(SectionsCount, 3); i++)
-                                    {
-                                        <div class="toc-entry">
-                                            <span class="toc-bullet">•</span>
-                                            <span class="toc-title-entry">Section personnalisée @(i + 1)</span>
-                                            @if (IncludeNumeroPages) { <span class="toc-page">........ @(currentPage++)</span> }
-                                        </div>
-                                    }
-
-                                    @if (SectionsCount > 3)
-                                    {
-                                        <div class="toc-entry text-muted">
-                                            <span class="toc-title-entry">... et @(SectionsCount - 3) section(s) supplémentaire(s)</span>
-                                        </div>
-                                    }
-                                }
-
-                                @if (FichesCount > 0)
-                                {
-                                    <div class="toc-entry">
-                                        <span class="toc-bullet">•</span>
-                                        <span class="toc-title-entry">Fiches techniques (@FichesCount)</span>
-                                        @if (IncludeNumeroPages) { <span class="toc-page">........ @(currentPage++)</span> }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
     </div>
 </div>
 
@@ -182,6 +287,11 @@
     public string TitreTableMatieres { get; set; } = "Table des matières";
     public bool IncludeNumeroPages { get; set; } = true;
     public bool IncludePageGarde { get; set; } = true;
+    public TocModeGeneration ModeGeneration { get; set; } = TocModeGeneration.Automatique;
+    public bool UseAutoPageNumbers { get; set; } = true;
+    public List<CustomTocEntry> EntriesCustom { get; set; } = new();
+
+    private bool IsLoadingStructure { get; set; } = false;
 
     protected override void OnParametersSet()
     {
@@ -202,6 +312,9 @@
                     TitreTableMatieres = config.Titre ?? "Table des matières";
                     IncludeNumeroPages = config.IncludeNumeroPages;
                     IncludePageGarde = config.IncludePageGarde;
+                    ModeGeneration = config.ModeGeneration;
+                    UseAutoPageNumbers = config.UseAutoPageNumbers;
+                    EntriesCustom = config.EntriesCustom ?? new();
                     return;
                 }
             }
@@ -215,6 +328,9 @@
         TitreTableMatieres = "Table des matières";
         IncludeNumeroPages = true;
         IncludePageGarde = true;
+        ModeGeneration = TocModeGeneration.Automatique;
+        UseAutoPageNumbers = true;
+        EntriesCustom = new();
     }
 
     private async Task OnTableMatieresChanged()
@@ -227,7 +343,10 @@
             {
                 Titre = TitreTableMatieres,
                 IncludeNumeroPages = IncludeNumeroPages,
-                IncludePageGarde = IncludePageGarde
+                IncludePageGarde = IncludePageGarde,
+                ModeGeneration = ModeGeneration,
+                UseAutoPageNumbers = UseAutoPageNumbers,
+                EntriesCustom = EntriesCustom
             };
 
             DocumentGenere.Parametres = JsonSerializer.Serialize(currentSettings, new JsonSerializerOptions
@@ -260,17 +379,221 @@
         return new TableMatieresSettings();
     }
 
+    private async Task OnModeGenerationChanged()
+    {
+        // Si on passe en mode personnalisable et qu'on n'a pas encore d'entrées custom,
+        // proposer de charger la structure actuelle
+        if (ModeGeneration == TocModeGeneration.Personnalisable && !EntriesCustom.Any())
+        {
+            // On peut soit proposer de charger automatiquement, soit laisser l'utilisateur le faire manuellement
+            // Pour l'instant, on laisse l'utilisateur décider
+        }
+
+        await OnTableMatieresChanged();
+    }
+
+    private async Task LoadDefaultStructure()
+    {
+        IsLoadingStructure = true;
+        StateHasChanged();
+
+        try
+        {
+            // Appeler l'API pour récupérer la structure par défaut
+            using var httpClient = new HttpClient();
+            httpClient.BaseAddress = new Uri("http://localhost:5282/"); // TODO: configurer l'URL de base
+
+            var response = await httpClient.GetAsync($"api/toc/structure/{DocumentGenere.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var tocStructure = JsonSerializer.Deserialize<TocStructureResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (tocStructure != null)
+                {
+                    EntriesCustom.Clear();
+                    var order = 0;
+
+                    foreach (var entry in tocStructure.Entries)
+                    {
+                        AddTocEntryRecursive(entry, order++, entry.Level);
+
+                        // Ajouter les entrées enfants
+                        foreach (var child in entry.Children)
+                        {
+                            AddTocEntryRecursive(child, order++, child.Level);
+                        }
+                    }
+
+                    await OnTableMatieresChanged();
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                        $"Structure chargée avec {EntriesCustom.Count} entrées");
+                }
+            }
+            else
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                    "Impossible de charger la structure par défaut");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors du chargement : {ex.Message}");
+        }
+        finally
+        {
+            IsLoadingStructure = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task MoveEntryUp(int index)
+    {
+        if (index > 0)
+        {
+            (EntriesCustom[index], EntriesCustom[index - 1]) = (EntriesCustom[index - 1], EntriesCustom[index]);
+
+            // Mettre à jour les ordres
+            for (int i = 0; i < EntriesCustom.Count; i++)
+            {
+                EntriesCustom[i].Order = i;
+            }
+
+            await OnTableMatieresChanged();
+        }
+    }
+
+    private async Task MoveEntryDown(int index)
+    {
+        if (index < EntriesCustom.Count - 1)
+        {
+            (EntriesCustom[index], EntriesCustom[index + 1]) = (EntriesCustom[index + 1], EntriesCustom[index]);
+
+            // Mettre à jour les ordres
+            for (int i = 0; i < EntriesCustom.Count; i++)
+            {
+                EntriesCustom[i].Order = i;
+            }
+
+            await OnTableMatieresChanged();
+        }
+    }
+
+    private async Task ResetEntry(CustomTocEntry entry)
+    {
+        if (!entry.IsManualEntry)
+        {
+            entry.Title = entry.OriginalTitle;
+            entry.IsModified = false;
+            await OnTableMatieresChanged();
+        }
+    }
+
+    private async Task RemoveEntry(int index)
+    {
+        EntriesCustom.RemoveAt(index);
+
+        // Mettre à jour les ordres
+        for (int i = 0; i < EntriesCustom.Count; i++)
+        {
+            EntriesCustom[i].Order = i;
+        }
+
+        await OnTableMatieresChanged();
+    }
+
+    private void AddTocEntryRecursive(TocEntryDto apiEntry, int order, int level)
+    {
+        EntriesCustom.Add(new CustomTocEntry
+        {
+            Title = apiEntry.Title,
+            OriginalTitle = apiEntry.Title,
+            Level = level,
+            PageNumber = apiEntry.PageNumber,
+            Order = order,
+            IsModified = false,
+            IsManualEntry = false
+        });
+    }
+
+    private async Task AddCustomEntry()
+    {
+        EntriesCustom.Add(new CustomTocEntry
+        {
+            Title = "Nouvelle entrée",
+            OriginalTitle = "",
+            Level = 1,
+            PageNumber = 1,
+            Order = EntriesCustom.Count,
+            IsModified = false,
+            IsManualEntry = true
+        });
+
+        await OnTableMatieresChanged();
+    }
+
+    private async Task OnEntryChanged(CustomTocEntry entry)
+    {
+        if (!entry.IsManualEntry && entry.Title != entry.OriginalTitle)
+        {
+            entry.IsModified = true;
+        }
+        await OnTableMatieresChanged();
+    }
+
+    // Classes DTO pour l'API
+    public class TocStructureResponse
+    {
+        public int DocumentId { get; set; }
+        public string DocumentTitle { get; set; } = "";
+        public bool IncludePageGuard { get; set; }
+        public bool IncludeTableOfContents { get; set; }
+        public List<TocEntryDto> Entries { get; set; } = new();
+    }
+
+    public class TocEntryDto
+    {
+        public string Title { get; set; } = "";
+        public int Level { get; set; }
+        public int PageNumber { get; set; }
+        public List<TocEntryDto> Children { get; set; } = new();
+    }
+
     // Classes pour la sérialisation JSON
-    private class TableMatieresSettings
+    public class TableMatieresSettings
     {
         public TableMatieresConfig? TableMatieres { get; set; }
     }
 
-    private class TableMatieresConfig
+    public class TableMatieresConfig
     {
         public string Titre { get; set; } = "Table des matières";
         public bool IncludeNumeroPages { get; set; } = true;
         public bool IncludePageGarde { get; set; } = true;
+        public TocModeGeneration ModeGeneration { get; set; } = TocModeGeneration.Automatique;
+        public bool UseAutoPageNumbers { get; set; } = true;
+        public List<CustomTocEntry> EntriesCustom { get; set; } = new();
+    }
+
+    public class CustomTocEntry
+    {
+        public string Title { get; set; } = "";
+        public int Level { get; set; } = 1;
+        public int PageNumber { get; set; } = 1;
+        public bool IsModified { get; set; } = false;
+        public string OriginalTitle { get; set; } = "";
+        public bool IsManualEntry { get; set; } = false;
+        public int Order { get; set; } = 0;
+    }
+
+    public enum TocModeGeneration
+    {
+        Automatique,
+        Personnalisable
     }
 }
 
@@ -369,11 +692,11 @@
     /* Responsivité pour mobile */
     @@media (max-width: 768px) {
         .toc-page {
-            display: none;
+            font-size: 0.8rem;
         }
 
-        .toc-entry {
-            flex-wrap: wrap;
+        .toc-title {
+            font-size: 1.1rem;
         }
     }
 </style>

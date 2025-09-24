@@ -23,6 +23,7 @@ namespace GenerateurDOE.Services.Implementations
         private readonly IPageGardeTemplateService _pageGardeTemplateService;
         private readonly IHtmlTemplateService _htmlTemplateService;
         private readonly IPdfProgressService _progressService;
+        private readonly IPdfPageCountService _pdfPageCountService;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
@@ -42,6 +43,7 @@ namespace GenerateurDOE.Services.Implementations
             IPageGardeTemplateService pageGardeTemplateService,
             IHtmlTemplateService htmlTemplateService,
             IPdfProgressService progressService,
+            IPdfPageCountService pdfPageCountService,
             IWebHostEnvironment webHostEnvironment)
         {
             _appSettings = appSettings.Value;
@@ -49,6 +51,7 @@ namespace GenerateurDOE.Services.Implementations
             _pageGardeTemplateService = pageGardeTemplateService;
             _htmlTemplateService = htmlTemplateService;
             _progressService = progressService;
+            _pdfPageCountService = pdfPageCountService;
             _webHostEnvironment = webHostEnvironment;
         }
 
@@ -105,7 +108,8 @@ namespace GenerateurDOE.Services.Implementations
         /// <exception cref="Exception">Erreur durant la génération avec tracking dans progressService</exception>
         public async Task<byte[]> GenerateCompletePdfAsync(DocumentGenere document, PdfGenerationOptions? options = null)
         {
-            _loggingService.LogInformation($"Génération PDF complète pour document {document.Id}");
+            _loggingService.LogInformation($"🔥 DÉBOGAGE: Génération PDF complète pour document {document.Id}");
+            _loggingService.LogInformation($"🔥 DÉBOGAGE: IncludeTableMatieres = {document.IncludeTableMatieres}");
 
             try
             {
@@ -710,6 +714,30 @@ namespace GenerateurDOE.Services.Implementations
         /// <returns>Données hiérarchisées de la table des matières avec numéros de page</returns>
         private async Task<TableOfContentsData> BuildTableOfContentsAsync(DocumentGenere document)
         {
+            // Vérifier si le document utilise une table des matières personnalisée
+            var customTocConfig = ExtractCustomTocConfiguration(document);
+            _loggingService.LogInformation($"🔍 Configuration TOC extraite - Document {document.Id}:");
+
+            if (customTocConfig != null)
+            {
+                _loggingService.LogInformation($"  ✅ Configuration trouvée - Mode: {customTocConfig.ModeGeneration}, Entrées: {customTocConfig.EntriesCustom.Count}");
+
+                if (customTocConfig.ModeGeneration == CustomModeGeneration.Personnalisable && customTocConfig.EntriesCustom.Any())
+                {
+                    _loggingService.LogInformation($"  🎯 Utilisation de la table des matières PERSONNALISÉE avec {customTocConfig.EntriesCustom.Count} entrées");
+                    return await BuildCustomTableOfContentsAsync(document, customTocConfig);
+                }
+                else
+                {
+                    _loggingService.LogInformation($"  ⚠️ Mode non personnalisable ou pas d'entrées personnalisées - Utilisation du mode automatique");
+                }
+            }
+            else
+            {
+                _loggingService.LogInformation($"  ❌ Aucune configuration personnalisée trouvée - Utilisation du mode automatique");
+            }
+
+            // Mode automatique (comportement original)
             var tocData = new TableOfContentsData();
             var pageNumber = 1;
 
@@ -764,7 +792,7 @@ namespace GenerateurDOE.Services.Implementations
                 pageNumber += 1; // Une page pour le tableau de synthèse
             }
 
-            // Fiches techniques
+            // Fiches techniques avec calcul précis des pages PDF
             if (document.FTConteneur?.Elements?.Any() == true)
             {
                 var ftEntry = new TocEntry
@@ -773,6 +801,17 @@ namespace GenerateurDOE.Services.Implementations
                     Level = 1,
                     PageNumber = pageNumber
                 };
+
+                // Précharger le cache pour tous les fichiers PDF
+                var pdfPaths = document.FTConteneur.Elements
+                    .Where(e => e.ImportPDF != null)
+                    .Select(e => e.ImportPDF.CheminFichier)
+                    .ToList();
+
+                if (pdfPaths.Any())
+                {
+                    await _pdfPageCountService.PreloadCacheAsync(pdfPaths);
+                }
 
                 foreach (var element in document.FTConteneur.Elements.OrderBy(e => e.Ordre))
                 {
@@ -783,7 +822,23 @@ namespace GenerateurDOE.Services.Implementations
                         Level = 2,
                         PageNumber = pageNumber
                     });
-                    pageNumber += 1; // Estimation
+
+                    // Calculer le nombre exact de pages pour ce PDF
+                    var pdfPageCount = 1; // Par défaut
+                    if (element.ImportPDF != null)
+                    {
+                        var count = await _pdfPageCountService.GetPageCountAsync(element.ImportPDF.CheminFichier);
+                        pdfPageCount = count ?? 1; // Si erreur, estimation à 1 page
+
+                        // Mettre à jour la base de données si nécessaire
+                        if (count.HasValue && element.ImportPDF.PageCount != count.Value)
+                        {
+                            element.ImportPDF.PageCount = count.Value;
+                            // La sauvegarde sera gérée par le service appelant
+                        }
+                    }
+
+                    pageNumber += pdfPageCount;
                 }
 
                 tocData.Entries.Add(ftEntry);
@@ -930,6 +985,140 @@ namespace GenerateurDOE.Services.Implementations
         }
 
         /// <summary>
+        /// Extrait la configuration personnalisée de la table des matières depuis les paramètres JSON
+        /// </summary>
+        private CustomTableMatieresConfig? ExtractCustomTocConfiguration(DocumentGenere document)
+        {
+            try
+            {
+                _loggingService.LogInformation($"🔍 ExtractCustomTocConfiguration - Document {document.Id}");
+
+                if (string.IsNullOrWhiteSpace(document.Parametres))
+                {
+                    _loggingService.LogInformation($"  ❌ Parametres vide ou null");
+                    return null;
+                }
+
+                _loggingService.LogInformation($"  📋 Parametres JSON (premières 200 char): {document.Parametres.Substring(0, Math.Min(200, document.Parametres.Length))}...");
+
+                var settings = JsonSerializer.Deserialize<JsonElement>(document.Parametres);
+
+                if (settings.TryGetProperty("TableMatieres", out var tableMatieres))
+                {
+                    _loggingService.LogInformation($"  ✅ Section TableMatieres trouvée dans JSON");
+
+                    var config = new CustomTableMatieresConfig();
+
+                    if (tableMatieres.TryGetProperty("ModeGeneration", out var mode))
+                    {
+                        try
+                        {
+                            // Gérer les deux cas : valeur numérique ou chaîne
+                            if (mode.ValueKind == JsonValueKind.Number)
+                            {
+                                var modeInt = mode.GetInt32();
+                                _loggingService.LogInformation($"  🔧 ModeGeneration trouvé (nombre): {modeInt}");
+                                config.ModeGeneration = (CustomModeGeneration)modeInt;
+                                _loggingService.LogInformation($"  ✅ ModeGeneration parsé depuis nombre: {config.ModeGeneration}");
+                            }
+                            else if (mode.ValueKind == JsonValueKind.String)
+                            {
+                                var modeString = mode.GetString();
+                                _loggingService.LogInformation($"  🔧 ModeGeneration trouvé (chaîne): {modeString}");
+                                if (Enum.TryParse<CustomModeGeneration>(modeString, out var modeEnum))
+                                {
+                                    config.ModeGeneration = modeEnum;
+                                    _loggingService.LogInformation($"  ✅ ModeGeneration parsé depuis chaîne: {modeEnum}");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogError($"  ❌ Erreur parsing ModeGeneration: {ex.Message}");
+                        }
+                    }
+
+                    if (tableMatieres.TryGetProperty("UseAutoPageNumbers", out var useAuto))
+                    {
+                        config.UseAutoPageNumbers = useAuto.GetBoolean();
+                        _loggingService.LogInformation($"  🔧 UseAutoPageNumbers: {config.UseAutoPageNumbers}");
+                    }
+
+                    if (tableMatieres.TryGetProperty("EntriesCustom", out var entries))
+                    {
+                        var entriesJson = entries.GetRawText();
+                        _loggingService.LogInformation($"  📋 EntriesCustom JSON: {entriesJson}");
+
+                        config.EntriesCustom = JsonSerializer.Deserialize<List<CustomTocEntry>>(entriesJson) ?? new();
+                        _loggingService.LogInformation($"  ✅ {config.EntriesCustom.Count} entrées personnalisées trouvées");
+                    }
+
+                    return config;
+                }
+                else
+                {
+                    _loggingService.LogInformation($"  ❌ Section TableMatieres non trouvée dans JSON");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError(ex, $"  🔥 Erreur lors de l'extraction de la configuration TOC personnalisée: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Construit une table des matières personnalisée basée sur la configuration utilisateur
+        /// </summary>
+        private async Task<TableOfContentsData> BuildCustomTableOfContentsAsync(DocumentGenere document, CustomTableMatieresConfig config)
+        {
+            var tocData = new TableOfContentsData();
+
+            // Trier les entrées personnalisées par ordre
+            var sortedEntries = config.EntriesCustom.OrderBy(e => e.Order).ToList();
+
+            // Si les numéros de pages sont automatiques, les recalculer
+            if (config.UseAutoPageNumbers)
+            {
+                var pageNumber = 1;
+
+                // Page de garde
+                if (document.IncludePageDeGarde)
+                    pageNumber++;
+
+                // Table des matières elle-même
+                pageNumber++;
+
+                // Recalculer les numéros de pages pour chaque entrée
+                foreach (var entry in sortedEntries)
+                {
+                    entry.PageNumber = pageNumber;
+                    pageNumber += 1; // Estimation simple : 1 page par entrée
+                }
+            }
+
+            // Convertir les entrées personnalisées vers le format TocEntry
+            foreach (var customEntry in sortedEntries)
+            {
+                var tocEntry = new TocEntry
+                {
+                    Title = customEntry.Title,
+                    Level = customEntry.Level,
+                    PageNumber = customEntry.PageNumber
+                };
+
+                tocData.Entries.Add(tocEntry);
+            }
+
+            // Table des matières personnalisée générée avec {Count} entrées pour le document {DocumentId}
+            // tocData.Entries.Count, document.Id
+
+            await Task.CompletedTask;
+            return tocData;
+        }
+
+        /// <summary>
         /// Libère les ressources utilisées par le service (navigateur Chromium et semaphore)
         /// Implémentation de IDisposable pour nettoyage automatique
         /// </summary>
@@ -938,5 +1127,38 @@ namespace GenerateurDOE.Services.Implementations
             _browser?.Dispose();
             _browserSemaphore?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Configuration pour la table des matières personnalisée
+    /// </summary>
+    public class CustomTableMatieresConfig
+    {
+        public CustomModeGeneration ModeGeneration { get; set; } = CustomModeGeneration.Automatique;
+        public bool UseAutoPageNumbers { get; set; } = true;
+        public List<CustomTocEntry> EntriesCustom { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Mode de génération de la table des matières
+    /// </summary>
+    public enum CustomModeGeneration
+    {
+        Automatique,
+        Personnalisable
+    }
+
+    /// <summary>
+    /// Entrée personnalisée pour la table des matières
+    /// </summary>
+    public class CustomTocEntry
+    {
+        public string Title { get; set; } = "";
+        public int Level { get; set; } = 1;
+        public int PageNumber { get; set; } = 1;
+        public bool IsModified { get; set; } = false;
+        public string OriginalTitle { get; set; } = "";
+        public bool IsManualEntry { get; set; } = false;
+        public int Order { get; set; } = 0;
     }
 }

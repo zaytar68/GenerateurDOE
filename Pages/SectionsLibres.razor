@@ -121,14 +121,14 @@
                                                     <div class="d-flex align-items-center">
                                                         <span class="badge bg-primary me-2">@(section.Ordre)</span>
                                                         <div class="btn-group btn-group-sm" role="group">
-                                                            <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                                                    @onclick="() => DeplacerSection(section, true)" 
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                                    @onclick="() => DeplacerSection(section, true)"
                                                                     disabled="@(section.Ordre == 1)"
                                                                     title="Monter">
                                                                 <span class="oi oi-arrow-top"></span>
                                                             </button>
-                                                            <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                                                    @onclick="() => DeplacerSection(section, false)" 
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                                    @onclick="() => DeplacerSection(section, false)"
                                                                     disabled="@(section.Ordre == sections.Count)"
                                                                     title="Descendre">
                                                                 <span class="oi oi-arrow-bottom"></span>

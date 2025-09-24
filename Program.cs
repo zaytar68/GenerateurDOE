@@ -82,6 +82,7 @@ builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();
 builder.Services.AddScoped<IHtmlTemplateService, HtmlTemplateService>();
 builder.Services.AddScoped<IPdfProgressService, PdfProgressService>();
 builder.Services.AddScoped<IPdfProgressDialogService, PdfProgressDialogService>();
+builder.Services.AddScoped<IPdfPageCountService, PdfPageCountService>();
 
 // Template management services
 builder.Services.AddScoped<IPageGardeTemplateService, PageGardeTemplateService>();

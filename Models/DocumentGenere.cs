@@ -32,7 +32,7 @@ public class DocumentGenere
     [StringLength(500, ErrorMessage = "Le chemin du fichier ne peut pas dépasser 500 caractères")]
     public string CheminFichier { get; set; } = string.Empty;
     
-    [StringLength(2000, ErrorMessage = "Les paramètres ne peuvent pas dépasser 2000 caractères")]
+    [StringLength(10000, ErrorMessage = "Les paramètres ne peuvent pas dépasser 10000 caractères")]
     public string Parametres { get; set; } = string.Empty;
     
     public DateTime DateCreation { get; set; } = DateTime.Now;

@@ -20,7 +20,12 @@ public class ImportPDF
     public long TailleFichier { get; set; }
     
     public DateTime DateImport { get; set; } = DateTime.Now;
-    
+
+    /// <summary>
+    /// Nombre de pages dans le fichier PDF (mis en cache pour optimisation)
+    /// </summary>
+    public int? PageCount { get; set; }
+
     [Required]
     public int FicheTechniqueId { get; set; }
     public virtual FicheTechnique FicheTechnique { get; set; } = null!;
