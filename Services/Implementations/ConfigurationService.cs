@@ -60,6 +60,19 @@ public class ConfigurationService : IConfigurationService
                             writer.WriteString("RepertoireStockageImages", appSettings.RepertoireStockageImages);
                             writer.WriteString("NomSociete", appSettings.NomSociete);
                             writer.WriteString("TailleMaxFichierPDF", appSettings.TailleMaxFichierPDF);
+
+                            // Sauvegarde des styles PDF
+                            writer.WritePropertyName("StylesPDF");
+                            writer.WriteStartObject();
+                            writer.WriteNumber("FontSizeScale", appSettings.StylesPDF.FontSizeScale);
+                            writer.WriteString("TitleColor", appSettings.StylesPDF.TitleColor);
+                            writer.WriteString("SubtitleColor", appSettings.StylesPDF.SubtitleColor);
+                            writer.WriteString("TextColor", appSettings.StylesPDF.TextColor);
+                            writer.WriteString("BorderColor", appSettings.StylesPDF.BorderColor);
+                            writer.WriteNumber("LineHeight", appSettings.StylesPDF.LineHeight);
+                            writer.WriteString("TemplatePredefini", appSettings.StylesPDF.TemplatePredefini);
+                            writer.WriteEndObject();
+
                             writer.WriteEndObject();
                         }
                         else

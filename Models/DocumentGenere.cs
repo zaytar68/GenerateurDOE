@@ -20,10 +20,10 @@ public class DocumentGenere
     public TypeDocumentGenere TypeDocument { get; set; }
     
     /// <summary>
-    /// Format d'export du document (PDF, HTML, Markdown, Word)
+    /// Format d'export du document (fixé à PDF uniquement)
     /// </summary>
     [Required(ErrorMessage = "Le format d'export est requis")]
-    public FormatExport FormatExport { get; set; }
+    public FormatExport FormatExport { get; set; } = FormatExport.PDF;
     
     [Required(ErrorMessage = "Le nom du fichier est requis")]
     [StringLength(255, ErrorMessage = "Le nom du fichier ne peut pas dépasser 255 caractères")]

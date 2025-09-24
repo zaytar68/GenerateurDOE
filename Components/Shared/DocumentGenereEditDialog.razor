@@ -20,15 +20,12 @@
             <ValidationMessage For="() => DocumentGenere.TypeDocument" class="text-danger" />
         </div>
         <div class="col-md-6">
-            <label for="formatExport" class="form-label">Format d'Export *</label>
-            <InputSelect @bind-Value="DocumentGenere.FormatExport" class="form-select" id="formatExport">
-                <option value="">-- Sélectionner un format --</option>
-                @foreach (var format in Enum.GetValues<FormatExport>())
-                {
-                    <option value="@format">@format</option>
-                }
-            </InputSelect>
-            <ValidationMessage For="() => DocumentGenere.FormatExport" class="text-danger" />
+            <label class="form-label">Format d'Export</label>
+            <div class="form-control-plaintext bg-light border rounded px-3 py-2">
+                <i class="fas fa-file-pdf text-danger me-2"></i>
+                <strong>PDF</strong>
+                <small class="text-muted ms-2">(Format unique)</small>
+            </div>
         </div>
     </div>
 
@@ -190,8 +187,6 @@
         if (DocumentGenere.TypeDocument == default)
             errors.Add("Le type de document est requis");
 
-        if (DocumentGenere.FormatExport == default)
-            errors.Add("Le format d'export est requis");
 
         if (string.IsNullOrWhiteSpace(DocumentGenere.NomFichier))
             errors.Add("Le nom du fichier est requis");

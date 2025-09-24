@@ -25,23 +25,6 @@
                     <div class="invalid-feedback">Le type de document est requis</div>
                 }
             </div>
-            <div class="col-md-6">
-                <label for="formatExport" class="form-label">Format d'Export *</label>
-                <select class="form-select @(FormatExportError ? "is-invalid" : "")"
-                        id="formatExport"
-                        value="@SelectedFormatExportString"
-                        @onchange="OnFormatExportChanged">
-                    <option value="">-- Sélectionner un format --</option>
-                    @foreach (var format in Enum.GetValues<FormatExport>())
-                    {
-                        <option value="@format.ToString()">@format.ToString()</option>
-                    }
-                </select>
-                @if (FormatExportError)
-                {
-                    <div class="invalid-feedback">Le format d'export est requis</div>
-                }
-            </div>
         </div>
 
         <div class="row mb-3">
@@ -162,35 +145,18 @@ else
     /// </summary>
     [Parameter] public EventCallback<string> SelectedTypeDocumentStringChanged { get; set; }
 
-    /// <summary>
-    /// Valeur sélectionnée pour le format d'export
-    /// </summary>
-    [Parameter] public string SelectedFormatExportString { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Callback pour le changement de format d'export
-    /// </summary>
-    [Parameter] public EventCallback<string> SelectedFormatExportStringChanged { get; set; }
 
     /// <summary>
     /// Indique une erreur de validation sur le type de document
     /// </summary>
     [Parameter] public bool TypeDocumentError { get; set; }
 
-    /// <summary>
-    /// Indique une erreur de validation sur le format d'export
-    /// </summary>
-    [Parameter] public bool FormatExportError { get; set; }
 
     /// <summary>
     /// Callback pour le changement de type de document
     /// </summary>
     [Parameter] public EventCallback OnTypeDocumentChanged { get; set; }
 
-    /// <summary>
-    /// Callback pour le changement de format d'export
-    /// </summary>
-    [Parameter] public EventCallback OnFormatExportChanged { get; set; }
 
     /// <summary>
     /// Callback pour l'édition du template de page de garde

@@ -299,8 +299,9 @@ namespace GenerateurDOE.Services.Implementations
         /// </summary>
         /// <param name="sectionConteneur">Conteneur avec sections ordonnées</param>
         /// <param name="template">Template de style pour personnaliser l'apparence</param>
+        /// <param name="stylesConfig">Configuration personnalisée des styles PDF (optionnel)</param>
         /// <returns>HTML formaté avec styles CSS pour impression PDF optimisée</returns>
-        public async Task<string> GenerateSectionLibreHtmlAsync(SectionConteneur sectionConteneur, SectionTemplate? template = null)
+        public async Task<string> GenerateSectionLibreHtmlAsync(SectionConteneur sectionConteneur, SectionTemplate? template = null, PdfStylesConfig? stylesConfig = null)
         {
             template ??= new SectionTemplate();
 

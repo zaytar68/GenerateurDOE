@@ -20,7 +20,7 @@ namespace GenerateurDOE.Services.Implementations
     /// </summary>
     public class PdfGenerationService : IPdfGenerationService, IDisposable
     {
-        private readonly AppSettings _appSettings;
+        private readonly IConfigurationService _configurationService;
         private readonly ILoggingService _loggingService;
         private readonly IPageGardeTemplateService _pageGardeTemplateService;
         private readonly IHtmlTemplateService _htmlTemplateService;
@@ -41,7 +41,7 @@ namespace GenerateurDOE.Services.Implementations
         /// <param name="progressService">Service de suivi de progression PDF en temps réel</param>
         /// <param name="webHostEnvironment">Environnement d'hébergement pour accès aux ressources</param>
         public PdfGenerationService(
-            IOptions<AppSettings> appSettings,
+            IConfigurationService configurationService,
             ILoggingService loggingService,
             IPageGardeTemplateService pageGardeTemplateService,
             IHtmlTemplateService htmlTemplateService,
@@ -50,7 +50,7 @@ namespace GenerateurDOE.Services.Implementations
             IWebHostEnvironment webHostEnvironment,
             IHttpContextAccessor httpContextAccessor)
         {
-            _appSettings = appSettings.Value;
+            _configurationService = configurationService;
             _loggingService = loggingService;
             _pageGardeTemplateService = pageGardeTemplateService;
             _htmlTemplateService = htmlTemplateService;
@@ -136,6 +136,9 @@ namespace GenerateurDOE.Services.Implementations
         {
             _loggingService.LogInformation($"🔥 DÉBOGAGE: Génération PDF complète pour document {document.Id}");
             _loggingService.LogInformation($"🔥 DÉBOGAGE: IncludeTableMatieres = {document.IncludeTableMatieres}");
+
+            // Récupérer les paramètres actuels de configuration
+            var appSettings = await _configurationService.GetAppSettingsAsync();
 
             try
             {
@@ -237,7 +240,7 @@ namespace GenerateurDOE.Services.Implementations
                     CompressImages = true,
                     EmbedFonts = true,
                     Title = $"{GetTypeDocumentLabel(document.TypeDocument)} - {document.Chantier?.NomProjet}",
-                    Author = _appSettings.NomSociete,
+                    Author = appSettings.NomSociete,
                     Subject = GetTypeDocumentLabel(document.TypeDocument),
                     Keywords = "DOE, Technique, Construction"
                 };
@@ -269,6 +272,7 @@ namespace GenerateurDOE.Services.Implementations
         public async Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent, PdfGenerationOptions? options = null)
         {
             options ??= new PdfGenerationOptions();
+            var appSettings = await _configurationService.GetAppSettingsAsync();
             var browser = await GetBrowserAsync();
             
             using var page = await browser.NewPageAsync();
@@ -292,7 +296,7 @@ namespace GenerateurDOE.Services.Implementations
             {
                 Format = PaperFormat.A4,
                 DisplayHeaderFooter = options.DisplayHeaderFooter,
-                HeaderTemplate = options.HeaderTemplate ?? GetDefaultHeaderTemplate(),
+                HeaderTemplate = options.HeaderTemplate ?? GetDefaultHeaderTemplate(appSettings),
                 FooterTemplate = options.FooterTemplate ?? GetDefaultFooterTemplate(),
                 PrintBackground = options.PrintBackground,
                 MarginOptions = new MarginOptions
@@ -318,10 +322,11 @@ namespace GenerateurDOE.Services.Implementations
         public async Task<byte[]> AssemblePdfsAsync(IEnumerable<byte[]> pdfBytesList, PdfAssemblyOptions? options = null)
         {
             options ??= new PdfAssemblyOptions();
-            
+            var appSettings = await _configurationService.GetAppSettingsAsync();
+
             using var outputDocument = new PdfDocument();
             outputDocument.Info.Title = "Document Assemblé";
-            outputDocument.Info.Author = _appSettings.NomSociete;
+            outputDocument.Info.Author = appSettings.NomSociete;
             outputDocument.Info.CreationDate = DateTime.Now;
             
             var pageCounter = 0;
@@ -444,6 +449,7 @@ namespace GenerateurDOE.Services.Implementations
         private async Task<string> GetDefaultPageGardeHtmlAsync(DocumentGenere document, string typeDocument)
         {
             _loggingService.LogInformation("Génération page de garde avec template par défaut intégré (sans gestion logo automatique)");
+            var appSettings = await _configurationService.GetAppSettingsAsync();
 
             return $@"
             <!DOCTYPE html>
@@ -535,7 +541,7 @@ namespace GenerateurDOE.Services.Implementations
 
                 <div class='company-info'>
                     <div style='display: flex; align-items: center; justify-content: center; margin-bottom: 15px;'>
-                        <strong>{_appSettings.NomSociete}</strong>
+                        <strong>{appSettings.NomSociete}</strong>
                     </div>
                 </div>
 
@@ -556,7 +562,8 @@ namespace GenerateurDOE.Services.Implementations
             try
             {
                 // Utiliser le répertoire d'images configuré
-                var imagesDirectory = _appSettings.RepertoireStockageImages;
+                var appSettings = await _configurationService.GetAppSettingsAsync();
+                var imagesDirectory = appSettings.RepertoireStockageImages;
                 _loggingService.LogInformation($"Recherche de logo dans le répertoire configuré : {imagesDirectory}");
 
                 if (Directory.Exists(imagesDirectory))
@@ -906,13 +913,14 @@ namespace GenerateurDOE.Services.Implementations
         }
 
         /// <summary>
-        /// Construit le HTML d'un conteneur de sections libres avec styles CSS professionnels
-        /// Inclut le titre du conteneur et le contenu HTML de chaque section ordonnée
+        /// Construit le HTML d'un conteneur de sections libres avec styles CSS professionnels centralisés
+        /// Utilise la configuration des styles PDF de l'utilisateur pour personnaliser l'apparence
         /// </summary>
         /// <param name="container">Conteneur de sections avec ses éléments ordonnés</param>
-        /// <returns>HTML complet du conteneur avec styles intégrés</returns>
+        /// <returns>HTML complet du conteneur avec styles configurables</returns>
         private async Task<string> BuildSectionHtmlAsync(SectionConteneur container)
         {
+            var appSettings = await _configurationService.GetAppSettingsAsync();
             var html = new StringBuilder();
             html.AppendLine($@"
             <!DOCTYPE html>
@@ -920,30 +928,7 @@ namespace GenerateurDOE.Services.Implementations
             <head>
                 <meta charset='UTF-8'>
                 <style>
-                    body {{ 
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        margin: 40px;
-                        line-height: 1.6;
-                        color: #333;
-                    }}
-                    h1 {{ 
-                        color: #2c3e50;
-                        border-bottom: 2px solid #3498db;
-                        padding-bottom: 10px;
-                        margin-bottom: 30px;
-                    }}
-                    h2 {{ color: #34495e; margin-top: 30px; }}
-                    .section {{ margin-bottom: 40px; }}
-                    .section-title {{ 
-                        font-size: 1.3em;
-                        font-weight: 600;
-                        color: #2980b9;
-                        margin-bottom: 15px;
-                    }}
-                    img {{ max-width: 100%; height: auto; margin: 15px 0; }}
-                    table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-                    th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
-                    th {{ background-color: #f8f9fa; }}
+                    {CssStylesHelper.GetSectionLibreCSS(appSettings.StylesPDF)}
                 </style>
             </head>
             <body>
@@ -1007,11 +992,11 @@ namespace GenerateurDOE.Services.Implementations
         /// Affiche le nom de la société centré avec style minimal
         /// </summary>
         /// <returns>Template HTML pour l'en-tête avec styles inline</returns>
-        private string GetDefaultHeaderTemplate()
+        private string GetDefaultHeaderTemplate(AppSettings appSettings)
         {
             return $@"
             <div style='font-size: 10px; width: 100%; text-align: center; color: #666; margin-top: 10px;'>
-                {_appSettings.NomSociete}
+                {appSettings.NomSociete}
             </div>";
         }
 

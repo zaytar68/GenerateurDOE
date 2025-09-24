@@ -420,6 +420,66 @@
                         </div>
                     </div>
 
+                    <!-- Section Styles PDF - Interface temporairement désactivée -->
+                    <div class="mt-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <span class="oi oi-brush" aria-hidden="true"></span>
+                                    Configuration des styles PDF
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="alert alert-success">
+                                    <strong>✅ Fonctionnalité active !</strong><br>
+                                    Les sections HTML sont maintenant générées avec <strong>@((int)(appSettings.StylesPDF.FontSizeScale * 100))%</strong> de leur taille originale.
+                                    <br><small>Taille de base : @(appSettings.StylesPDF.GetBaseFontSize())px</small>
+                                </p>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Échelle des polices</label>
+                                        <input type="range" class="form-range"
+                                               value="@appSettings.StylesPDF.FontSizeScale.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)"
+                                               @oninput="OnFontScaleInput"
+                                               @onchange="OnFontScaleChange"
+                                               min="0.5" max="1.5" step="0.1">
+                                        <div class="form-text">
+                                            <strong>@((int)(appSettings.StylesPDF.FontSizeScale * 100))%</strong>
+                                            - Taille de base : @(appSettings.StylesPDF.GetBaseFontSize().ToString("F1"))px
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                Templates prédéfinis :
+                                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="SetTemplateCompact">Compact (70%)</button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="SetTemplateNormal">Normal (80%)</button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="SetTemplateLarge">Large (120%)</button>
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Couleurs des styles</label>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <label class="form-label small">Titre</label>
+                                                <input type="color" class="form-control form-control-color"
+                                                       @bind="appSettings.StylesPDF.TitleColor" @bind:event="onchange">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Sous-titre</label>
+                                                <input type="color" class="form-control form-control-color"
+                                                       @bind="appSettings.StylesPDF.SubtitleColor" @bind:event="onchange">
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-primary" @onclick="SaveConfiguration">
+                                                <i class="oi oi-check"></i> Sauvegarder les styles
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                 </div>
 
@@ -1030,5 +1090,60 @@
                 isSuccess = false;
             }
         }
+    }
+
+    // Méthodes pour gestion des styles PDF
+    private void OnFontScaleInput(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float value))
+        {
+            appSettings.StylesPDF.FontSizeScale = value;
+            StateHasChanged(); // Force la mise à jour de l'interface
+        }
+    }
+
+    private void OnFontScaleChange(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float value))
+        {
+            appSettings.StylesPDF.FontSizeScale = value;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetTemplate(string templateName)
+    {
+        try
+        {
+            var template = GenerateurDOE.Services.Shared.CssStylesHelper.GetTemplatePredefini(templateName);
+            appSettings.StylesPDF = template;
+            StateHasChanged();
+
+            statusMessage = $"Template '{templateName}' appliqué avec succès !";
+            isSuccess = true;
+
+            // Auto-sauvegarde du template
+            await SaveConfiguration();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de l'application du template : {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task SetTemplateCompact()
+    {
+        await SetTemplate("Compact");
+    }
+
+    private async Task SetTemplateNormal()
+    {
+        await SetTemplate("Normal");
+    }
+
+    private async Task SetTemplateLarge()
+    {
+        await SetTemplate("Large");
     }
 }

@@ -17,7 +17,7 @@ namespace GenerateurDOE.Services.Interfaces
         /// <summary>
         /// Génère le HTML pour une section libre
         /// </summary>
-        Task<string> GenerateSectionLibreHtmlAsync(SectionConteneur sectionConteneur, SectionTemplate? template = null);
+        Task<string> GenerateSectionLibreHtmlAsync(SectionConteneur sectionConteneur, SectionTemplate? template = null, PdfStylesConfig? stylesConfig = null);
 
         /// <summary>
         /// Génère le HTML pour un conteneur de fiches techniques

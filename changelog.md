@@ -22,6 +22,9 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **ImportPDF modèle** : Ajout propriété PageCount pour cache des nombres de pages
 
 ### Corrigé
+- **🔥 Bug critique styles PDF** : Les réglages de styles PDF ne sont plus pris en compte lors de la génération (PdfGenerationService.cs:16-31)
+- **Architecture injection de dépendances** : Migration `IOptions<AppSettings>` (valeurs figées) → `IConfigurationService` (valeurs dynamiques)
+- **Synchronisation configuration** : 6 méthodes mises à jour pour récupérer les paramètres actuels à chaque génération PDF
 - **🔥 Bug critique TOC personnalisées** : Correction erreur `JsonElementWrongTypeException` dans ExtractCustomTocConfiguration (PdfGenerationService.cs:1014)
 - **Ambiguïtés de classes** : Suppression des définitions dupliquées dans IPdfGenerationService.cs
 - **Using statements manquants** : Ajout GenerateurDOE.Models dans Controllers et Services

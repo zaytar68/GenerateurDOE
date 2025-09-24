@@ -59,9 +59,7 @@ public partial class DocumentEdit : ComponentBase
     private bool isLoadingData = false;
 
     private string selectedTypeDocumentString = string.Empty;
-    private string selectedFormatExportString = string.Empty;
     private bool typeDocumentError = false;
-    private bool formatExportError = false;
 
     #endregion
 
@@ -145,7 +143,6 @@ public partial class DocumentEdit : ComponentBase
 
                     // Initialiser les valeurs des select
                     selectedTypeDocumentString = document.TypeDocument.ToString();
-                    selectedFormatExportString = document.FormatExport.ToString();
                 }
             }
             else if (ChantierId.HasValue)
@@ -273,15 +270,11 @@ public partial class DocumentEdit : ComponentBase
 
         // Validation des champs obligatoires avec mise à jour des erreurs visuelles
         typeDocumentError = string.IsNullOrEmpty(selectedTypeDocumentString);
-        formatExportError = string.IsNullOrEmpty(selectedFormatExportString);
 
         var errors = new List<string>();
 
         if (typeDocumentError)
             errors.Add("Le type de document est requis");
-
-        if (formatExportError)
-            errors.Add("Le format d'export est requis");
 
         if (string.IsNullOrWhiteSpace(document.NomFichier))
             errors.Add("Le nom du fichier est requis");
@@ -474,24 +467,6 @@ public partial class DocumentEdit : ComponentBase
         StateHasChanged();
     }
 
-    /// <summary>
-    /// Gestion du changement de format d'export
-    /// </summary>
-    public void OnFormatExportChanged()
-    {
-        formatExportError = string.IsNullOrEmpty(selectedFormatExportString);
-
-        if (!formatExportError && document != null)
-        {
-            if (Enum.TryParse<FormatExport>(selectedFormatExportString, out var formatExport))
-            {
-                document.FormatExport = formatExport;
-            }
-        }
-
-        hasUnsavedChanges = true;
-        StateHasChanged();
-    }
 
     /// <summary>
     /// Gestion des changements dans les sections
