@@ -82,19 +82,17 @@
 
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <RadzenButton Text="Charger la structure par défaut"
-                                      Click="LoadDefaultStructure"
-                                      ButtonStyle="Radzen.ButtonStyle.Secondary"
-                                      Icon="refresh"
-                                      Size="Radzen.ButtonSize.Small"
-                                      Disabled="IsLoadingStructure" />
+                        <button type="button" class="btn btn-outline-info btn-sm"
+                                @onclick="LoadDefaultStructure"
+                                disabled="@IsLoadingStructure">
+                            <i class="oi oi-cloud-download"></i> Charger la structure par défaut
+                        </button>
                     </div>
                     <div class="col-md-6">
-                        <RadzenButton Text="Ajouter une entrée personnalisée"
-                                      Click="AddCustomEntry"
-                                      ButtonStyle="Radzen.ButtonStyle.Primary"
-                                      Icon="add"
-                                      Size="Radzen.ButtonSize.Small" />
+                        <button type="button" class="btn btn-success btn-sm"
+                                @onclick="AddCustomEntry">
+                            <i class="oi oi-plus"></i> Ajouter une entrée personnalisée
+                        </button>
                     </div>
                 </div>
 

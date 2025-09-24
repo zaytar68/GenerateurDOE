@@ -49,13 +49,13 @@
                         <h4 class="mb-0">@chantier.NomProjet</h4>
                         <div>
                             <button class="btn btn-light btn-sm me-2" @onclick="() => ArchiverChantier()">
-                                @(chantier.EstArchive ? "Désarchiver" : "Archiver")
+                                <i class="oi oi-box"></i> @(chantier.EstArchive ? "Désarchiver" : "Archiver")
                             </button>
                             <button class="btn btn-warning btn-sm me-2" @onclick="() => ModifierChantier()">
-                                Modifier
+                                <i class="oi oi-pencil"></i> Modifier
                             </button>
                             <button class="btn btn-danger btn-sm" @onclick="() => SupprimerChantier()">
-                                Supprimer
+                                <i class="oi oi-trash"></i> Supprimer
                             </button>
                         </div>
                     </div>
@@ -141,24 +141,24 @@
                                                     <button class="btn btn-outline-primary btn-sm me-1" 
                                                             @onclick="() => TelechargerDocument(document)"
                                                             title="Télécharger">
-                                                        📥
+                                                        <i class="oi oi-cloud-download"></i>
                                                     </button>
                                                     <button class="btn btn-outline-info btn-sm me-1" 
                                                             @onclick="() => EditerContenuDocument(document)"
                                                             title="Éditer le contenu">
-                                                        📝
+                                                        <i class="oi oi-pencil"></i>
                                                     </button>
                                                     
                                                     <button class="btn btn-outline-info btn-sm me-1"
                                                             @onclick="() => DupliquerDocument(document)"
                                                             title="Dupliquer">
-                                                            📚
+                                                            <i class="oi oi-collapse-right"></i>
                                                     </button>
 
                                                     <button class="btn btn-outline-danger btn-sm" 
                                                             @onclick="() => SupprimerDocument(document)"
                                                             title="Supprimer">
-                                                        🗑️
+                                                        <i class="oi oi-trash"></i>
                                                     </button>
                                                 </td>
                                             </tr>

@@ -104,13 +104,12 @@
     </div>
 
     <div class="modal-actions">
-        <RadzenButton Text="Annuler"
-                     ButtonStyle="ButtonStyle.Light"
-                     Click="OnCancel" />
-        <RadzenButton Text="Dupliquer"
-                     ButtonStyle="ButtonStyle.Primary"
-                     Click="OnConfirm"
-                     Disabled="@isProcessing" />
+        <button type="button" class="btn btn-outline-secondary" @onclick="OnCancel">
+            <i class="oi oi-x"></i> Annuler
+        </button>
+        <button type="button" class="btn btn-primary" @onclick="OnConfirm" disabled="@isProcessing">
+            <i class="oi oi-collapse-right"></i> Dupliquer
+        </button>
     </div>
 </div>
 

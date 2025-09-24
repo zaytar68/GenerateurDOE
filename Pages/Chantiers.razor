@@ -64,20 +64,20 @@
                             {
                                 <span class="badge bg-warning me-2">Archivé</span>
                                 <button class="btn btn-sm btn-outline-light me-1" @onclick="() => UnarchiveChantier(selectedChantier.Id)">
-                                    <i class="fa fa-archive"></i> Désarchiver
+                                    <i class="oi oi-box"></i> Désarchiver
                                 </button>
                             }
                             else
                             {
                                 <button class="btn btn-sm btn-outline-light me-1" @onclick="() => ArchiveChantier(selectedChantier.Id)">
-                                    <i class="fa fa-archive"></i> Archiver
+                                    <i class="oi oi-box"></i> Archiver
                                 </button>
                             }
                             <button class="btn btn-sm btn-outline-light me-1" @onclick="() => ShowEditDialog(selectedChantier)">
-                                <i class="fa fa-edit"></i> Modifier
+                                <i class="oi oi-pencil"></i> Modifier
                             </button>
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteChantier(selectedChantier.Id)">
-                                <i class="fa fa-trash"></i> Supprimer
+                                <i class="oi oi-trash"></i> Supprimer
                             </button>
                         </div>
                     </div>
@@ -181,13 +181,13 @@
                                                         @onclick:stopPropagation="true"
                                                         @onclick="() => SelectChantier(chantier)"
                                                         title="Consulter le chantier">
-                                                    👁️
+                                                    <i class="oi oi-eye"></i>
                                                 </button>
                                                 <button class="btn btn-outline-secondary me-1 px-3" 
                                                         @onclick:stopPropagation="true"
                                                         @onclick="() => ShowEditDialog(chantier)"
                                                         title="Modifier le chantier">
-                                                    ✏️
+                                                    <i class="oi oi-pencil"></i>
                                                 </button>
                                             </td>
                                         </tr>
