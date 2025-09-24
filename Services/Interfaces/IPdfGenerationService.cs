@@ -12,7 +12,7 @@ namespace GenerateurDOE.Services.Interfaces
         /// <summary>
         /// Convertit du contenu HTML en PDF via PuppeteerSharp
         /// </summary>
-        Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent, PdfGenerationOptions? options = null);
+        Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent, PdfGenerationOptions? options = null, DocumentGenere? document = null);
 
         /// <summary>
         /// Assemble plusieurs PDFs en un seul document
@@ -48,6 +48,7 @@ namespace GenerateurDOE.Services.Interfaces
         public string MarginRight { get; set; } = "20mm";
         public int Scale { get; set; } = 1;
         public int WaitForTimeout { get; set; } = 30000;
+        public bool DisableFooterForPostProcessing { get; set; } = false;
     }
 
     public class PdfAssemblyOptions
@@ -56,6 +57,8 @@ namespace GenerateurDOE.Services.Interfaces
         public bool AddPageNumbers { get; set; } = true;
         public string PageNumberFormat { get; set; } = "Page {0} sur {1}";
         public bool OptimizeForPrint { get; set; } = true;
+        public bool EnableFooterPostProcessing { get; set; } = false;
+        public DocumentGenere? DocumentForFooter { get; set; }
     }
 
     public class PdfOptimizationOptions

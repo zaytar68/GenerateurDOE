@@ -148,6 +148,10 @@ namespace GenerateurDOE.Services.Implementations
                 var pdfParts = new List<byte[]>();
                 options ??= new PdfGenerationOptions();
 
+                // Activer le post-processing pour la numérotation globale et les pieds de page uniformes
+                options.DisableFooterForPostProcessing = true;
+                _loggingService.LogInformation("Post-processing activé : Les pieds de page seront ajoutés avec numérotation globale après assembly");
+
                 // 1. Page de garde
                 _progressService.UpdateProgress(document.Id, PdfGenerationStep.PageDeGarde);
                 if (document.IncludePageDeGarde && document.Chantier != null)
@@ -173,7 +177,7 @@ namespace GenerateurDOE.Services.Implementations
                         if (container.Items?.Any() == true)
                         {
                             var htmlContent = await BuildSectionHtmlAsync(container);
-                            var sectionPdf = await ConvertHtmlToPdfAsync(htmlContent, options);
+                            var sectionPdf = await ConvertHtmlToPdfAsync(htmlContent, options, document);
                             pdfParts.Add(sectionPdf);
                         }
                     }
@@ -187,7 +191,7 @@ namespace GenerateurDOE.Services.Implementations
                     _loggingService.LogInformation("Génération du tableau de synthèse des produits");
 
                     var tableauHtml = await _htmlTemplateService.GenerateTableauSyntheseProduits(document.FTConteneur);
-                    var tableauPdf = await ConvertHtmlToPdfAsync(tableauHtml, options);
+                    var tableauPdf = await ConvertHtmlToPdfAsync(tableauHtml, options, document);
                     pdfParts.Add(tableauPdf);
 
                     _loggingService.LogInformation("Tableau de synthèse ajouté avant les fiches techniques");
@@ -223,13 +227,15 @@ namespace GenerateurDOE.Services.Implementations
                     pdfParts.Insert(document.IncludePageDeGarde ? 1 : 0, tocPdf);
                 }
 
-                // 7. Assembly final
+                // 7. Assembly final avec post-processing des pieds de page
                 _progressService.UpdateProgress(document.Id, PdfGenerationStep.AssemblyFinal);
                 var assemblyOptions = new PdfAssemblyOptions
                 {
                     AddBookmarks = true,
-                    AddPageNumbers = true,
-                    OptimizeForPrint = true
+                    AddPageNumbers = false, // Désactivé car géré par post-processing
+                    OptimizeForPrint = true,
+                    EnableFooterPostProcessing = true,
+                    DocumentForFooter = document
                 };
 
                 var finalPdf = await AssemblePdfsAsync(pdfParts, assemblyOptions);
@@ -268,8 +274,9 @@ namespace GenerateurDOE.Services.Implementations
         /// </summary>
         /// <param name="htmlContent">Contenu HTML complet à convertir</param>
         /// <param name="options">Options de mise en page et de rendu</param>
+        /// <param name="document">Document optionnel pour personnaliser le pied de page avec les informations du chantier</param>
         /// <returns>Données binaires du PDF généré</returns>
-        public async Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent, PdfGenerationOptions? options = null)
+        public async Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent, PdfGenerationOptions? options = null, DocumentGenere? document = null)
         {
             options ??= new PdfGenerationOptions();
             var appSettings = await _configurationService.GetAppSettingsAsync();
@@ -292,12 +299,30 @@ namespace GenerateurDOE.Services.Implementations
                 _loggingService.LogInformation("Aucune image détectée ou timeout d'attente atteint");
             }
             
+            // Choisir le template de pied de page approprié (sauf si post-processing activé)
+            string footerTemplate = "";
+            bool displayFooter = options.DisplayHeaderFooter;
+
+            if (options.DisableFooterForPostProcessing)
+            {
+                // Post-processing activé : désactiver les pieds de page PuppeteerSharp
+                displayFooter = false;
+                footerTemplate = "";
+                _loggingService.LogInformation("Pied de page désactivé - sera ajouté en post-processing via PDFSharp");
+            }
+            else
+            {
+                // Comportement normal : utiliser les templates de pied de page
+                footerTemplate = options.FooterTemplate ??
+                    (document != null ? GetDocumentFooterTemplate(document, appSettings) : GetDefaultFooterTemplate());
+            }
+
             var pdfOptions = new PdfOptions
             {
                 Format = PaperFormat.A4,
-                DisplayHeaderFooter = options.DisplayHeaderFooter,
+                DisplayHeaderFooter = displayFooter,
                 HeaderTemplate = options.HeaderTemplate ?? GetDefaultHeaderTemplate(appSettings),
-                FooterTemplate = options.FooterTemplate ?? GetDefaultFooterTemplate(),
+                FooterTemplate = footerTemplate,
                 PrintBackground = options.PrintBackground,
                 MarginOptions = new MarginOptions
                 {
@@ -361,6 +386,14 @@ namespace GenerateurDOE.Services.Implementations
                 {
                     var outline = outputDocument.Outlines.Add(bookmark.title, outputDocument.Pages[bookmark.pageIndex]);
                 }
+            }
+
+            // Post-processing : Ajouter les pieds de page avec numérotation globale si activé
+            if (options.EnableFooterPostProcessing && options.DocumentForFooter != null)
+            {
+                _loggingService.LogInformation("Démarrage du post-processing : Ajout des pieds de page avec numérotation globale");
+                await AddFooterToAllPagesAsync(outputDocument, options.DocumentForFooter, true);
+                _loggingService.LogInformation("Post-processing terminé avec succès");
             }
 
             using var outputStream = new MemoryStream();
@@ -706,7 +739,7 @@ namespace GenerateurDOE.Services.Implementations
 
             html.AppendLine("</body></html>");
 
-            return await ConvertHtmlToPdfAsync(html.ToString(), options);
+            return await ConvertHtmlToPdfAsync(html.ToString(), options, document);
         }
 
         /// <summary>
@@ -1014,6 +1047,25 @@ namespace GenerateurDOE.Services.Implementations
         }
 
         /// <summary>
+        /// Génère le template HTML personnalisé pour le pied de page des PDF avec informations du document
+        /// Affiche le nom du chantier et type de document à gauche, numérotation à droite
+        /// </summary>
+        /// <param name="document">Document contenant les informations du chantier</param>
+        /// <param name="appSettings">Configuration de l'application</param>
+        /// <returns>Template HTML avec informations personnalisées et alignement gauche/droite</returns>
+        private string GetDocumentFooterTemplate(DocumentGenere document, AppSettings appSettings)
+        {
+            var nomChantier = document.Chantier?.NomProjet ?? "Chantier";
+            var typeDocument = GetTypeDocumentLabel(document.TypeDocument);
+
+            return $@"
+            <div style='font-size: 10px; width: 100%; display: flex; justify-content: space-between; align-items: center; color: #666; margin-bottom: 10px; padding: 0 5px;'>
+                <span style='flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{nomChantier} - {typeDocument}</span>
+                <span style='white-space: nowrap; margin-left: 10px;'><span class='pageNumber'></span> / <span class='totalPages'></span></span>
+            </div>";
+        }
+
+        /// <summary>
         /// Convertit le type de document énuméré en libellé lisible pour l'affichage
         /// </summary>
         /// <param name="typeDocument">Type de document énuméré</param>
@@ -1161,6 +1213,84 @@ namespace GenerateurDOE.Services.Implementations
 
             await Task.CompletedTask;
             return tocData;
+        }
+
+        /// <summary>
+        /// Ajoute un pied de page uniforme à toutes les pages d'un document PDF assemblé (post-processing)
+        /// Utilise PDFSharp pour surimpression avec numérotation globale correcte
+        /// </summary>
+        /// <param name="document">Document PDF assemblé à modifier</param>
+        /// <param name="documentGenere">Document source pour informations du pied de page</param>
+        /// <param name="excludePageDeGarde">True pour exclure la page de garde (première page)</param>
+        private async Task AddFooterToAllPagesAsync(PdfDocument document, DocumentGenere documentGenere, bool excludePageDeGarde = true)
+        {
+            var appSettings = await _configurationService.GetAppSettingsAsync();
+            var nomChantier = documentGenere.Chantier?.NomProjet ?? "Chantier";
+            var typeDocument = GetTypeDocumentLabel(documentGenere.TypeDocument);
+            var totalPages = document.PageCount;
+
+            var startPage = excludePageDeGarde ? 1 : 0; // Commencer à la page 2 si on exclut la page de garde
+
+            _loggingService.LogInformation($"Post-processing : Ajout pied de page sur {totalPages - startPage} pages (exclusion page de garde: {excludePageDeGarde})");
+
+            for (int i = startPage; i < totalPages; i++)
+            {
+                var page = document.Pages[i];
+                var pageNumber = i + 1; // Numérotation à partir de 1
+                AddFooterToPage(page, pageNumber, totalPages, nomChantier, typeDocument);
+            }
+
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Ajoute un pied de page à une page individuelle avec PDFSharp Graphics
+        /// Génère le pied de page avec alignement gauche/droite et fond gris clair
+        /// </summary>
+        /// <param name="page">Page PDF à modifier</param>
+        /// <param name="pageNumber">Numéro de la page courante</param>
+        /// <param name="totalPages">Nombre total de pages</param>
+        /// <param name="nomChantier">Nom du chantier</param>
+        /// <param name="typeDocument">Type de document</param>
+        private void AddFooterToPage(PdfPage page, int pageNumber, int totalPages, string nomChantier, string typeDocument)
+        {
+            using var gfx = PdfSharp.Drawing.XGraphics.FromPdfPage(page);
+
+            // Définir les couleurs et styles
+            var font = new PdfSharp.Drawing.XFont("Arial", 8, PdfSharp.Drawing.XFontStyleEx.Regular);
+            var textBrush = new PdfSharp.Drawing.XSolidBrush(PdfSharp.Drawing.XColor.FromArgb(102, 102, 102)); // #666 - texte gris foncé
+            var backgroundBrush = new PdfSharp.Drawing.XSolidBrush(PdfSharp.Drawing.XColor.FromArgb(245, 245, 245)); // #F5F5F5 - fond gris clair
+
+            // Position du pied de page
+            var pageWidth = page.Width;
+            var pageHeight = page.Height;
+            var footerHeight = 16; // Hauteur du rectangle de fond
+            var footerY = pageHeight - 25; // Position Y du rectangle de fond
+            var textY = pageHeight - 16; // Position Y du texte (centré dans le rectangle)
+            var leftMargin = 15; // Marge gauche
+            var rightMargin = 15; // Marge droite
+
+            // Dessiner le fond gris clair
+            var backgroundRect = new PdfSharp.Drawing.XRect(0, footerY, pageWidth, footerHeight);
+            gfx.DrawRectangle(backgroundBrush, backgroundRect);
+
+            // Texte de gauche : Nom chantier + Type document
+            var leftText = $"{nomChantier} - {typeDocument}";
+
+            // Texte de droite : Numérotation
+            var rightText = $"{pageNumber} / {totalPages}";
+
+            // Dessiner le texte de gauche
+            gfx.DrawString(leftText, font, textBrush, leftMargin, textY);
+
+            // Mesurer le texte de droite pour l'aligner à droite
+            var rightTextSize = gfx.MeasureString(rightText, font);
+            var rightX = pageWidth - rightMargin - rightTextSize.Width;
+
+            // Dessiner le texte de droite
+            gfx.DrawString(rightText, font, textBrush, rightX, textY);
+
+            _loggingService.LogInformation($"Pied de page avec fond gris clair ajouté à la page {pageNumber}/{totalPages}: '{leftText}' | '{rightText}'");
         }
 
         /// <summary>
