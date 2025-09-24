@@ -36,6 +36,9 @@ builder.Services.AddServerSideBlazor();
 // Add Controllers for API endpoints
 builder.Services.AddControllers();
 
+// Add HTTP Context Accessor for dynamic URL detection in PdfGenerationService
+builder.Services.AddHttpContextAccessor();
+
 // Add Radzen services
 builder.Services.AddScoped<Radzen.DialogService>();
 builder.Services.AddScoped<Radzen.NotificationService>();

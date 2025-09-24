@@ -2,6 +2,7 @@ using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using GenerateurDOE.Services.Shared;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using PuppeteerSharp;
 using PuppeteerSharp.Media;
@@ -9,6 +10,7 @@ using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace GenerateurDOE.Services.Implementations
 {
@@ -25,6 +27,7 @@ namespace GenerateurDOE.Services.Implementations
         private readonly IPdfProgressService _progressService;
         private readonly IPdfPageCountService _pdfPageCountService;
         private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private IBrowser? _browser;
         private readonly SemaphoreSlim _browserSemaphore = new(1, 1);
 
@@ -44,7 +47,8 @@ namespace GenerateurDOE.Services.Implementations
             IHtmlTemplateService htmlTemplateService,
             IPdfProgressService progressService,
             IPdfPageCountService pdfPageCountService,
-            IWebHostEnvironment webHostEnvironment)
+            IWebHostEnvironment webHostEnvironment,
+            IHttpContextAccessor httpContextAccessor)
         {
             _appSettings = appSettings.Value;
             _loggingService = loggingService;
@@ -53,6 +57,7 @@ namespace GenerateurDOE.Services.Implementations
             _progressService = progressService;
             _pdfPageCountService = pdfPageCountService;
             _webHostEnvironment = webHostEnvironment;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -96,6 +101,27 @@ namespace GenerateurDOE.Services.Implementations
             }
 
             return _browser;
+        }
+
+        /// <summary>
+        /// Obtient l'URL de base dynamique du serveur en cours d'exécution
+        /// Utilise le contexte HTTP pour détecter automatiquement le scheme, host et port
+        /// </summary>
+        /// <returns>URL de base complète (ex: http://localhost:5282)</returns>
+        private string GetBaseUrl()
+        {
+            var request = _httpContextAccessor.HttpContext?.Request;
+            if (request != null)
+            {
+                var baseUrl = $"{request.Scheme}://{request.Host}";
+                _loggingService.LogInformation($"URL de base détectée dynamiquement : {baseUrl}");
+                return baseUrl;
+            }
+
+            // Fallback si pas de contexte HTTP disponible
+            var fallbackUrl = "http://localhost:5282";
+            _loggingService.LogWarning($"Aucun contexte HTTP disponible, utilisation du fallback : {fallbackUrl}");
+            return fallbackUrl;
         }
 
         /// <summary>
@@ -554,9 +580,9 @@ namespace GenerateurDOE.Services.Implementations
                                 var fileName = Path.GetFileName(logoPath);
                                 _loggingService.LogInformation($"Logo trouvé : {fileName}");
 
-                                // Construire l'URL vers l'API d'images
-                                var logoUrl = $"http://localhost:5283/api/images/{fileName}";
-                                _loggingService.LogInformation($"URL logo générée : {logoUrl}");
+                                // Construire l'URL vers l'API d'images avec détection automatique du port
+                                var logoUrl = $"{GetBaseUrl()}/api/images/{fileName}";
+                                _loggingService.LogInformation($"URL logo générée dynamiquement : {logoUrl}");
                                 return logoUrl;
                             }
                         }
@@ -573,8 +599,8 @@ namespace GenerateurDOE.Services.Implementations
                 var faviconPath = Path.Combine(_webHostEnvironment.WebRootPath, "favicon-32x32.png");
                 if (File.Exists(faviconPath))
                 {
-                    var faviconUrl = "http://localhost:5283/favicon-32x32.png";
-                    _loggingService.LogInformation($"Fallback vers favicon : {faviconUrl}");
+                    var faviconUrl = $"{GetBaseUrl()}/favicon-32x32.png";
+                    _loggingService.LogInformation($"Fallback vers favicon avec URL dynamique : {faviconUrl}");
                     return faviconUrl;
                 }
 
@@ -849,6 +875,37 @@ namespace GenerateurDOE.Services.Implementations
         }
 
         /// <summary>
+        /// Convertit les URLs relatives des images en URLs absolues dans le contenu HTML
+        /// Transforme src="/images/nom.jpg" en src="http://localhost:5283/images/nom.jpg"
+        /// </summary>
+        /// <param name="htmlContent">Contenu HTML contenant potentiellement des images</param>
+        /// <returns>HTML avec URLs d'images converties en absolues</returns>
+        private string ConvertRelativeImagesToAbsolute(string htmlContent)
+        {
+            if (string.IsNullOrWhiteSpace(htmlContent))
+                return htmlContent;
+
+            var baseUrl = GetBaseUrl();
+            var pattern = @"src\s*=\s*[""']/images/([^""']+)[""']";
+            var replacement = $"src=\"{baseUrl}/images/$1\"";
+
+            var convertedHtml = Regex.Replace(htmlContent, pattern, replacement, RegexOptions.IgnoreCase);
+
+            // Log pour diagnostic
+            var matches = Regex.Matches(htmlContent, pattern, RegexOptions.IgnoreCase);
+            if (matches.Count > 0)
+            {
+                _loggingService.LogInformation($"Conversion de {matches.Count} URLs d'images relatives vers URLs absolues avec base {baseUrl}");
+                foreach (Match match in matches)
+                {
+                    _loggingService.LogInformation($"  Image convertie : /images/{match.Groups[1].Value} → {baseUrl}/images/{match.Groups[1].Value}");
+                }
+            }
+
+            return convertedHtml;
+        }
+
+        /// <summary>
         /// Construit le HTML d'un conteneur de sections libres avec styles CSS professionnels
         /// Inclut le titre du conteneur et le contenu HTML de chaque section ordonnée
         /// </summary>
@@ -896,10 +953,13 @@ namespace GenerateurDOE.Services.Implementations
             {
                 foreach (var section in container.Items.OrderBy(sl => sl.Ordre))
                 {
+                    // Convertir les URLs relatives des images en URLs absolues
+                    var convertedContent = ConvertRelativeImagesToAbsolute(section.SectionLibre.ContenuHtml);
+
                     html.AppendLine($@"
                     <div class='section'>
                         <div class='section-title'>{section.SectionLibre.Titre}</div>
-                        <div class='section-content'>{section.SectionLibre.ContenuHtml}</div>
+                        <div class='section-content'>{convertedContent}</div>
                     </div>");
                 }
             }

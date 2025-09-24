@@ -8,14 +8,39 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Non publié]
 
 ### Ajouté
+- **Service de comptage de pages PDF** : PdfPageCountService avec cache intelligent et persistence base de données
+- **API Table des matières** : TableOfContentsController pour récupération dynamique de la structure TOC
+- **Interface TOC personnalisable** : Mode automatique/personnalisable dans TableMatieresEditor avec drag & drop des entrées
+- **Logs de débogage avancés** : Traçabilité complète du processus de génération PDF et extraction configuration TOC
+- **Extension base de données** : Colonne Parametres étendue de 2000 à 10000 caractères pour configurations complexes
 - Documentation XML complète pour tous les services et modèles
 - Commentaires IntelliSense pour améliorer l'expérience développeur
 
+### Modifié
+- **Architecture TOC consolidée** : Classes TableOfContentsData/TocEntry/CustomTocEntry unifiées dans Models/TableOfContentsModels.cs
+- **Gestion des enums JSON** : Support polymorphe Number/String pour désérialisation CustomModeGeneration robuste
+- **ImportPDF modèle** : Ajout propriété PageCount pour cache des nombres de pages
+
 ### Corrigé
+- **🔥 Bug critique TOC personnalisées** : Correction erreur `JsonElementWrongTypeException` dans ExtractCustomTocConfiguration (PdfGenerationService.cs:1014)
+- **Ambiguïtés de classes** : Suppression des définitions dupliquées dans IPdfGenerationService.cs
+- **Using statements manquants** : Ajout GenerateurDOE.Models dans Controllers et Services
+- **Références JSON** : Gestion robuste des enums sérialisés comme nombre (0,1) ou chaîne ("Automatique", "Personnalisable")
 - **Drag & Drop conteneurs** : Correction de la mise à jour UI après réorganisation des conteneurs de sections
 - **SectionConteneurEditor** : Rafraîchissement automatique de l'interface après opérations drag & drop
 - **StateHasChanged()** : Synchronisation correcte entre base de données et affichage visuel
 - **Hot reload** : Compatibilité avec les modifications en temps réel via dotnet watch
+
+### Technique
+- **3 Migrations EF Core** : ExtendParametresFieldForCustomToc, AddPageCountToImportPDF, ExtendParametresTo10000Characters
+- **Services injection** : IPdfPageCountService avec implémentation cache MemoryCache
+- **Debugging** : 15+ logs détaillés pour diagnostic problèmes TOC et génération PDF
+- **Résolution problème utilisateur** : "La table modifiée n'est pas prise en compte dans le PDF" ✅ **RÉSOLU**
+
+### Tests
+- ✅ Génération PDF réussie avec TOC personnalisées (validé en production)
+- ✅ Cache PdfPageCountService fonctionnel avec invalidation basée sur LastWriteTime
+- ✅ Interface TableMatieresEditor responsive avec modes automatique/personnalisable
 
 ## [1.5.0] - 2025-09-23
 
