@@ -4,7 +4,6 @@
 @using GenerateurDOE.Components.Shared
 @inject IChantierService chantierService
 @inject IDeletionService deletionService
-@inject IDocumentGenereService documentService
 @inject Radzen.DialogService DialogService
 @inject Radzen.NotificationService NotificationService
 @inject NavigationManager Navigation
@@ -26,7 +25,7 @@
                          DisplaySelector="@(c => $"{c.NomProjet} - {c.Adresse} ({c.MaitreOuvrage})")"
                          Placeholder="Rechercher dans tous les champs..."
                          OnTextChanged="OnChantierSearchChanged"
-                         OnItemSelected="OnChantierSelected"
+                         OnItemSelected="@(chantier => NavigateToChantierDetail(chantier.Id))"
                          MinSearchLength="0">
                 <ItemTemplate>
                     <div class="p-2">
@@ -53,188 +52,9 @@
         </div>
     </div>
 
-    <!-- Chantier sélectionné -->
-    @if (selectedChantier != null)
-    {
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card border-primary">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-0">@selectedChantier.NomProjet</h5>
-                            <button class="btn btn-sm btn-outline-light" @onclick="RetourListeChantiers">
-                                <i class="oi oi-chevron-left"></i> Retour à la liste
-                            </button>
-                        </div>
-                        <div>
-                            @if (selectedChantier.EstArchive)
-                            {
-                                <span class="badge bg-warning me-2">Archivé</span>
-                                <button class="btn btn-sm btn-outline-light me-1" @onclick="() => UnarchiveChantier(selectedChantier.Id)">
-                                    <i class="oi oi-box"></i> Désarchiver
-                                </button>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-light me-1" @onclick="() => ArchiveChantier(selectedChantier.Id)">
-                                    <i class="oi oi-box"></i> Archiver
-                                </button>
-                            }
-                            <button class="btn btn-sm btn-outline-light me-1" @onclick="() => ShowEditDialog(selectedChantier)">
-                                <i class="oi oi-pencil"></i> Modifier
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteChantier(selectedChantier.Id)">
-                                <i class="oi oi-trash"></i> Supprimer
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Maître d'œuvre:</strong> @selectedChantier.MaitreOeuvre</p>
-                                <p><strong>Maître d'ouvrage:</strong> @selectedChantier.MaitreOuvrage</p>
-                                <p><strong>Adresse:</strong> @selectedChantier.Adresse</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Créé le:</strong> @selectedChantier.DateCreation.ToString("dd/MM/yyyy")</p>
-                                <p><strong>Modifié le:</strong> @selectedChantier.DateModification.ToString("dd/MM/yyyy")</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Documents générés pour ce chantier -->
-        @if (selectedChantierWithDocuments?.DocumentsGeneres?.Any() == true)
-        {
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">
-                                <i class="oi oi-document"></i> Documents Générés (@selectedChantierWithDocuments.DocumentsGeneres.Count)
-                            </h5>
-                            <button class="btn btn-primary" @onclick="NouveauDocument">
-                                <i class="oi oi-plus"></i> Nouveau Document
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Document</th>
-                                            <th>Type</th>
-                                            <th>Lot</th>
-                                            <th>Créé le</th>
-                                            <th>Statut</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var doc in selectedChantierWithDocuments.DocumentsGeneres)
-                                        {
-                                            <tr class="@(doc.EnCours ? "" : "table-success")">
-                                                <td>
-                                                    <div>
-                                                        <strong>@doc.NomFichier</strong>
-                                                        <br />
-                                                        <small class="text-muted">
-                                                            <i class="oi oi-file"></i> @doc.FormatExport
-                                                            @if (doc.IncludePageDeGarde)
-                                                            {
-                                                                <span class="badge bg-info ms-1">Page de garde</span>
-                                                            }
-                                                            @if (doc.IncludeTableMatieres)
-                                                            {
-                                                                <span class="badge bg-info ms-1">Table des matières</span>
-                                                            }
-                                                        </small>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span class="badge @GetTypeDocumentClass(doc.TypeDocument)">
-                                                        @GetTypeDocumentLabel(doc.TypeDocument)
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <strong>@doc.NumeroLot</strong>
-                                                    <br />
-                                                    <small class="text-muted">@doc.IntituleLot</small>
-                                                </td>
-                                                <td>@doc.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
-                                                <td>
-                                                    @if (doc.EnCours)
-                                                    {
-                                                        <span class="badge bg-warning">
-                                                            <i class="oi oi-pencil"></i> En cours
-                                                        </span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="badge bg-success">
-                                                            <i class="oi oi-check"></i> Finalisé
-                                                        </span>
-                                                    }
-                                                </td>
-                                                <td>
-                                                    <div class="btn-group" role="group">
-                                                        <button class="btn btn-outline-primary btn-sm"
-                                                                @onclick="() => ConsulterDocument(doc.Id)"
-                                                                title="Consulter/Éditer le document">
-                                                            <i class="oi oi-eye"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-info btn-sm"
-                                                                @onclick="() => VoirDetailsDocument(doc)"
-                                                                title="Voir les détails">
-                                                            <i class="oi oi-info"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-danger btn-sm"
-                                                                @onclick="() => SupprimerDocument(doc.Id)"
-                                                                title="Supprimer définitivement">
-                                                            <i class="oi oi-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
-        else if (selectedChantier != null)
-        {
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">
-                                <i class="oi oi-document"></i> Documents Générés (0)
-                            </h5>
-                            <button class="btn btn-primary" @onclick="NouveauDocument">
-                                <i class="oi oi-plus"></i> Nouveau Document
-                            </button>
-                        </div>
-                        <div class="card-body text-center text-muted py-4">
-                            <i class="oi oi-document" style="font-size: 3rem; opacity: 0.3;"></i>
-                            <p class="mt-3">Aucun document généré pour ce chantier</p>
-                            <button class="btn btn-primary" @onclick="NouveauDocument">
-                                <i class="oi oi-plus"></i> Créer le premier document
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
-    }
 
     <!-- Liste des chantiers -->
-    @if (chantiers?.Any() == true && selectedChantier == null)
+    @if (chantiers?.Any() == true)
     {
         <div class="row">
             <div class="col-md-12">
@@ -260,7 +80,7 @@
                                     {
                                         <tr class="@(chantier.EstArchive ? "text-muted" : "")"
                                             style="cursor: pointer;"
-                                            @onclick="() => SelectChantier(chantier)">
+                                            @onclick="@(() => NavigateToChantierDetail(chantier.Id))">
                                             <td>@chantier.NomProjet</td>
                                             <td>@chantier.MaitreOuvrage</td>
                                             <td>@chantier.Adresse</td>
@@ -275,15 +95,13 @@
                                                     <span class="badge bg-success">Actif</span>
                                                 }
                                             </td>
-                                            <td>
+                                            <td @onclick:stopPropagation="true">
                                                 <button class="btn btn-outline-primary me-1 px-3"
-                                                        @onclick:stopPropagation="true"
-                                                        @onclick="() => SelectChantier(chantier)"
+                                                        @onclick="@(() => NavigateToChantierDetail(chantier.Id))"
                                                         title="Consulter le chantier">
                                                     <i class="oi oi-eye"></i>
                                                 </button>
-                                                <button class="btn btn-outline-secondary me-1 px-3" 
-                                                        @onclick:stopPropagation="true"
+                                                <button class="btn btn-outline-secondary me-1 px-3"
                                                         @onclick="() => ShowEditDialog(chantier)"
                                                         title="Modifier le chantier">
                                                     <i class="oi oi-pencil"></i>
@@ -317,91 +135,13 @@
     }
 </div>
 
-<!-- Modal détails document -->
-@if (documentDetails != null && showDetailsModal)
-{
-    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Détails du Document</h5>
-                    <button type="button" class="btn-close" @onclick="FermerDetailsModal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Informations générales</h6>
-                            <p><strong>Nom:</strong> @documentDetails.NomFichier</p>
-                            <p><strong>Type:</strong> @GetTypeDocumentLabel(documentDetails.TypeDocument)</p>
-                            <p><strong>Format:</strong> @documentDetails.FormatExport</p>
-                            <p><strong>Créé le:</strong> @documentDetails.DateCreation.ToString("dd/MM/yyyy HH:mm")</p>
-                            <p><strong>Statut:</strong>
-                                @if (documentDetails.EnCours)
-                                {
-                                    <span class="badge bg-warning">En cours</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-success">Finalisé</span>
-                                }
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Chantier associé</h6>
-                            <p><strong>Projet:</strong> @selectedChantier?.NomProjet</p>
-                            <p><strong>Maître d'ouvrage:</strong> @selectedChantier?.MaitreOuvrage</p>
-                            <p><strong>Adresse:</strong> @selectedChantier?.Adresse</p>
-                            <p><strong>Lot:</strong> @documentDetails.NumeroLot - @documentDetails.IntituleLot</p>
-                        </div>
-                    </div>
-
-                    <hr />
-
-                    <div class="row">
-                        <div class="col-md-12">
-                            <h6>Options du document</h6>
-                            <div class="d-flex gap-2">
-                                @if (documentDetails.IncludePageDeGarde)
-                                {
-                                    <span class="badge bg-info">Page de garde incluse</span>
-                                }
-                                @if (documentDetails.IncludeTableMatieres)
-                                {
-                                    <span class="badge bg-info">Table des matières incluse</span>
-                                }
-                                @if (!string.IsNullOrEmpty(documentDetails.CheminFichier))
-                                {
-                                    <span class="badge bg-success">PDF généré</span>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" @onclick="() => ConsulterDocument(documentDetails.Id)">
-                        <i class="oi oi-pencil"></i> Éditer
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" @onclick="() => SupprimerDocument(documentDetails.Id)">
-                        <i class="oi oi-trash"></i> Supprimer
-                    </button>
-                    <button type="button" class="btn btn-secondary" @onclick="FermerDetailsModal">Fermer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
 
 @code {
     private List<Chantier> chantiers = new();
-    private Chantier? selectedChantier = null;
-    private Chantier? selectedChantierWithDocuments = null;
     private bool includeArchived = false;
     private bool isLoading = false;
     private string currentSearchText = "";
 
-    // Variables pour le modal détails document
-    private DocumentGenere? documentDetails = null;
-    private bool showDetailsModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -473,40 +213,7 @@
         }
     }
 
-    private async Task OnChantierSelected(Chantier chantier)
-    {
-        await SelectChantier(chantier);
-    }
 
-    private async Task SelectChantier(Chantier chantier)
-    {
-        try
-        {
-            isLoading = true;
-            selectedChantier = chantier;
-            StateHasChanged();
-
-            // Charger le chantier complet avec ses documents
-            selectedChantierWithDocuments = await chantierService.GetByIdWithDocumentsAsync(chantier.Id);
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement du chantier: {ex.Message}");
-            Console.WriteLine($"[ERROR] SelectChantier: {ex.Message}");
-        }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    private void RetourListeChantiers()
-    {
-        selectedChantier = null;
-        selectedChantierWithDocuments = null;
-        StateHasChanged();
-    }
 
     private async Task ShowCreateDialog()
     {
@@ -543,13 +250,6 @@
             await chantierService.ArchiveAsync(chantierId);
             await RefreshChantiers();
             NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier archivé avec succès");
-            
-            // Rafraîchir les détails si c'est le chantier sélectionné
-            if (selectedChantier?.Id == chantierId)
-            {
-                selectedChantier.EstArchive = true;
-                StateHasChanged();
-            }
         }
         catch (Exception ex)
         {
@@ -570,13 +270,6 @@
             await chantierService.UnarchiveAsync(chantierId);
             await RefreshChantiers();
             NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier désarchivé avec succès");
-            
-            // Rafraîchir les détails si c'est le chantier sélectionné
-            if (selectedChantier?.Id == chantierId)
-            {
-                selectedChantier.EstArchive = false;
-                StateHasChanged();
-            }
         }
         catch (Exception ex)
         {
@@ -669,13 +362,6 @@
                     // 6. Mise à jour de l'interface
                     await RefreshChantiers();
 
-                    // Recharger les documents du chantier sélectionné si c'est le même
-                    if (selectedChantier?.Id == chantierId)
-                    {
-                        selectedChantierWithDocuments = await chantierService.GetByIdWithDocumentsAsync(chantierId);
-                        StateHasChanged();
-                    }
-
                     // 7. Notification de succès détaillée
                     var successMessage = $"Chantier supprimé avec succès !\n" +
                                        $"• {result.FilesDeleted} fichier(s) supprimé(s)\n" +
@@ -706,167 +392,15 @@
         }
     }
 
-    #region Méthodes pour la gestion des documents
 
-    private void NouveauDocument()
-    {
-        if (selectedChantier != null)
-        {
-            Navigation.NavigateTo($"/document/edit/nouveau/{selectedChantier.Id}");
-        }
-    }
-
-    private void ConsulterDocument(int documentId)
-    {
-        Navigation.NavigateTo($"/document/{documentId}");
-    }
-
-    private async Task VoirDetailsDocument(DocumentGenere document)
-    {
-        try
-        {
-            // Charger les détails complets du document
-            documentDetails = await documentService.GetByIdAsync(document.Id);
-            showDetailsModal = true;
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement des détails: {ex.Message}");
-        }
-    }
-
-    private void FermerDetailsModal()
-    {
-        showDetailsModal = false;
-        documentDetails = null;
-        StateHasChanged();
-    }
 
     /// <summary>
-    /// Supprime un document avec prévisualisation avancée de l'impact
-    /// Utilise le DeletionService robuste avec validation, gestion des fichiers et audit
+    /// Navigate vers les détails d'un chantier
     /// </summary>
-    private async Task SupprimerDocument(int documentId)
+    private void NavigateToChantierDetail(int chantierId)
     {
-        try
-        {
-            // 1. Obtenir l'impact de la suppression
-            var impact = await deletionService.GetDocumentDeletionImpactAsync(documentId);
-
-            // 2. Construire le message de confirmation détaillé
-            var document = selectedChantierWithDocuments?.DocumentsGeneres.FirstOrDefault(d => d.Id == documentId);
-            var confirmationMessage = $"Êtes-vous sûr de vouloir supprimer ce document ?\n\n" +
-                                    $"📄 DOCUMENT : {document?.NomFichier}\n" +
-                                    $"🏗️ CHANTIER : {selectedChantier?.NomProjet}\n\n" +
-                                    $"⚠️ IMPACT DE LA SUPPRESSION :\n" +
-                                    $"• {impact.SectionsLibresCount} section(s) libre(s)\n" +
-                                    $"• {FormatFileSize(impact.TotalFileSize)} de données\n\n";
-
-            if (impact.Warnings.Any())
-            {
-                confirmationMessage += $"🔸 AVERTISSEMENTS :\n";
-                foreach (var warning in impact.Warnings)
-                {
-                    confirmationMessage += $"• {warning}\n";
-                }
-                confirmationMessage += "\n";
-            }
-
-            confirmationMessage += "\n❌ Cette action est IRRÉVERSIBLE !";
-
-            // 3. Confirmation avec détails
-            var confirmResult = await DialogService.Confirm(
-                confirmationMessage,
-                "⚠️ SUPPRESSION DÉFINITIVE DU DOCUMENT",
-                new Radzen.ConfirmOptions {
-                    OkButtonText = "🗑️ SUPPRIMER DÉFINITIVEMENT",
-                    CancelButtonText = "❌ Annuler",
-                    Width = "500px",
-                    Height = "400px"
-                });
-
-            if (confirmResult == true)
-            {
-                // 4. Notification de début d'opération
-                NotificationService.Notify(Radzen.NotificationSeverity.Info, "Suppression en cours...",
-                    $"Suppression du document '{document?.NomFichier}' et de ses {impact.SectionsLibresCount} section(s)...");
-
-                // 5. Suppression avec options d'audit
-                var options = new DeletionOptions
-                {
-                    DeletePhysicalFiles = true,
-                    EnableAuditLogging = true,
-                    InitiatedBy = "Interface Chantiers - Documents",
-                    Reason = "Suppression manuelle d'un document via interface chantiers"
-                };
-
-                var result = await deletionService.DeleteDocumentAsync(documentId, options);
-
-                if (result.Success)
-                {
-                    // 6. Mise à jour de l'interface - recharger les documents du chantier
-                    if (selectedChantier != null)
-                    {
-                        selectedChantierWithDocuments = await chantierService.GetByIdWithDocumentsAsync(selectedChantier.Id);
-                        StateHasChanged();
-                    }
-
-                    // Fermer le modal de détails si ouvert
-                    if (documentDetails?.Id == documentId)
-                    {
-                        FermerDetailsModal();
-                    }
-
-                    // 7. Notification de succès détaillée
-                    var successMessage = $"Document '{document?.NomFichier}' supprimé avec succès !\n" +
-                                       $"• {result.FilesDeleted} fichier(s) supprimé(s)\n" +
-                                       $"• {result.RecordsDeleted} enregistrement(s) supprimé(s)\n" +
-                                       $"• Durée: {result.Duration.TotalSeconds:F2}s";
-
-                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "✅ Suppression Réussie", successMessage);
-                }
-                else
-                {
-                    // 8. Gestion des erreurs avec détails
-                    var errorMessage = "Échec de la suppression :\n" + string.Join("\n", result.Messages);
-                    NotificationService.Notify(Radzen.NotificationSeverity.Error, "❌ Erreur de Suppression", errorMessage);
-
-                    if (result.Exception != null)
-                    {
-                        Console.WriteLine($"[DEBUG] Deletion error: {result.Exception.Message}");
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            // 9. Gestion d'erreur globale
-            var errorMsg = $"Erreur inattendue lors de la suppression: {ex.Message}";
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "❌ Erreur Critique", errorMsg);
-            Console.WriteLine($"[ERROR] SupprimerDocument exception: {ex}");
-        }
+        Navigation.NavigateTo($"/chantier/{chantierId}");
     }
-
-    #endregion
-
-    #region Méthodes utilitaires
-
-    private static string GetTypeDocumentClass(TypeDocumentGenere type) => type switch
-    {
-        TypeDocumentGenere.DOE => "bg-primary",
-        TypeDocumentGenere.DossierTechnique => "bg-info",
-        TypeDocumentGenere.MemoireTechnique => "bg-secondary",
-        _ => "bg-dark"
-    };
-
-    private static string GetTypeDocumentLabel(TypeDocumentGenere type) => type switch
-    {
-        TypeDocumentGenere.DOE => "DOE",
-        TypeDocumentGenere.DossierTechnique => "Dossier Technique",
-        TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
-        _ => type.ToString()
-    };
 
     /// <summary>
     /// Formate une taille de fichier en unités lisibles
@@ -887,6 +421,4 @@
 
         return $"{size:0.##} {sizes[order]}";
     }
-
-    #endregion
 }

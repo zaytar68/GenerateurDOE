@@ -77,6 +77,9 @@ builder.Services.AddScoped<ILoadingStateService, LoadingStateService>();
 // Service de protection anti-concurrence DbContext (CORRECTION CRITIQUE)
 builder.Services.AddScoped<IOperationLockService, OperationLockService>();
 
+// Service de suppression centralisé avec validation et audit
+builder.Services.AddScoped<IDeletionService, DeletionService>();
+
 // Service de téléchargement de documents factorisé
 builder.Services.AddScoped<IDocumentDownloadService, DocumentDownloadService>();
 

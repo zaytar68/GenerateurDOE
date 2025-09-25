@@ -16,6 +16,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly IMemoryCache _cache;
+    private readonly IDeletionService _deletionService;
     private const string CACHE_KEY_PREFIX = "DocumentRepo_";
 
     /// <summary>
@@ -23,10 +24,12 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// </summary>
     /// <param name="contextFactory">Factory pour créer les contextes EF thread-safe</param>
     /// <param name="cache">Cache en mémoire pour optimiser les requêtes fréquentes</param>
-    public DocumentRepositoryService(IDbContextFactory<ApplicationDbContext> contextFactory, IMemoryCache cache)
+    /// <param name="deletionService">Service de suppression robuste</param>
+    public DocumentRepositoryService(IDbContextFactory<ApplicationDbContext> contextFactory, IMemoryCache cache, IDeletionService deletionService)
     {
         _contextFactory = contextFactory;
         _cache = cache;
+        _deletionService = deletionService;
     }
 
     /// <summary>
@@ -349,24 +352,26 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// <returns>True si suppression réussie, False si document inexistant</returns>
     public async Task<bool> DeleteAsync(int documentId)
     {
-        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
-        var document = await context.DocumentsGeneres.FindAsync(documentId).ConfigureAwait(false);
-        if (document == null)
-            return false;
-
-        if (!string.IsNullOrEmpty(document.CheminFichier) && File.Exists(document.CheminFichier))
+        // Utiliser le DeletionService robuste pour éviter les problèmes de contraintes FK
+        var options = new DeletionOptions
         {
-            File.Delete(document.CheminFichier);
+            DeletePhysicalFiles = true,
+            EnableAuditLogging = true,
+            InitiatedBy = "DocumentRepositoryService",
+            Reason = "Suppression d'un document via DocumentRepositoryService"
+        };
+
+        var result = await _deletionService.DeleteDocumentAsync(documentId, options).ConfigureAwait(false);
+
+        if (result.Success)
+        {
+            // Invalider le cache après suppression réussie
+            InvalidateDocumentCaches();
+            _cache.Remove($"{CACHE_KEY_PREFIX}Summary_{documentId}");
+            return true;
         }
 
-        context.DocumentsGeneres.Remove(document);
-        await context.SaveChangesAsync().ConfigureAwait(false);
-
-        // Invalidate cache
-        InvalidateDocumentCaches();
-        _cache.Remove($"{CACHE_KEY_PREFIX}Summary_{documentId}");
-        
-        return true;
+        return false; // Suppression échouée
     }
 
     /// <summary>

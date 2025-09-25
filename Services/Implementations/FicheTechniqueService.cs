@@ -14,16 +14,19 @@ public class FicheTechniqueService : IFicheTechniqueService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly AppSettings _appSettings;
+    private readonly ILoggingService _loggingService;
 
     /// <summary>
     /// Initialise une nouvelle instance du service FicheTechniqueService
     /// </summary>
     /// <param name="contextFactory">Factory pour créer les contextes EF thread-safe</param>
     /// <param name="appSettings">Configuration de l'application</param>
-    public FicheTechniqueService(IDbContextFactory<ApplicationDbContext> contextFactory, IOptions<AppSettings> appSettings)
+    /// <param name="loggingService">Service de logging</param>
+    public FicheTechniqueService(IDbContextFactory<ApplicationDbContext> contextFactory, IOptions<AppSettings> appSettings, ILoggingService loggingService)
     {
         _contextFactory = contextFactory;
         _appSettings = appSettings.Value;
+        _loggingService = loggingService;
     }
 
     /// <summary>
@@ -110,16 +113,32 @@ public class FicheTechniqueService : IFicheTechniqueService
         if (ficheTechnique == null)
             return false;
 
+        // 1. Supprimer d'abord tous les FTElements qui référencent cette fiche technique
+        var ftElements = await context.FTElements
+            .Where(fte => fte.FicheTechniqueId == id)
+            .ToListAsync();
+
+        if (ftElements.Any())
+        {
+            context.FTElements.RemoveRange(ftElements);
+            _loggingService.LogInformation($"Suppression de {ftElements.Count} FTElement(s) référençant la fiche technique {id}");
+        }
+
+        // 2. Supprimer les fichiers PDF physiques
         foreach (var importPDF in ficheTechnique.ImportsPDF)
         {
             if (File.Exists(importPDF.CheminFichier))
             {
                 File.Delete(importPDF.CheminFichier);
+                _loggingService.LogInformation($"Fichier PDF supprimé : {importPDF.CheminFichier}");
             }
         }
 
+        // 3. Supprimer la fiche technique (les ImportsPDF seront supprimés en cascade)
         context.FichesTechniques.Remove(ficheTechnique);
         await context.SaveChangesAsync();
+
+        _loggingService.LogInformation($"Fiche technique {id} supprimée avec succès");
         return true;
     }
 

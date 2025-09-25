@@ -41,6 +41,53 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Ajout flag `isFileNameManuallySet` pour tracking des modifications utilisateur
 - Amélioration de `GenerateDefaultFileName()` avec logique conditionnelle intelligente
 
+## [2.1.3] - 2025-09-25
+
+### ✨ **Refactorisation Majeure - Interface Chantiers Simplifiée**
+- **🔄 Navigation directe** : Clic sur chantier → redirection vers page détail dédiée `/chantier/{id}`
+- **🧹 Nettoyage architecture** : Suppression -300 lignes de code complexe de gestion détails inline
+- **📱 UX améliorée** : Séparation claire des responsabilités entre liste et détail de chantier
+- **🎯 Actions centralisées** : Toutes les opérations (archiver, supprimer, documents) dans la page détail
+
+### Corrigé
+- **🔥 Bug navigation vs modal** : Correction conflit événements entre modal d'édition et navigation détails
+- **⚡ Propagation événements** : `@onclick:stopPropagation="true"` sur `<td>` pour éviter double-déclenchement
+- **📊 Interface unifiée** : Retrait dépendance `IDocumentGenereService` dans la liste des chantiers
+
+### Technique
+- Suppression méthodes `SelectChantier()`, `OnChantierSelected()`, modal détails documents
+- Simplification du modèle de données : plus de `selectedChantier`, `selectedChantierWithDocuments`
+- Code plus maintenable avec séparation claire liste/détail
+
+## [2.1.2] - 2025-09-25
+
+### ✨ **Fonctionnalité Majeure - Système de Maintenance des Fichiers Orphelins**
+- **🔧 Service DeletionService étendu** : Détection et nettoyage automatique des références orphelines
+- **🖥️ Interface de maintenance** : Page dédiée `/maintenance` pour supervision et nettoyage
+- **📊 Rapport d'intégrité** : Score de santé système et recommandations automatiques
+- **⚠️ Notifications améliorées** : Logging détaillé des PDFs manquants lors de la génération
+- **🎯 Navigation étendue** : Lien "Maintenance" ajouté au menu principal
+
+### Technique
+- **3 nouvelles méthodes IDeletionService** : DetectOrphanReferencesAsync, CleanupOrphanReferencesAsync, GenerateFileIntegrityReportAsync
+- **Types complets pour maintenance** : OrphanFilesReport, FileIntegrityReport, OrphanDetectionOptions, etc.
+- **PdfGenerationService amélioré** : Remplacement du "fail silently" par notification explicite
+- **Architecture transactionnelle** : Nettoyage sécurisé avec rollback automatique
+- **Support multi-types** : ImportPDF, DocumentsGenerés, ImagesMethodes orphelins
+
+### Corrigé
+- **🔥 Bug critique PDFs manquants** : Les PDFs ne sont plus insérés silencieusement lors de suppression incomplète
+- **📄 Synchronisation BD/filesystem** : Détection automatique des références cassées
+- **🎯 Interface utilisateur** : Feedback temps réel avec statut de progression et alertes
+- **⚡ Logging détaillé** : Messages explicites avec noms de fichiers et chemins d'accès
+
+### Interface Utilisateur
+- **Pages/Maintenance.razor** : Interface complète de gestion des orphelins
+- **Cartes de statut** : PDFs orphelins, Documents orphelins, Vue d'ensemble
+- **Nettoyage sécurisé** : Confirmation utilisateur et prévisualisation des actions
+- **Score de santé** : Indicateur visuel de l'état du système (0-100%)
+- **Recommandations automatiques** : Actions suggérées selon l'état détecté
+
 ## [Non publié]
 
 ### Ajouté

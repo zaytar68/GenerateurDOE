@@ -1,0 +1,450 @@
+@page "/maintenance"
+@using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Models
+@inject IDeletionService DeletionService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Maintenance du Système</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <span class="oi oi-wrench" aria-hidden="true"></span>
+                    Maintenance du Système
+                </h1>
+                <div>
+                    @if (healthScore >= 0)
+                    {
+                        <span class="badge @GetHealthScoreBadgeClass(healthScore) fs-6 me-2">
+                            Santé: @healthScore%
+                        </span>
+                    }
+                    <button class="btn btn-outline-primary" @onclick="RefreshReports" disabled="@isLoading">
+                        <span class="oi oi-reload" aria-hidden="true"></span>
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm ms-1" role="status"></span>
+                        }
+                        Actualiser
+                    </button>
+                </div>
+            </div>
+
+            @if (errorMessage != null)
+            {
+                <div class="alert alert-danger alert-dismissible" role="alert">
+                    <span class="oi oi-warning" aria-hidden="true"></span>
+                    <strong>Erreur :</strong> @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            @if (successMessage != null)
+            {
+                <div class="alert alert-success alert-dismissible" role="alert">
+                    <span class="oi oi-check" aria-hidden="true"></span>
+                    <strong>Succès :</strong> @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-2 text-muted">@loadingMessage</p>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <!-- Vue d'ensemble -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">
+                            <span class="oi oi-dashboard" aria-hidden="true"></span>
+                            Vue d'ensemble
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (integrityReport != null)
+                        {
+                            <div class="mb-3">
+                                <small class="text-muted">Fichiers valides</small>
+                                <div class="fw-bold">@(integrityReport.ValidPdfFilesCount + integrityReport.ValidDocumentsCount)</div>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Références orphelines</small>
+                                <div class="fw-bold text-@(integrityReport.OrphansReport.TotalOrphanReferences > 0 ? "danger" : "success")">
+                                    @integrityReport.OrphansReport.TotalOrphanReferences
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Taille fichiers valides</small>
+                                <div class="fw-bold">@FormatFileSize(integrityReport.TotalValidFilesSize)</div>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Durée dernier scan</small>
+                                <div class="fw-bold">@integrityReport.OrphansReport.ScanDuration.TotalSeconds.ToString("F1")s</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">
+                                <span class="oi oi-info" aria-hidden="true"></span>
+                                Cliquez sur "Actualiser" pour générer le rapport
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDFs orphelins -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header @(orphanPdfsCount > 0 ? "bg-warning text-dark" : "bg-success text-white")">
+                        <h5 class="card-title mb-0">
+                            <span class="oi oi-document" aria-hidden="true"></span>
+                            PDFs Orphelins
+                            @if (orphanPdfsCount > 0)
+                            {
+                                <span class="badge bg-dark ms-2">@orphanPdfsCount</span>
+                            }
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (integrityReport?.OrphansReport.OrphanImportPdfs.Any() == true)
+                        {
+                            <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                                @foreach (var pdf in integrityReport.OrphansReport.OrphanImportPdfs.Take(5))
+                                {
+                                    <div class="list-group-item px-0 py-2">
+                                        <div class="fw-bold text-truncate">@pdf.NomFichierOriginal</div>
+                                        <small class="text-muted">
+                                            Fiche: @pdf.FicheTechniqueName<br />
+                                            Importé: @pdf.DateImport.ToString("dd/MM/yyyy")
+                                        </small>
+                                    </div>
+                                }
+                                @if (integrityReport.OrphansReport.OrphanImportPdfs.Count > 5)
+                                {
+                                    <div class="list-group-item px-0 py-2 text-muted">
+                                        ... et @(integrityReport.OrphansReport.OrphanImportPdfs.Count - 5) autres
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-success">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                                Aucun PDF orphelin détecté
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documents orphelins -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header @(orphanDocsCount > 0 ? "bg-warning text-dark" : "bg-success text-white")">
+                        <h5 class="card-title mb-0">
+                            <span class="oi oi-file" aria-hidden="true"></span>
+                            Documents Orphelins
+                            @if (orphanDocsCount > 0)
+                            {
+                                <span class="badge bg-dark ms-2">@orphanDocsCount</span>
+                            }
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (integrityReport?.OrphansReport.OrphanDocuments.Any() == true)
+                        {
+                            <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                                @foreach (var doc in integrityReport.OrphansReport.OrphanDocuments.Take(5))
+                                {
+                                    <div class="list-group-item px-0 py-2">
+                                        <div class="fw-bold text-truncate">@doc.NomFichier</div>
+                                        <small class="text-muted">
+                                            Chantier: @doc.ChantierNom<br />
+                                            Créé: @doc.DateCreation.ToString("dd/MM/yyyy")
+                                        </small>
+                                    </div>
+                                }
+                                @if (integrityReport.OrphansReport.OrphanDocuments.Count > 5)
+                                {
+                                    <div class="list-group-item px-0 py-2 text-muted">
+                                        ... et @(integrityReport.OrphansReport.OrphanDocuments.Count - 5) autres
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-success">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                                Aucun document orphelin détecté
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions de nettoyage -->
+        @if (integrityReport?.OrphansReport.TotalOrphanReferences > 0)
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="card-title mb-0">
+                                <span class="oi oi-warning" aria-hidden="true"></span>
+                                Actions de Nettoyage Requises
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning" role="alert">
+                                <h6 class="alert-heading">
+                                    <span class="oi oi-info" aria-hidden="true"></span>
+                                    Références orphelines détectées
+                                </h6>
+                                <p class="mb-0">
+                                    @integrityReport.OrphansReport.TotalOrphanReferences références orphelines ont été trouvées.
+                                    Ces références pointent vers des fichiers qui n'existent plus sur le système et empêchent
+                                    l'inclusion correcte des PDFs dans la génération de documents.
+                                </p>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-danger"
+                                        @onclick="StartCleanup"
+                                        disabled="@isCleanupRunning">
+                                    <span class="oi oi-trash" aria-hidden="true"></span>
+                                    @if (isCleanupRunning)
+                                    {
+                                        <span class="spinner-border spinner-border-sm ms-1" role="status"></span>
+                                        <span>Nettoyage en cours...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Nettoyer les Références Orphelines</span>
+                                    }
+                                </button>
+
+                                <button class="btn btn-outline-info" @onclick="ShowCleanupDetails">
+                                    <span class="oi oi-list" aria-hidden="true"></span>
+                                    Voir les Détails
+                                </button>
+                            </div>
+
+                            @if (cleanupResult != null)
+                            {
+                                <div class="mt-3">
+                                    <div class="alert @(cleanupResult.Success ? "alert-success" : "alert-danger")" role="alert">
+                                        <h6 class="alert-heading">
+                                            <span class="oi oi-@(cleanupResult.Success ? "check" : "warning")" aria-hidden="true"></span>
+                                            Résultat du Nettoyage
+                                        </h6>
+                                        <ul class="mb-0">
+                                            @foreach (var message in cleanupResult.Messages)
+                                            {
+                                                <li>@message</li>
+                                            }
+                                        </ul>
+                                        @if (cleanupResult.Success)
+                                        {
+                                            <hr />
+                                            <p class="mb-0">
+                                                <strong>@cleanupResult.RecordsDeleted</strong> références nettoyées en
+                                                <strong>@cleanupResult.Duration.TotalSeconds.ToString("F2")s</strong>
+                                            </p>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Recommandations -->
+        @if (integrityReport?.MaintenanceRecommendations.Any() == true)
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <span class="oi oi-lightbulb" aria-hidden="true"></span>
+                                Recommandations de Maintenance
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="mb-0">
+                                @foreach (var recommendation in integrityReport.MaintenanceRecommendations)
+                                {
+                                    <li class="mb-2">@recommendation</li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private FileIntegrityReport? integrityReport;
+    private DeletionResult? cleanupResult;
+    private bool isLoading = false;
+    private bool isCleanupRunning = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string loadingMessage = "Chargement...";
+    private int healthScore = -1;
+
+    private int orphanPdfsCount => integrityReport?.OrphansReport.OrphanImportPdfs.Count ?? 0;
+    private int orphanDocsCount => integrityReport?.OrphansReport.OrphanDocuments.Count ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshReports();
+    }
+
+    private async Task RefreshReports()
+    {
+        isLoading = true;
+        errorMessage = null;
+        loadingMessage = "Génération du rapport d'intégrité...";
+        StateHasChanged();
+
+        try
+        {
+            integrityReport = await DeletionService.GenerateFileIntegrityReportAsync();
+            healthScore = integrityReport.HealthScore;
+            cleanupResult = null; // Reset cleanup result when refreshing
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la génération du rapport : {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartCleanup()
+    {
+        if (integrityReport?.OrphansReport == null || integrityReport.OrphansReport.TotalOrphanReferences == 0)
+            return;
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Êtes-vous sûr de vouloir nettoyer {integrityReport.OrphansReport.TotalOrphanReferences} références orphelines ?\n\n" +
+            "Cette action :\n" +
+            "• Supprimera définitivement les références des PDFs inexistants\n" +
+            "• Nettoiera les chemins de fichiers cassés\n" +
+            "• Ne peut pas être annulée\n\n" +
+            "Continuer ?");
+
+        if (!confirmed) return;
+
+        isCleanupRunning = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var options = new DeletionOptions
+            {
+                EnableAuditLogging = true,
+                InitiatedBy = "Interface Maintenance",
+                Reason = "Nettoyage automatique des références orphelines"
+            };
+
+            cleanupResult = await DeletionService.CleanupOrphanReferencesAsync(integrityReport.OrphansReport, options);
+
+            if (cleanupResult.Success)
+            {
+                successMessage = $"Nettoyage terminé avec succès ! {cleanupResult.RecordsDeleted} références supprimées.";
+                // Rafraîchir le rapport après nettoyage
+                await RefreshReports();
+            }
+            else
+            {
+                errorMessage = $"Erreur lors du nettoyage : {string.Join(", ", cleanupResult.Messages)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors du nettoyage : {ex.Message}";
+        }
+        finally
+        {
+            isCleanupRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowCleanupDetails()
+    {
+        if (integrityReport?.OrphansReport == null) return;
+
+        var details = new List<string>();
+
+        if (integrityReport.OrphansReport.OrphanImportPdfs.Any())
+        {
+            details.Add($"• {integrityReport.OrphansReport.OrphanImportPdfs.Count} PDFs de fiches techniques");
+        }
+
+        if (integrityReport.OrphansReport.OrphanDocuments.Any())
+        {
+            details.Add($"• {integrityReport.OrphansReport.OrphanDocuments.Count} documents générés");
+        }
+
+        if (integrityReport.OrphansReport.OrphanMethodeImages.Any())
+        {
+            details.Add($"• {integrityReport.OrphansReport.OrphanMethodeImages.Count} images de méthodes");
+        }
+
+        var message = "Détails du nettoyage prévu :\n\n" + string.Join("\n", details) +
+            $"\n\nTaille estimée à libérer en base : {FormatFileSize(integrityReport.OrphansReport.EstimatedDatabaseCleanupSize)}";
+
+        await JSRuntime.InvokeVoidAsync("alert", message);
+    }
+
+    private string GetHealthScoreBadgeClass(int score)
+    {
+        return score switch
+        {
+            >= 95 => "bg-success",
+            >= 80 => "bg-warning",
+            _ => "bg-danger"
+        };
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = ["B", "KB", "MB", "GB"];
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

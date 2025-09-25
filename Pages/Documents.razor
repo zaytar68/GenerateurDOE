@@ -1,0 +1,651 @@
+@page "/documents"
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Components.Shared
+@inject IDocumentGenereService documentService
+@inject IDeletionService deletionService
+@inject IChantierService chantierService
+@inject IDocumentRepositoryService documentRepository
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+@inject NavigationManager Navigation
+
+<PageTitle>Gestion des Documents</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>Gestion des Documents Générés</h2>
+            <p class="text-muted">Visualisez et gérez tous les documents générés avec suppression sécurisée</p>
+        </div>
+    </div>
+
+    <!-- Statistiques rapides -->
+    @if (documentsStats != null)
+    {
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <h4 class="text-primary">@documentsStats.TotalDocuments</h4>
+                        <small class="text-muted">Documents totaux</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-warning">
+                    <div class="card-body text-center">
+                        <h4 class="text-warning">@documentsStats.DocumentsEnCours</h4>
+                        <small class="text-muted">En cours d'édition</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <h4 class="text-success">@documentsStats.DocumentsFinalises</h4>
+                        <small class="text-muted">Finalisés</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-info">
+                    <div class="card-body text-center">
+                        <h4 class="text-info">@FormatFileSize(documentsStats.TailleTotale)</h4>
+                        <small class="text-muted">Taille totale</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Filtres et recherche -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="form-group">
+                <label for="typeDocumentFilter">Type de document</label>
+                <select @bind="typeDocumentFilter" @bind:after="ApplyFilters" class="form-select" id="typeDocumentFilter">
+                    <option value="">Tous les types</option>
+                    <option value="DOE">DOE</option>
+                    <option value="DossierTechnique">Dossier Technique</option>
+                    <option value="MemoireTechnique">Mémoire Technique</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label for="chantierFilter">Chantier</label>
+                <select @bind="chantierIdFilter" @bind:after="ApplyFilters" class="form-select" id="chantierFilter">
+                    <option value="0">Tous les chantiers</option>
+                    @if (chantiers?.Any() == true)
+                    {
+                        @foreach (var chantier in chantiers)
+                        {
+                            <option value="@chantier.Id">@chantier.NomProjet</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check align-middle mt-4">
+                <input class="form-check-input" type="checkbox"
+                       @bind="showFinalisedOnly" @bind:after="ApplyFilters"
+                       id="showFinalisedCheck"/>
+                <label class="form-check-label" for="showFinalisedCheck">
+                    Afficher seulement les documents finalisés
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des documents -->
+    @if (documentsAffiches?.Any() == true)
+    {
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Documents (@documentsAffiches.Count)</h5>
+                        <div>
+                            <span class="badge bg-secondary me-2">@documentsAffiches.Count(d => d.EnCours) en cours</span>
+                            <span class="badge bg-success">@documentsAffiches.Count(d => !d.EnCours) finalisés</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Document</th>
+                                        <th>Chantier</th>
+                                        <th>Type</th>
+                                        <th>Lot</th>
+                                        <th>Créé le</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var document in documentsAffiches.Take(50))
+                                    {
+                                        <tr class="@(document.EnCours ? "" : "table-success")">
+                                            <td>
+                                                <div>
+                                                    <strong>@document.NomFichier</strong>
+                                                    <br />
+                                                    <small class="text-muted">
+                                                        <i class="oi oi-file"></i> @document.FormatExport
+                                                        @if (document.IncludePageDeGarde)
+                                                        {
+                                                            <span class="badge bg-info ms-1">Page de garde</span>
+                                                        }
+                                                        @if (document.IncludeTableMatieres)
+                                                        {
+                                                            <span class="badge bg-info ms-1">Table des matières</span>
+                                                        }
+                                                    </small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong>@document.Chantier?.NomProjet</strong>
+                                                <br />
+                                                <small class="text-muted">@document.Chantier?.Adresse</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge @GetTypeDocumentClass(document.TypeDocument)">
+                                                    @GetTypeDocumentLabel(document.TypeDocument)
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong>@document.NumeroLot</strong>
+                                                <br />
+                                                <small class="text-muted">@document.IntituleLot</small>
+                                            </td>
+                                            <td>@document.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>
+                                                @if (document.EnCours)
+                                                {
+                                                    <span class="badge bg-warning">
+                                                        <i class="oi oi-pencil"></i> En cours
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <i class="oi oi-check"></i> Finalisé
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <button class="btn btn-outline-primary btn-sm"
+                                                            @onclick="() => ConsulterDocument(document.Id)"
+                                                            title="Consulter/Éditer le document">
+                                                        <i class="oi oi-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info btn-sm"
+                                                            @onclick="() => VoirDetailsDocument(document)"
+                                                            title="Voir les détails">
+                                                        <i class="oi oi-info"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm"
+                                                            @onclick="() => SupprimerDocument(document.Id)"
+                                                            title="Supprimer définitivement">
+                                                        <i class="oi oi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+
+    @if (documentsAffiches?.Any() != true && !isLoading)
+    {
+        <div class="text-center text-muted">
+            <div class="card">
+                <div class="card-body">
+                    <i class="oi oi-document" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mt-3">Aucun document trouvé avec les filtres actuels.</p>
+                    <button class="btn btn-primary" @onclick="NaviguerVersChantiers">
+                        <i class="oi oi-plus"></i> Aller aux chantiers pour créer des documents
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Modal détails document -->
+@if (documentDetails != null && showDetailsModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Détails du Document</h5>
+                    <button type="button" class="btn-close" @onclick="FermerDetailsModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Informations générales</h6>
+                            <p><strong>Nom:</strong> @documentDetails.NomFichier</p>
+                            <p><strong>Type:</strong> @GetTypeDocumentLabel(documentDetails.TypeDocument)</p>
+                            <p><strong>Format:</strong> @documentDetails.FormatExport</p>
+                            <p><strong>Créé le:</strong> @documentDetails.DateCreation.ToString("dd/MM/yyyy HH:mm")</p>
+                            <p><strong>Statut:</strong>
+                                @if (documentDetails.EnCours)
+                                {
+                                    <span class="badge bg-warning">En cours</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Finalisé</span>
+                                }
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Chantier associé</h6>
+                            <p><strong>Projet:</strong> @documentDetails.Chantier?.NomProjet</p>
+                            <p><strong>Maître d'ouvrage:</strong> @documentDetails.Chantier?.MaitreOuvrage</p>
+                            <p><strong>Adresse:</strong> @documentDetails.Chantier?.Adresse</p>
+                            <p><strong>Lot:</strong> @documentDetails.NumeroLot - @documentDetails.IntituleLot</p>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h6>Options du document</h6>
+                            <div class="d-flex gap-2">
+                                @if (documentDetails.IncludePageDeGarde)
+                                {
+                                    <span class="badge bg-info">Page de garde incluse</span>
+                                }
+                                @if (documentDetails.IncludeTableMatieres)
+                                {
+                                    <span class="badge bg-info">Table des matières incluse</span>
+                                }
+                                @if (!string.IsNullOrEmpty(documentDetails.CheminFichier))
+                                {
+                                    <span class="badge bg-success">PDF généré</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="() => ConsulterDocument(documentDetails.Id)">
+                        <i class="oi oi-pencil"></i> Éditer
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" @onclick="() => SupprimerDocument(documentDetails.Id)">
+                        <i class="oi oi-trash"></i> Supprimer
+                    </button>
+                    <button type="button" class="btn btn-secondary" @onclick="FermerDetailsModal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<DocumentGenere> documents = new();
+    private List<DocumentGenere> documentsAffiches = new();
+    private List<Chantier> chantiers = new();
+    private DocumentGenere? documentDetails = null;
+    private DocumentStats? documentsStats = null;
+
+    private bool isLoading = false;
+    private bool showDetailsModal = false;
+
+    // Filtres
+    private string typeDocumentFilter = "";
+    private int chantierIdFilter = 0;
+    private bool showFinalisedOnly = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDocuments();
+        await LoadChantiers();
+        LoadStats();
+        ApplyFilters();
+    }
+
+    private async Task LoadDocuments()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Utiliser uniquement le repository pour éviter les problèmes de cache entre services
+            var allDocuments = await documentRepository.GetDocumentSummariesAsync();
+            documents = allDocuments.Select(dto => new DocumentGenere
+            {
+                Id = dto.Id,
+                NomFichier = dto.NomFichier,
+                TypeDocument = dto.TypeDocument,
+                FormatExport = dto.FormatExport,
+                DateCreation = dto.DateCreation,
+                EnCours = dto.EnCours,
+                NumeroLot = dto.NumeroLot,
+                IntituleLot = dto.IntituleLot,
+                IncludePageDeGarde = dto.IncludePageDeGarde,
+                IncludeTableMatieres = dto.IncludeTableMatieres,
+                // ChantierId et CheminFichier pas disponibles dans DocumentSummaryDto
+                ChantierId = 0,
+                CheminFichier = "",
+                Chantier = new Chantier
+                {
+                    Id = 0, // Pas d'ID de chantier disponible dans DTO
+                    NomProjet = dto.ChantierNom,
+                    Adresse = dto.ChantierAdresse,
+                    MaitreOuvrage = "" // Pas disponible dans DocumentSummaryDto
+                }
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement des documents: {ex.Message}");
+            Console.WriteLine($"[ERROR] LoadDocuments: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadChantiers()
+    {
+        try
+        {
+            chantiers = await chantierService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] LoadChantiers: {ex.Message}");
+        }
+    }
+
+    private void LoadStats()
+    {
+        try
+        {
+            if (documents?.Any() == true)
+            {
+                documentsStats = new DocumentStats
+                {
+                    TotalDocuments = documents.Count,
+                    DocumentsEnCours = documents.Count(d => d.EnCours),
+                    DocumentsFinalises = documents.Count(d => !d.EnCours),
+                    TailleTotale = CalculerTailleTotale()
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] LoadStats: {ex.Message}");
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        if (documents?.Any() != true)
+        {
+            documentsAffiches = new List<DocumentGenere>();
+            return;
+        }
+
+        var query = documents.AsEnumerable();
+
+        // Filtre par type
+        if (!string.IsNullOrEmpty(typeDocumentFilter))
+        {
+            if (Enum.TryParse<TypeDocumentGenere>(typeDocumentFilter, out var type))
+            {
+                query = query.Where(d => d.TypeDocument == type);
+            }
+        }
+
+        // Filtre par chantier (désactivé temporairement - ChantierId pas disponible dans DTO)
+        // TODO: Améliorer DocumentSummaryDto pour inclure ChantierId
+        if (chantierIdFilter > 0)
+        {
+            // Filtrer par nom de chantier à la place
+            var selectedChantier = chantiers.FirstOrDefault(c => c.Id == chantierIdFilter);
+            if (selectedChantier != null)
+            {
+                query = query.Where(d => d.Chantier?.NomProjet == selectedChantier.NomProjet);
+            }
+        }
+
+        // Filtre par statut
+        if (showFinalisedOnly)
+        {
+            query = query.Where(d => !d.EnCours);
+        }
+
+        documentsAffiches = query
+            .OrderByDescending(d => d.DateCreation)
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Supprime un document avec prévisualisation avancée de l'impact
+    /// Utilise le DeletionService robuste avec validation, gestion des fichiers et audit
+    /// </summary>
+    private async Task SupprimerDocument(int documentId)
+    {
+        try
+        {
+            // 1. Obtenir l'impact de la suppression
+            var impact = await deletionService.GetDocumentDeletionImpactAsync(documentId);
+
+            // 2. Construire le message de confirmation détaillé
+            var document = documents.FirstOrDefault(d => d.Id == documentId);
+            var confirmationMessage = $"Êtes-vous sûr de vouloir supprimer ce document ?\n\n" +
+                                    $"📄 DOCUMENT : {document?.NomFichier}\n" +
+                                    $"🏗️ CHANTIER : {document?.Chantier?.NomProjet}\n\n" +
+                                    $"⚠️ IMPACT DE LA SUPPRESSION :\n" +
+                                    $"• {impact.SectionsLibresCount} section(s) libre(s)\n" +
+                                    $"• {FormatFileSize(impact.TotalFileSize)} de données\n\n";
+
+            if (impact.Warnings.Any())
+            {
+                confirmationMessage += $"🔸 AVERTISSEMENTS :\n";
+                foreach (var warning in impact.Warnings)
+                {
+                    confirmationMessage += $"• {warning}\n";
+                }
+                confirmationMessage += "\n";
+            }
+
+            confirmationMessage += "\n❌ Cette action est IRRÉVERSIBLE !";
+
+            // 3. Confirmation avec détails
+            var confirmResult = await DialogService.Confirm(
+                confirmationMessage,
+                "⚠️ SUPPRESSION DÉFINITIVE DU DOCUMENT",
+                new Radzen.ConfirmOptions {
+                    OkButtonText = "🗑️ SUPPRIMER DÉFINITIVEMENT",
+                    CancelButtonText = "❌ Annuler",
+                    Width = "500px",
+                    Height = "400px"
+                });
+
+            if (confirmResult == true)
+            {
+                // 4. Notification de début d'opération
+                NotificationService.Notify(Radzen.NotificationSeverity.Info, "Suppression en cours...",
+                    $"Suppression du document '{document?.NomFichier}' et de ses {impact.SectionsLibresCount} section(s)...");
+
+                // 5. Suppression avec options d'audit
+                var options = new DeletionOptions
+                {
+                    DeletePhysicalFiles = true,
+                    EnableAuditLogging = true,
+                    InitiatedBy = "Interface Documents",
+                    Reason = "Suppression manuelle d'un document via interface utilisateur"
+                };
+
+                var result = await deletionService.DeleteDocumentAsync(documentId, options);
+
+                if (result.Success)
+                {
+                    // 6. Mise à jour de l'interface
+                    await LoadDocuments();
+                    LoadStats();
+                    ApplyFilters();
+
+                    // Fermer le modal de détails si ouvert
+                    if (documentDetails?.Id == documentId)
+                    {
+                        FermerDetailsModal();
+                    }
+
+                    // 7. Notification de succès détaillée
+                    var successMessage = $"Document '{document?.NomFichier}' supprimé avec succès !\n" +
+                                       $"• {result.FilesDeleted} fichier(s) supprimé(s)\n" +
+                                       $"• {result.RecordsDeleted} enregistrement(s) supprimé(s)\n" +
+                                       $"• Durée: {result.Duration.TotalSeconds:F2}s";
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "✅ Suppression Réussie", successMessage);
+                }
+                else
+                {
+                    // 8. Gestion des erreurs avec détails
+                    var errorMessage = "Échec de la suppression :\n" + string.Join("\n", result.Messages);
+                    NotificationService.Notify(Radzen.NotificationSeverity.Error, "❌ Erreur de Suppression", errorMessage);
+
+                    if (result.Exception != null)
+                    {
+                        Console.WriteLine($"[DEBUG] Deletion error: {result.Exception.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // 9. Gestion d'erreur globale
+            var errorMsg = $"Erreur inattendue lors de la suppression: {ex.Message}";
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "❌ Erreur Critique", errorMsg);
+            Console.WriteLine($"[ERROR] SupprimerDocument exception: {ex}");
+        }
+    }
+
+    private void ConsulterDocument(int documentId)
+    {
+        Navigation.NavigateTo($"/document/{documentId}");
+    }
+
+    private async Task VoirDetailsDocument(DocumentGenere document)
+    {
+        try
+        {
+            // Charger les détails complets du document
+            documentDetails = await documentService.GetByIdAsync(document.Id);
+            showDetailsModal = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", $"Erreur lors du chargement des détails: {ex.Message}");
+        }
+    }
+
+    private void FermerDetailsModal()
+    {
+        showDetailsModal = false;
+        documentDetails = null;
+        StateHasChanged();
+    }
+
+    #region Méthodes utilitaires
+
+    private static string GetTypeDocumentClass(TypeDocumentGenere type) => type switch
+    {
+        TypeDocumentGenere.DOE => "bg-primary",
+        TypeDocumentGenere.DossierTechnique => "bg-info",
+        TypeDocumentGenere.MemoireTechnique => "bg-secondary",
+        _ => "bg-dark"
+    };
+
+    private static string GetTypeDocumentLabel(TypeDocumentGenere type) => type switch
+    {
+        TypeDocumentGenere.DOE => "DOE",
+        TypeDocumentGenere.DossierTechnique => "Dossier Technique",
+        TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
+        _ => type.ToString()
+    };
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size = size / 1024;
+        }
+
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private long CalculerTailleTotale()
+    {
+        long total = 0;
+        foreach (var doc in documents)
+        {
+            if (!string.IsNullOrEmpty(doc.CheminFichier) && File.Exists(doc.CheminFichier))
+            {
+                var fileInfo = new FileInfo(doc.CheminFichier);
+                total += fileInfo.Length;
+            }
+        }
+        return total;
+    }
+
+    private void NaviguerVersChantiers()
+    {
+        Navigation.NavigateTo("/chantiers");
+    }
+
+    #endregion
+
+    #region Classes utilitaires
+
+    private class DocumentStats
+    {
+        public int TotalDocuments { get; set; }
+        public int DocumentsEnCours { get; set; }
+        public int DocumentsFinalises { get; set; }
+        public long TailleTotale { get; set; }
+    }
+
+    #endregion
+}

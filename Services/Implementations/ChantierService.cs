@@ -12,14 +12,19 @@ namespace GenerateurDOE.Services.Implementations;
 public class ChantierService : IChantierService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+    private readonly IDeletionService _deletionService;
 
     /// <summary>
     /// Initialise une nouvelle instance du service ChantierService
     /// </summary>
     /// <param name="contextFactory">Factory pour créer les contextes EF thread-safe</param>
-    public ChantierService(IDbContextFactory<ApplicationDbContext> contextFactory)
+    /// <param name="deletionService">Service de suppression centralisé avec validation et audit</param>
+    public ChantierService(
+        IDbContextFactory<ApplicationDbContext> contextFactory,
+        IDeletionService deletionService)
     {
         _contextFactory = contextFactory;
+        _deletionService = deletionService;
     }
 
     /// <summary>
@@ -138,14 +143,28 @@ public class ChantierService : IChantierService
         return chantier;
     }
 
+    /// <summary>
+    /// Supprime un chantier avec gestion complète des dépendances via DeletionService
+    /// AMÉLIORATION: Utilise maintenant le service centralisé pour validation, audit et gestion des fichiers
+    /// </summary>
+    /// <param name="id">Identifiant du chantier à supprimer</param>
+    /// <exception cref="InvalidOperationException">Si la suppression échoue selon les règles métier</exception>
     public async Task DeleteAsync(int id)
     {
-        var chantier = await GetByIdAsync(id);
-        if (chantier != null)
+        var options = new DeletionOptions
         {
-            using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
-            context.Chantiers.Remove(chantier);
-            await context.SaveChangesAsync();
+            DeletePhysicalFiles = true,
+            EnableAuditLogging = true,
+            InitiatedBy = "ChantierService",
+            Reason = "Suppression via interface de gestion des chantiers"
+        };
+
+        var result = await _deletionService.DeleteChantierAsync(id, options);
+
+        if (!result.Success)
+        {
+            var errorMessage = string.Join("; ", result.Messages);
+            throw new InvalidOperationException($"Échec de la suppression du chantier ID {id}: {errorMessage}");
         }
     }
 

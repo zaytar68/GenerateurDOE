@@ -199,6 +199,9 @@ namespace GenerateurDOE.Services.Implementations
 
                 // 5. Fiches techniques (PDFs existants)
                 _progressService.UpdateProgress(document.Id, PdfGenerationStep.FichesTechniques);
+                var missingPdfs = new List<string>();
+                var includedPdfs = 0;
+
                 if (document.FTConteneur?.Elements?.Any() == true)
                 {
                     var totalElements = document.FTConteneur.Elements.Count;
@@ -206,16 +209,43 @@ namespace GenerateurDOE.Services.Implementations
 
                     foreach (var element in document.FTConteneur.Elements.OrderBy(e => e.Ordre))
                     {
-                        if (element.ImportPDF?.CheminFichier != null && File.Exists(element.ImportPDF.CheminFichier))
+                        if (element.ImportPDF?.CheminFichier != null)
                         {
-                            var existingPdfBytes = await File.ReadAllBytesAsync(element.ImportPDF.CheminFichier);
-                            pdfParts.Add(existingPdfBytes);
+                            if (File.Exists(element.ImportPDF.CheminFichier))
+                            {
+                                var existingPdfBytes = await File.ReadAllBytesAsync(element.ImportPDF.CheminFichier);
+                                pdfParts.Add(existingPdfBytes);
+                                includedPdfs++;
+                                _loggingService.LogDebug($"[PDF-GENERATION] PDF inclus: {element.ImportPDF.NomFichierOriginal}");
+                            }
+                            else
+                            {
+                                var missingFileName = element.ImportPDF.NomFichierOriginal ?? Path.GetFileName(element.ImportPDF.CheminFichier) ?? "Fichier inconnu";
+                                missingPdfs.Add(missingFileName);
+                                _loggingService.LogWarning($"[PDF-GENERATION] PDF MANQUANT lors de la génération du document {document.Id}: {missingFileName} (Chemin: {element.ImportPDF.CheminFichier})");
+                            }
+                        }
+                        else if (element.ImportPDF != null)
+                        {
+                            _loggingService.LogWarning($"[PDF-GENERATION] ImportPDF sans chemin de fichier pour le document {document.Id} (Element ID: {element.Id})");
                         }
 
                         processedElements++;
                         // Mise à jour du message avec le nombre de fiches traitées
-                        _progressService.UpdateProgress(document.Id, PdfGenerationStep.FichesTechniques,
-                            $"Intégration des fiches techniques ({processedElements}/{totalElements})");
+                        var statusMessage = missingPdfs.Any()
+                            ? $"Intégration des fiches techniques ({processedElements}/{totalElements}) - {missingPdfs.Count} PDF(s) manquant(s)"
+                            : $"Intégration des fiches techniques ({processedElements}/{totalElements})";
+                        _progressService.UpdateProgress(document.Id, PdfGenerationStep.FichesTechniques, statusMessage);
+                    }
+
+                    // Logging de synthèse
+                    if (missingPdfs.Any())
+                    {
+                        _loggingService.LogWarning($"[PDF-GENERATION] RÉSUMÉ pour document {document.Id}: {includedPdfs} PDFs inclus, {missingPdfs.Count} PDFs manquants. PDFs manquants: [{string.Join(", ", missingPdfs)}]");
+                    }
+                    else
+                    {
+                        _loggingService.LogInformation($"[PDF-GENERATION] Tous les PDFs intégrés avec succès pour le document {document.Id}: {includedPdfs} fichiers");
                     }
                 }
 
