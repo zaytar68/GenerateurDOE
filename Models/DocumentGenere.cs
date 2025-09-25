@@ -45,14 +45,12 @@ public class DocumentGenere
     
     public bool EnCours { get; set; } = true;
     
-    [Required(ErrorMessage = "Le numéro de lot est requis")]
     [StringLength(50, ErrorMessage = "Le numéro de lot ne peut pas dépasser 50 caractères")]
     public string NumeroLot { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Intitulé du lot spécifique à ce document (migration Phase 2)
     /// </summary>
-    [Required(ErrorMessage = "L'intitulé du lot est requis")]
     [StringLength(300, ErrorMessage = "L'intitulé du lot ne peut pas dépasser 300 caractères")]
     public string IntituleLot { get; set; } = string.Empty;
     

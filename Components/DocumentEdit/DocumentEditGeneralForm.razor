@@ -13,7 +13,7 @@
                 <select class="form-select @(TypeDocumentError ? "is-invalid" : "")"
                         id="typeDocument"
                         value="@SelectedTypeDocumentString"
-                        @onchange="OnTypeDocumentChanged">
+                        @onchange="HandleTypeChange">
                     <option value="">-- Sélectionner un type --</option>
                     @foreach (var type in Enum.GetValues<TypeDocumentGenere>())
                     {
@@ -31,6 +31,7 @@
             <div class="col-12">
                 <label for="nomFichier" class="form-label">Nom du Fichier *</label>
                 <InputText @bind-Value="Document.NomFichier"
+                          @oninput="OnFileNameInput"
                           class="form-control"
                           id="nomFichier"
                           placeholder="ex: DOE_Tour_Europe_2025"
@@ -164,6 +165,11 @@ else
     [Parameter] public EventCallback OnEditTemplateClick { get; set; }
 
     /// <summary>
+    /// Callback pour signaler que le nom de fichier a été modifié manuellement
+    /// </summary>
+    [Parameter] public EventCallback OnFileNameManuallyChanged { get; set; }
+
+    /// <summary>
     /// Retourne le libellé d'affichage pour un type de document
     /// </summary>
     private string GetTypeDisplayName(TypeDocumentGenere type)
@@ -175,5 +181,27 @@ else
             TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
             _ => type.ToString()
         };
+    }
+
+    /// <summary>
+    /// Détecte la saisie manuelle dans le champ nom de fichier
+    /// </summary>
+    private async Task OnFileNameInput(ChangeEventArgs e)
+    {
+        // Informer le parent que le nom a été modifié manuellement
+        await OnFileNameManuallyChanged.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Gère le changement de sélection du type de document
+    /// </summary>
+    private async Task HandleTypeChange(ChangeEventArgs e)
+    {
+        // Mettre à jour la valeur sélectionnée
+        var newValue = e.Value?.ToString() ?? string.Empty;
+        await SelectedTypeDocumentStringChanged.InvokeAsync(newValue);
+
+        // Notifier le parent du changement
+        await OnTypeDocumentChanged.InvokeAsync();
     }
 }

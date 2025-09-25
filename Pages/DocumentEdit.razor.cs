@@ -60,6 +60,7 @@ public partial class DocumentEdit : ComponentBase
 
     private string selectedTypeDocumentString = string.Empty;
     private bool typeDocumentError = false;
+    private bool isFileNameManuallySet = false;
 
     #endregion
 
@@ -154,8 +155,13 @@ public partial class DocumentEdit : ComponentBase
                     ChantierId = ChantierId.Value,
                     IncludePageDeGarde = true,
                     IncludeTableMatieres = true,
-                    EnCours = true
+                    EnCours = true,
+                    TypeDocument = TypeDocumentGenere.DOE // Valeur par défaut
                 };
+
+                // Initialiser la string de sélection avec la valeur par défaut
+                selectedTypeDocumentString = document.TypeDocument.ToString();
+
                 GenerateDefaultFileName();
             }
         }
@@ -248,7 +254,7 @@ public partial class DocumentEdit : ComponentBase
     /// </summary>
     private void GenerateDefaultFileName()
     {
-        if (document != null && string.IsNullOrWhiteSpace(document.NomFichier))
+        if (document != null && (!isFileNameManuallySet || string.IsNullOrWhiteSpace(document.NomFichier) || IsAutomaticallyGeneratedName(document.NomFichier)))
         {
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd");
             document.NomFichier = document.TypeDocument switch
@@ -258,7 +264,24 @@ public partial class DocumentEdit : ComponentBase
                 TypeDocumentGenere.MemoireTechnique => $"MemoireTechnique_{chantier?.NomProjet?.Replace(" ", "_") ?? "Document"}_{timestamp}",
                 _ => $"Document_{timestamp}"
             };
+
+            // Marquer comme nom généré automatiquement
+            isFileNameManuallySet = false;
         }
+    }
+
+    /// <summary>
+    /// Détecte si un nom de fichier suit le pattern de génération automatique
+    /// </summary>
+    private bool IsAutomaticallyGeneratedName(string fileName)
+    {
+        if (string.IsNullOrEmpty(fileName))
+            return false;
+
+        return fileName.StartsWith("DOE_") ||
+               fileName.StartsWith("DossierTechnique_") ||
+               fileName.StartsWith("MemoireTechnique_") ||
+               fileName.StartsWith("Document_");
     }
 
     /// <summary>
@@ -278,12 +301,6 @@ public partial class DocumentEdit : ComponentBase
 
         if (string.IsNullOrWhiteSpace(document.NomFichier))
             errors.Add("Le nom du fichier est requis");
-
-        if (string.IsNullOrWhiteSpace(document.NumeroLot))
-            errors.Add("Le numéro de lot est requis");
-
-        if (string.IsNullOrWhiteSpace(document.IntituleLot))
-            errors.Add("L'intitulé du lot est requis");
 
         if (errors.Any())
         {
@@ -463,6 +480,16 @@ public partial class DocumentEdit : ComponentBase
             }
         }
 
+        hasUnsavedChanges = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Marque le nom de fichier comme ayant été modifié manuellement par l'utilisateur
+    /// </summary>
+    public void OnFileNameManuallyChanged()
+    {
+        isFileNameManuallySet = true;
         hasUnsavedChanges = true;
         StateHasChanged();
     }
