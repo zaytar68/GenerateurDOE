@@ -25,6 +25,22 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **📄 Fiches techniques** : Application uniforme du pied de page sur PDFs importés
 - **🎯 Exclusion page de garde** : Logique conditionnelle pour préserver l'esthétique
 
+## [2.1.1] - 2025-09-25
+
+### Corrigé
+- **🔥 Bug validation création documents** : Correction des champs lot obligatoires alors qu'ils doivent être optionnels
+- **🎯 Type de document pré-sélectionné** : Initialisation automatique à "DOE" lors de la création d'un nouveau document
+- **📝 Synchronisation selectedTypeDocumentString** : Correction du problème "Type de document requis" malgré une sélection
+- **⚡ Callback de sélection amélioré** : HandleTypeChange avec mise à jour appropriée du modèle
+- **✏️ Détection saisie manuelle** : Préservation des noms de fichiers personnalisés par l'utilisateur
+- **🔄 Génération automatique intelligente** : IsAutomaticallyGeneratedName() pour détecter les patterns automatiques
+
+### Technique
+- Suppression des attributs `[Required]` sur `NumeroLot` et `IntituleLot` dans `DocumentGenere.cs`
+- Correction du binding bidirectionnel dans `DocumentEditGeneralForm.razor`
+- Ajout flag `isFileNameManuallySet` pour tracking des modifications utilisateur
+- Amélioration de `GenerateDefaultFileName()` avec logique conditionnelle intelligente
+
 ## [Non publié]
 
 ### Ajouté
