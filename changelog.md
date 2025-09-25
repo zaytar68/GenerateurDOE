@@ -5,9 +5,33 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-09-24
+
+### ✨ **Fonctionnalité Majeure - Pied de page avec surimpression**
+- **🎯 Pied de page global** : Système de surimpression automatique sur toutes les pages (sauf page de garde)
+- **📊 Numérotation globale** : Pages numérotées correctement sur l'ensemble du document (ex: 5/23, 6/23)
+- **📑 Informations contextuelles** : Nom du chantier + type de document alignés à gauche, pagination à droite
+- **🎨 Design professionnel** : Fond gris clair (#F5F5F5) pour une meilleure lisibilité
+- **📎 Compatibilité totale** : Surimpression uniforme sur pages générées ET fiches techniques PDF importées
+
+### Technique
+- **Architecture post-processing** : Workflow PuppeteerSharp → Assembly → Post-processing → Optimisation
+- **PDFSharp Graphics** : Rendu vectoriel haute qualité avec XGraphics pour positionnement précis
+- **Options configurables** : `DisableFooterForPostProcessing` et `EnableFooterPostProcessing` pour contrôle granulaire
+- **Rétrocompatibilité** : Paramètres optionnels préservant l'API existante
+
+### Corrigé
+- **🔥 Bug pagination locale** : Correction "1/1" → numérotation globale correcte
+- **📄 Fiches techniques** : Application uniforme du pied de page sur PDFs importés
+- **🎯 Exclusion page de garde** : Logique conditionnelle pour préserver l'esthétique
+
 ## [Non publié]
 
 ### Ajouté
+- **🎨 Interface Chantiers modernisée** : Conversion du layout en cartes vers présentation en tableau responsive
+- **🆕 Bouton "Nouveau Document"** : Création rapide de documents depuis la page Chantiers avec navigation directe
+- **📊 Tableau documents professionnel** : Colonnes Document, Type, Lot, Créé le, Statut, Actions avec badges colorés
+- **🎯 État vide amélioré** : Message contextuel et bouton de création pour chantiers sans documents
 - **Service de comptage de pages PDF** : PdfPageCountService avec cache intelligent et persistence base de données
 - **API Table des matières** : TableOfContentsController pour récupération dynamique de la structure TOC
 - **Interface TOC personnalisable** : Mode automatique/personnalisable dans TableMatieresEditor avec drag & drop des entrées
