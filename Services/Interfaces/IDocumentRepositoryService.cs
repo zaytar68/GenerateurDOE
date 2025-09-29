@@ -35,5 +35,8 @@ public interface IDocumentRepositoryService
     // Méthodes pour tests et composants
     Task<DocumentGenere?> GetFirstDocumentAsync();
     Task<DocumentGenere?> GetDocumentWithFTContainerAsync();
+
+    // Cache management
+    void InvalidateChantierCache(int chantierId);
 }
 

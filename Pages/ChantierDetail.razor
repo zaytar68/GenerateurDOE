@@ -5,6 +5,7 @@
 @inject IDocumentGenereService documentGenereService
 @inject IDocumentDownloadService documentDownloadService
 @inject IPdfProgressDialogService pdfProgressDialogService
+@inject IDocumentRepositoryService documentRepositoryService
 @inject NavigationManager Navigation
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
@@ -189,10 +190,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // S'abonner aux changements de navigation pour détecter les retours depuis DocumentEdit
-        Navigation.LocationChanged += OnLocationChanged;
-        await ChargerChantier();
-        isInitialized = true;
+        // Protection contre le prerendering : éviter les doubles exécutions
+        if (!isInitialized)
+        {
+            await RefreshPageAsync();
+            isInitialized = true;
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -200,28 +203,26 @@
         // ⚡ CORRECTION CONCURRENCE: Éviter double exécution OnInitialized + OnParametersSet
         if (ChantierId > 0 && isInitialized)
         {
-            await ChargerChantier();
+            await RefreshPageAsync();
         }
     }
 
-    private async void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-    {
-        // Recharger les données uniquement si on revient sur cette page depuis une autre
-        var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (currentPath == $"chantier/{ChantierId}" && isInitialized)
-        {
-            await InvokeAsync(async () =>
-            {
-                await ChargerChantier();
-                StateHasChanged();
-            });
-        }
-    }
 
     public void Dispose()
     {
-        // Se désabonner pour éviter les fuites mémoire
-        Navigation.LocationChanged -= OnLocationChanged;
+        // Aucun événement à nettoyer depuis suppression LocationChanged
+    }
+
+    private void ForceRefreshPage()
+    {
+        // Navigation forcée pour garantir la fraîcheur des données après CRUD
+        Navigation.NavigateTo($"/chantier/{ChantierId}", forceLoad: true);
+    }
+
+    private async Task RefreshPageAsync()
+    {
+        await ChargerChantier();
+        StateHasChanged();
     }
 
     private async Task ChargerChantier()
@@ -271,8 +272,11 @@
                 await chantierService.ArchiveAsync(chantier.Id);
                 NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier archivé");
             }
-            
-            await ChargerChantier(); // Recharger pour mettre à jour l'état
+
+            // ⚡ INVALIDATION CACHE : Force rafraîchissement immédiat de l'affichage
+            documentRepositoryService.InvalidateChantierCache(ChantierId);
+
+            ForceRefreshPage(); // Recharger forcé pour mettre à jour l'état
         }
         catch (Exception ex)
         {
@@ -355,7 +359,10 @@
                 // Recharger la liste si le document est dupliqué dans le même chantier
                 if (duplicationResult.ChantierId == ChantierId)
                 {
-                    await ChargerChantier();
+                    // ⚡ INVALIDATION CACHE : Force rafraîchissement immédiat pour duplication même chantier
+                    documentRepositoryService.InvalidateChantierCache(ChantierId);
+
+                    ForceRefreshPage();
                 }
             }
         }
@@ -390,9 +397,12 @@
             try
             {
                 await documentGenereService.DeleteDocumentGenereAsync(document.Id);
+
+                // ⚡ INVALIDATION CACHE : Force rafraîchissement immédiat de l'affichage
+                documentRepositoryService.InvalidateChantierCache(ChantierId);
+
                 NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document supprimé");
-                await ChargerChantier(); // Recharger la liste
-                StateHasChanged(); // Forcer la mise à jour de l'interface
+                ForceRefreshPage(); // Recharger la liste
             }
             catch (Exception ex)
             {

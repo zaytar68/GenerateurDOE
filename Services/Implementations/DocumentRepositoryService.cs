@@ -321,9 +321,14 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         context.DocumentsGeneres.Add(document);
         await context.SaveChangesAsync().ConfigureAwait(false);
 
-        // Invalidate cache
+        // ⚡ INVALIDATION CACHE : Invalider cache global ET cache spécifique du chantier
         InvalidateDocumentCaches();
-        
+        if (document.ChantierId > 0)
+        {
+            var chantierCacheKey = $"{CACHE_KEY_PREFIX}Chantier_{document.ChantierId}";
+            _cache.Remove(chantierCacheKey);
+        }
+
         return document;
     }
 
@@ -338,10 +343,15 @@ public class DocumentRepositoryService : IDocumentRepositoryService
         context.DocumentsGeneres.Update(document);
         await context.SaveChangesAsync().ConfigureAwait(false);
 
-        // Invalidate cache
+        // ⚡ INVALIDATION CACHE : Invalider cache global, summary ET cache spécifique du chantier
         InvalidateDocumentCaches();
         _cache.Remove($"{CACHE_KEY_PREFIX}Summary_{document.Id}");
-        
+        if (document.ChantierId > 0)
+        {
+            var chantierCacheKey = $"{CACHE_KEY_PREFIX}Chantier_{document.ChantierId}";
+            _cache.Remove(chantierCacheKey);
+        }
+
         return document;
     }
 
@@ -533,8 +543,8 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                 DateCreation = d.DateCreation,
                 ChantierId = d.ChantierId,
                 ChantierNom = d.Chantier.NomProjet,
-                NbSections = d.SectionsConteneurs.Sum(sc => sc.Items.Count),
-                NbFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count : 0
+                NbSections = d.SectionsConteneurs.Count(),
+                NbFichesTechniques = d.FTConteneur != null ? d.FTConteneur.Elements.Count() : 0
             })
             .ToListAsync().ConfigureAwait(false);
             
@@ -695,6 +705,20 @@ public class DocumentRepositoryService : IDocumentRepositoryService
             .Where(d => d.FTConteneur != null && d.FTConteneur.Elements.Any(e => e.ImportPDF != null))
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Invalide le cache d'un chantier spécifique après opérations CRUD
+    /// Résout les problèmes d'affichage en forçant le rechargement des données
+    /// </summary>
+    /// <param name="chantierId">Identifiant du chantier à invalider</param>
+    public void InvalidateChantierCache(int chantierId)
+    {
+        var cacheKey = $"{CACHE_KEY_PREFIX}Chantier_{chantierId}";
+        _cache.Remove(cacheKey);
+
+        // Invalider aussi les caches globaux pour cohérence
+        InvalidateDocumentCaches();
     }
 
     /// <summary>
