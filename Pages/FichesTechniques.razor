@@ -3,11 +3,13 @@
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Data
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.WebUtilities
 @using Components
 @inject IFicheTechniqueService FicheTechniqueService
 @inject ITypeProduitService TypeProduitService
 @inject ITypeDocumentImportService TypeDocumentImportService
 @inject ILoadingStateService LoadingStateService
+@inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
 <PageTitle>Fiches Techniques</PageTitle>
@@ -458,6 +460,16 @@
     protected override async Task OnInitializedAsync()
     {
         await ChargerDonnees();
+
+        // Vérifier si on doit ouvrir le modal de création automatiquement
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("action", out var action)
+            && action == "nouveau")
+        {
+            // Petit délai pour s'assurer que la page est entièrement rendue
+            await Task.Delay(100);
+            OuvrirModalCreation();
+        }
     }
 
     private async Task ChargerDonnees()

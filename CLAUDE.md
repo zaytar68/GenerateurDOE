@@ -485,3 +485,4 @@ La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Cor
 - Crée et maintient un fichier changelog.md.
 - Synchronise le numéro de version du changlog avec appsettingd
 - l'application est déployée dans un conteneur linux sur un autre poste.
+- plus de develloppement local. Occupe toi uniquement du code et je deploiereais

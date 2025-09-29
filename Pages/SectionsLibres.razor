@@ -2,8 +2,10 @@
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Components.Shared
+@using Microsoft.AspNetCore.WebUtilities
 @inject ISectionLibreService SectionLibreService
 @inject ITypeSectionService TypeSectionService
+@inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
 <PageTitle>Sections Libres</PageTitle>
@@ -302,6 +304,16 @@
     protected override async Task OnInitializedAsync()
     {
         await ChargerDonnees();
+
+        // Vérifier si on doit ouvrir le modal de création automatiquement
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("action", out var action)
+            && action == "nouveau")
+        {
+            // Petit délai pour s'assurer que la page est entièrement rendue
+            await Task.Delay(100);
+            OuvrirModalNouvelleSection();
+        }
     }
 
     private async Task ChargerDonnees()

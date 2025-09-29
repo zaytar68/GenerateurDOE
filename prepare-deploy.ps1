@@ -5,14 +5,14 @@
 # ===================================================================
 
 param(
-    [string]$OutputPath = "../GenerateurDOE-Deploy",
+    [string]$OutputPath = "..\GenerateurDOE-Deploy",
     [switch]$Clean,
     [switch]$Help
 )
 
 if ($Help) {
     Write-Host "Usage: .\prepare-deploy.ps1 [-OutputPath PATH] [-Clean] [-Help]"
-    Write-Host "  -OutputPath PATH  : Répertoire de sortie (défaut: ../GenerateurDOE-Deploy)"
+    Write-Host "  -OutputPath PATH  : Répertoire de sortie (défaut: ..\GenerateurDOE-Deploy)"
     Write-Host "  -Clean           : Nettoyer le répertoire existant"
     Write-Host "  -Help            : Afficher cette aide"
     exit 0

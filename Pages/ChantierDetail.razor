@@ -9,6 +9,7 @@
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 @inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <PageTitle>Détail du Chantier</PageTitle>
 
@@ -111,6 +112,7 @@
                                         <tr>
                                             <th>Type de Document</th>
                                             <th>Nom du Fichier</th>
+                                            <th>Lot</th>
                                             <th>Date de Création</th>
                                             <th>Options</th>
                                             <th>Actions</th>
@@ -126,6 +128,7 @@
                                                     </span>
                                                 </td>
                                                 <td>@document.NomFichier</td>
+                                                <td>@GetLotDisplayText(document)</td>
                                                 <td>@document.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
                                                 <td>
                                                     @if (document.IncludePageDeGarde)
@@ -177,7 +180,7 @@
 
 @code {
     [Parameter] public int ChantierId { get; set; }
-    
+
     private Chantier? chantier;
     private List<DocumentGenere> documentsGeneres = new();
     private bool isLoading = true;
@@ -186,6 +189,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // S'abonner aux changements de navigation pour détecter les retours depuis DocumentEdit
+        Navigation.LocationChanged += OnLocationChanged;
         await ChargerChantier();
         isInitialized = true;
     }
@@ -197,6 +202,26 @@
         {
             await ChargerChantier();
         }
+    }
+
+    private async void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        // Recharger les données uniquement si on revient sur cette page depuis une autre
+        var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (currentPath == $"chantier/{ChantierId}" && isInitialized)
+        {
+            await InvokeAsync(async () =>
+            {
+                await ChargerChantier();
+                StateHasChanged();
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        // Se désabonner pour éviter les fuites mémoire
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 
     private async Task ChargerChantier()
@@ -214,15 +239,9 @@
         }
         catch (Exception ex)
         {
-            // Masquer les erreurs de concurrence DbContext (temporaire)
-            if (!ex.Message.Contains("A second operation was started on this context") &&
-                !ex.Message.Contains("context instance"))
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                    $"Erreur lors du chargement du chantier: {ex.Message}");
-            }
-            // Log l'erreur silencieusement pour debug
-            Console.WriteLine($"[DEBUG] ChantierDetail error (masqué): {ex.Message}");
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors du chargement du chantier: {ex.Message}");
+            Console.WriteLine($"[ERROR] ChantierDetail ChargerChantier: {ex.Message}");
         }
         finally
         {
@@ -257,13 +276,9 @@
         }
         catch (Exception ex)
         {
-            // Masquer les erreurs de concurrence DbContext (temporaire)
-            if (!ex.Message.Contains("A second operation was started on this context") &&
-                !ex.Message.Contains("context instance"))
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
-            }
-            Console.WriteLine($"[DEBUG] ArchiverChantier error (masqué): {ex.Message}");
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de l'archivage: {ex.Message}");
+            Console.WriteLine($"[ERROR] ArchiverChantier: {ex.Message}");
         }
     }
 
@@ -292,13 +307,9 @@
             }
             catch (Exception ex)
             {
-                // Masquer les erreurs de concurrence DbContext (temporaire)
-                if (!ex.Message.Contains("A second operation was started on this context") &&
-                    !ex.Message.Contains("context instance"))
-                {
-                    NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
-                }
-                Console.WriteLine($"[DEBUG] SupprimerChantier error (masqué): {ex.Message}");
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                    $"Erreur lors de la suppression du chantier: {ex.Message}");
+                Console.WriteLine($"[ERROR] SupprimerChantier: {ex.Message}");
             }
         }
     }
@@ -350,14 +361,9 @@
         }
         catch (Exception ex)
         {
-            // Masquer les erreurs de concurrence DbContext (temporaire)
-            if (!ex.Message.Contains("A second operation was started on this context") &&
-                !ex.Message.Contains("context instance"))
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                    $"Erreur lors de la duplication: {ex.Message}");
-            }
-            Console.WriteLine($"[DEBUG] DupliquerDocument error (masqué): {ex.Message}");
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la duplication: {ex.Message}");
+            Console.WriteLine($"[ERROR] DupliquerDocument: {ex.Message}");
         }
     }
 
@@ -386,16 +392,13 @@
                 await documentGenereService.DeleteDocumentGenereAsync(document.Id);
                 NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Document supprimé");
                 await ChargerChantier(); // Recharger la liste
+                StateHasChanged(); // Forcer la mise à jour de l'interface
             }
             catch (Exception ex)
             {
-                // Masquer les erreurs de concurrence DbContext (temporaire)
-                if (!ex.Message.Contains("A second operation was started on this context") &&
-                    !ex.Message.Contains("context instance"))
-                {
-                    NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", ex.Message);
-                }
-                Console.WriteLine($"[DEBUG] SupprimerDocument error (masqué): {ex.Message}");
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                    $"Erreur lors de la suppression: {ex.Message}");
+                Console.WriteLine($"[ERROR] SupprimerDocument: {ex.Message}");
             }
         }
     }
@@ -421,6 +424,29 @@
             TypeDocumentGenere.MemoireTechnique => "Mémoire Technique",
             _ => type.ToString()
         };
+    }
+
+    private string GetLotDisplayText(DocumentGenere document)
+    {
+        var hasNumero = !string.IsNullOrWhiteSpace(document.NumeroLot);
+        var hasIntitule = !string.IsNullOrWhiteSpace(document.IntituleLot);
+
+        if (hasNumero && hasIntitule)
+        {
+            return $"{document.NumeroLot} - {document.IntituleLot}";
+        }
+        else if (hasNumero)
+        {
+            return document.NumeroLot;
+        }
+        else if (hasIntitule)
+        {
+            return document.IntituleLot;
+        }
+        else
+        {
+            return "Non défini";
+        }
     }
 }
 

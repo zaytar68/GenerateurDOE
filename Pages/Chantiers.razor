@@ -2,6 +2,7 @@
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Components.Shared
+@using Microsoft.AspNetCore.WebUtilities
 @inject IChantierService chantierService
 @inject IDeletionService deletionService
 @inject Radzen.DialogService DialogService
@@ -146,6 +147,16 @@
     protected override async Task OnInitializedAsync()
     {
         await RefreshChantiers();
+
+        // Vérifier si on doit ouvrir le modal de création automatiquement
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("action", out var action)
+            && action == "nouveau")
+        {
+            // Petit délai pour s'assurer que la page est entièrement rendue
+            await Task.Delay(100);
+            await ShowCreateDialog();
+        }
     }
 
     private async Task RefreshChantiers()

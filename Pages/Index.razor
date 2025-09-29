@@ -33,23 +33,23 @@
                 <div class="row">
                     <!-- Bouton Nouveau Chantier -->
                     <div class="col-md-4 text-left">
-                        <button class="btn btn-primary" > 
+                        <button class="btn btn-primary" @onclick="NavigateToNouveauChantier">
                         <i class="oi oi-plus"></i> Nouveau Chantier
-                        </button> 
+                        </button>
                     </div>
 
                     <!-- Bouton Nouvelle Fiche Technique -->
                     <div class="col-md-4 text-center" align="center">
-                        <button class="btn btn-success" > 
+                        <button class="btn btn-success" @onclick="NavigateToNouvelleFicheTechnique">
                         <i class="oi oi-plus"></i> Nouvelle Fiche Technique
-                        </button> 
+                        </button>
                     </div>
 
                     <!-- Bouton Nouvelle Section -->
                     <div class="col-md-4 text-right" align="right">
-                        <button class="btn btn-warning" > 
+                        <button class="btn btn-warning" @onclick="NavigateToNouvelleSection">
                         <i class="oi oi-plus"></i> Nouvelle Section
-                        </button> 
+                        </button>
                     </div>
                 </div>
             </div>
@@ -264,4 +264,20 @@
         TypeDocumentGenere.MemoireTechnique => "warning",
         _ => "secondary"
     };
+
+    // Méthodes de navigation vers les pages avec ouverture automatique des modals
+    private void NavigateToNouveauChantier()
+    {
+        Navigation.NavigateTo("/chantiers?action=nouveau");
+    }
+
+    private void NavigateToNouvelleFicheTechnique()
+    {
+        Navigation.NavigateTo("/fiches-techniques?action=nouveau");
+    }
+
+    private void NavigateToNouvelleSection()
+    {
+        Navigation.NavigateTo("/sections-libres?action=nouveau");
+    }
 }
