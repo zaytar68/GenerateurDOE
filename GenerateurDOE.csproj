@@ -4,12 +4,42 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Version Information -->
+    <Version>2.1.3</Version>
+    <AssemblyVersion>2.1.3</AssemblyVersion>
+    <FileVersion>2.1.3</FileVersion>
+    <Product>Générateur DOE</Product>
+    <Company>Multisols</Company>
+    <Copyright>© 2025 Multisols</Copyright>
+    <Description>Application de génération de documents techniques (DOE, Dossiers Techniques, Mémoires Techniques)</Description>
+    <!-- Deployment Optimizations -->
+    <PublishAot>false</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <TrimmerDefaultAction>copyused</TrimmerDefaultAction>
+    <!-- PuppeteerSharp requires full runtime for browser automation -->
+    <IlcDisableReflection>false</IlcDisableReflection>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <!-- Production-specific properties -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <NoWarn>1591,8032</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.41.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.8">
+    <!-- DataProtection Extensions for Docker persistence -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="8.0.10" />
+    <!-- Database Providers -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

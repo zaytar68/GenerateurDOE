@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using GenerateurDOE.Data;
 using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
@@ -106,6 +107,13 @@ builder.Services.AddScoped<IOperationLockService, OperationLockService>();
 
 // Add health checks for Docker container monitoring
 builder.Services.AddHealthChecks();
+
+// Configure DataProtection for Docker containers
+// This ensures that antiforgery tokens and other protected data survive container restarts
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/app/DataProtection-Keys"))
+    .SetApplicationName("GenerateurDOE")
+    .SetDefaultKeyLifetime(TimeSpan.FromDays(90)); // Keys valid for 90 days
 
 // Service de suppression centralisé avec validation et audit
 builder.Services.AddScoped<IDeletionService, DeletionService>();

@@ -116,6 +116,7 @@ services:
       - /data/generateur-doe-data/documents/pdf:/app/Documents/PDF
       - /data/generateur-doe-data/documents/images:/app/Documents/Images
       - /data/generateur-doe-data/logs:/app/Logs
+      - /data/generateur-doe-data/dataprotection-keys:/app/DataProtection-Keys
       - /data/generateur-doe-data/temp:/app/wwwroot/temp
 
     healthcheck:

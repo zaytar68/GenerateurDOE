@@ -4,6 +4,7 @@ using GenerateurDOE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,13 +12,15 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GenerateurDOE.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250926153922_InitialMigrationPostgreSQL")]
+    partial class InitialMigrationPostgreSQL
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.8")
+                .HasAnnotation("ProductVersion", "8.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -430,12 +433,12 @@ namespace GenerateurDOE.Migrations
                     b.Property<string>("ContenuHtml")
                         .IsRequired()
                         .HasMaxLength(2147483647)
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ContenuJson")
                         .IsRequired()
                         .HasMaxLength(2147483647)
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("DateCreation")
                         .ValueGeneratedOnAdd()
@@ -556,12 +559,12 @@ namespace GenerateurDOE.Migrations
                     b.Property<string>("ContenuHtml")
                         .IsRequired()
                         .HasMaxLength(2147483647)
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ContenuJson")
                         .IsRequired()
                         .HasMaxLength(2147483647)
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("DateCreation")
                         .ValueGeneratedOnAdd()

@@ -89,8 +89,13 @@ RUN mkdir -p \
     /app/Documents/PDF \
     /app/Documents/Images \
     /app/Logs \
+    /app/DataProtection-Keys \
     /app/wwwroot/temp \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app \
+    && chmod -R 755 /app/Documents \
+    && chmod -R 777 /app/Logs \
+    && chmod -R 755 /app/DataProtection-Keys \
+    && chmod -R 755 /app/wwwroot
 
 # Copy application files from build stage
 COPY --from=build --chown=appuser:appuser /app/publish .

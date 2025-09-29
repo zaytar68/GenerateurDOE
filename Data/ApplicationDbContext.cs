@@ -39,11 +39,19 @@ public class ApplicationDbContext : DbContext
     public DbSet<FTElement> FTElements { get; set; }
     public DbSet<PageGardeTemplate> PageGardeTemplates { get; set; }
 
+    private string GetCurrentTimestampSql()
+    {
+        // Détection du provider pour utiliser la syntaxe correcte
+        var providerName = Database.ProviderName;
+        return providerName?.Contains("Npgsql") == true ? "CURRENT_TIMESTAMP" : "GETDATE()";
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        
+
         // ⚡ Configuration QuerySplittingBehavior pour optimiser les requêtes avec multiple collections
+        var timestampSql = GetCurrentTimestampSql();
 
         modelBuilder.Entity<Chantier>(entity =>
         {
@@ -52,8 +60,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.MaitreOeuvre).HasMaxLength(200).IsRequired();
             entity.Property(e => e.MaitreOuvrage).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Adresse).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
             entity.Property(e => e.EstArchive).HasDefaultValue(false);
         });
 
@@ -64,8 +72,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.NomFabricant).HasMaxLength(200).IsRequired();
             entity.Property(e => e.TypeProduit).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(1000);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
                 
         });
 
@@ -78,7 +86,7 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.TypeDocumentImportId)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.Property(e => e.DateImport).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateImport).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.FicheTechnique)
                 .WithMany(p => p.ImportsPDF)
@@ -91,8 +99,8 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Titre).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(5000).IsRequired();
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
         });
 
         modelBuilder.Entity<ImageMethode>(entity =>
@@ -101,7 +109,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CheminFichier).HasMaxLength(500).IsRequired();
             entity.Property(e => e.NomFichierOriginal).HasMaxLength(255);
             entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.DateImport).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateImport).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.Methode)
                 .WithMany(p => p.Images)
@@ -119,7 +127,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Parametres).HasMaxLength(10000);
             entity.Property(e => e.NumeroLot).HasMaxLength(50).IsRequired();
             entity.Property(e => e.IntituleLot).HasMaxLength(300).IsRequired();
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
             entity.Property(e => e.EnCours).HasDefaultValue(true);
             
             entity.HasOne(d => d.Chantier)
@@ -146,8 +154,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
         });
 
         modelBuilder.Entity<TypeDocumentImport>(entity =>
@@ -156,8 +164,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
         });
 
         modelBuilder.Entity<TypeSection>(entity =>
@@ -166,8 +174,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
         });
 
         modelBuilder.Entity<SectionLibre>(entity =>
@@ -175,10 +183,10 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Titre).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Ordre).IsRequired();
-            entity.Property(e => e.ContenuHtml).HasColumnType("nvarchar(max)");
-            entity.Property(e => e.ContenuJson).HasColumnType("nvarchar(max)");
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.ContenuHtml).HasColumnType("text");
+            entity.Property(e => e.ContenuJson).HasColumnType("text");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.TypeSection)
                 .WithMany(p => p.SectionsLibres)
@@ -191,8 +199,8 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Ordre).IsRequired();
             entity.Property(e => e.Titre).HasMaxLength(200);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.DocumentGenere)
                 .WithMany(p => p.SectionsConteneurs)
@@ -215,8 +223,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Titre).HasMaxLength(200);
             entity.Property(e => e.Ordre).IsRequired();
             entity.Property(e => e.AfficherTableauRecapitulatif).HasDefaultValue(true);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.DocumentGenere)
                 .WithOne(p => p.FTConteneur)
@@ -229,7 +237,7 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.PositionMarche).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Ordre).IsRequired();
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.FTConteneur)
                 .WithMany(p => p.Elements)
@@ -251,7 +259,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Ordre).IsRequired();
-            entity.Property(e => e.DateAjout).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateAjout).HasDefaultValueSql(timestampSql);
             
             entity.HasOne(d => d.SectionConteneur)
                 .WithMany(p => p.Items)
@@ -273,11 +281,11 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Nom).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.ContenuHtml).HasColumnType("nvarchar(max)").IsRequired();
-            entity.Property(e => e.ContenuJson).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ContenuHtml).HasColumnType("text").IsRequired();
+            entity.Property(e => e.ContenuJson).HasColumnType("text");
             entity.Property(e => e.EstParDefaut).HasDefaultValue(false);
-            entity.Property(e => e.DateCreation).HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.DateModification).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
+            entity.Property(e => e.DateModification).HasDefaultValueSql(timestampSql);
 
             // Index unique pour le nom
             entity.HasIndex(e => e.Nom).IsUnique();
