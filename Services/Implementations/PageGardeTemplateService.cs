@@ -3,6 +3,7 @@ using GenerateurDOE.Models;
 using GenerateurDOE.Services.Interfaces;
 using GenerateurDOE.Services.Shared;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;
 
 namespace GenerateurDOE.Services.Implementations
@@ -12,15 +13,18 @@ namespace GenerateurDOE.Services.Implementations
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILoggingService _loggingService;
         private readonly IConfigurationService _configurationService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public PageGardeTemplateService(
             IDbContextFactory<ApplicationDbContext> contextFactory,
             ILoggingService loggingService,
-            IConfigurationService configurationService)
+            IConfigurationService configurationService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _contextFactory = contextFactory;
             _loggingService = loggingService;
             _configurationService = configurationService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<IEnumerable<PageGardeTemplate>> GetAllTemplatesAsync()
@@ -221,9 +225,12 @@ namespace GenerateurDOE.Services.Implementations
                 html = Regex.Replace(html, @"\{\{system\.date\}\}", DateTime.Now.ToString("dd/MM/yyyy"), RegexOptions.IgnoreCase);
                 html = Regex.Replace(html, @"\{\{system\.nomEntreprise\}\}", "Réalisé par notre société", RegexOptions.IgnoreCase);
 
-                // Remplacer la variable logo
-                var logoDataUrl = await GetLogoAsBase64DataUrlAsync();
-                html = Regex.Replace(html, @"\{\{system\.logo\}\}", logoDataUrl, RegexOptions.IgnoreCase);
+                // Remplacer la variable logo avec URL absolue (même méthode que les sections libres)
+                var logoUrl = await GetLogoUrlAsync();
+                html = Regex.Replace(html, @"\{\{system\.logo\}\}", logoUrl, RegexOptions.IgnoreCase);
+
+                // Convertir les URLs relatives des images en URLs absolues (même logique que les sections libres)
+                html = ConvertRelativeImagesToAbsolute(html);
 
                 // Encapsuler dans une structure HTML complète avec les styles corrigés
                 html = WrapWithPageStructure(html);
@@ -257,9 +264,12 @@ namespace GenerateurDOE.Services.Implementations
                 html = Regex.Replace(html, @"\{\{system\.date\}\}", DateTime.Now.ToString("dd/MM/yyyy"), RegexOptions.IgnoreCase);
                 html = Regex.Replace(html, @"\{\{system\.nomEntreprise\}\}", "Notre Entreprise SARL", RegexOptions.IgnoreCase);
 
-                // Remplacer la variable logo
-                var logoDataUrl = await GetLogoAsBase64DataUrlAsync();
-                html = Regex.Replace(html, @"\{\{system\.logo\}\}", logoDataUrl, RegexOptions.IgnoreCase);
+                // Remplacer la variable logo avec URL absolue (même méthode que les sections libres)
+                var logoUrl = await GetLogoUrlAsync();
+                html = Regex.Replace(html, @"\{\{system\.logo\}\}", logoUrl, RegexOptions.IgnoreCase);
+
+                // Convertir les URLs relatives des images en URLs absolues (même logique que les sections libres)
+                html = ConvertRelativeImagesToAbsolute(html);
 
                 // Encapsuler dans une structure HTML complète avec les styles corrigés
                 html = WrapWithPageStructure(html);
@@ -296,7 +306,7 @@ namespace GenerateurDOE.Services.Implementations
             };
         }
 
-        private async Task<string> GetLogoAsBase64DataUrlAsync()
+        private async Task<string> GetLogoUrlAsync()
         {
             try
             {
@@ -327,23 +337,10 @@ namespace GenerateurDOE.Services.Implementations
                                 var fileName = Path.GetFileName(logoPath);
                                 _loggingService.LogInformation($"Logo trouvé pour template : {fileName}");
 
-                                // Lire le fichier et convertir en base64
-                                var logoBytes = await File.ReadAllBytesAsync(logoPath);
-                                var base64String = Convert.ToBase64String(logoBytes);
-
-                                // Déterminer le type MIME basé sur l'extension
-                                var extension_lower = Path.GetExtension(logoPath).ToLower();
-                                var mimeType = extension_lower switch
-                                {
-                                    ".png" => "image/png",
-                                    ".jpg" or ".jpeg" => "image/jpeg",
-                                    _ => "image/png"
-                                };
-
-                                // Construire la data URL complète
-                                var dataUrl = $"data:{mimeType};base64,{base64String}";
-                                _loggingService.LogInformation($"Logo converti en base64 pour template - Type: {mimeType} - Taille: {logoBytes.Length / 1024} KB");
-                                return dataUrl;
+                                // Construire l'URL absolue vers l'API d'images (même méthode que les sections libres)
+                                var logoUrl = $"{GetBaseUrl()}/api/images/{fileName}";
+                                _loggingService.LogInformation($"URL logo générée pour template : {logoUrl}");
+                                return logoUrl;
                             }
                         }
                     }
@@ -364,6 +361,58 @@ namespace GenerateurDOE.Services.Implementations
                 _loggingService.LogError(ex, $"Erreur lors de la recherche du logo pour template : {ex.Message}");
                 return string.Empty;
             }
+        }
+
+        /// <summary>
+        /// Convertit les URLs relatives des images en URLs absolues dans le contenu HTML
+        /// Transforme src="/images/nom.jpg" en src="http://localhost:5282/images/nom.jpg"
+        /// </summary>
+        /// <param name="htmlContent">Contenu HTML contenant potentiellement des images</param>
+        /// <returns>HTML avec URLs d'images converties en absolues</returns>
+        private string ConvertRelativeImagesToAbsolute(string htmlContent)
+        {
+            if (string.IsNullOrWhiteSpace(htmlContent))
+                return htmlContent;
+
+            var baseUrl = GetBaseUrl();
+            var pattern = @"src\s*=\s*[""']/images/([^""']+)[""']";
+            var replacement = $"src=\"{baseUrl}/images/$1\"";
+
+            var convertedHtml = Regex.Replace(htmlContent, pattern, replacement, RegexOptions.IgnoreCase);
+
+            // Log pour diagnostic
+            var matches = Regex.Matches(htmlContent, pattern, RegexOptions.IgnoreCase);
+            if (matches.Count > 0)
+            {
+                _loggingService.LogInformation($"Template : Conversion de {matches.Count} URLs d'images relatives vers URLs absolues avec base {baseUrl}");
+                foreach (Match match in matches)
+                {
+                    _loggingService.LogInformation($"  Template image convertie : /images/{match.Groups[1].Value} → {baseUrl}/images/{match.Groups[1].Value}");
+                }
+            }
+
+            return convertedHtml;
+        }
+
+        /// <summary>
+        /// Obtient l'URL de base dynamique du serveur en cours d'exécution
+        /// Utilise le contexte HTTP pour détecter automatiquement le scheme, host et port
+        /// </summary>
+        /// <returns>URL de base complète (ex: http://localhost:5282)</returns>
+        private string GetBaseUrl()
+        {
+            var request = _httpContextAccessor.HttpContext?.Request;
+            if (request != null)
+            {
+                var baseUrl = $"{request.Scheme}://{request.Host}";
+                _loggingService.LogInformation($"URL de base détectée dynamiquement pour template : {baseUrl}");
+                return baseUrl;
+            }
+
+            // Fallback si pas de contexte HTTP disponible
+            var fallbackUrl = "http://localhost:5282";
+            _loggingService.LogWarning($"Aucun contexte HTTP disponible pour template, utilisation du fallback : {fallbackUrl}");
+            return fallbackUrl;
         }
 
         private string WrapWithPageStructure(string bodyContent)
