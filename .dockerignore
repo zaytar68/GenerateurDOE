@@ -1,0 +1,79 @@
+# ===================================================================
+# Docker Ignore - Générateur DOE v2.1.3
+# ===================================================================
+# Exclusions pour optimiser la construction de l'image Docker
+# ===================================================================
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# IDE and development files
+**/.vs/
+**/.vscode/
+**/.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Runtime files
+**/*.log
+**/logs/
+**/Logs/
+**/temp/
+**/wwwroot/temp/
+
+# Test data and temporary files
+**/TestData/
+**/*test*
+**/*Test*
+
+# Git and version control
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Docker files (avoid recursive copying)
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# Package files
+**/packages/
+**/node_modules/
+**/*.tgz
+**/*.tar.gz
+
+# Documentation and scripts (not needed in container)
+**/*.md
+**/Scripts/
+**/docs/
+**/documentation/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+**/*.bak
+**/*.tmp
+**/*.temp
+
+# Application specific exclusions
+**/appsettings.Development.json
+**/libman.json
+**/package.json
+**/package-lock.json
+**/bundleconfig.json
+
+# Local development certificates
+**/*.pfx
+**/*.p12

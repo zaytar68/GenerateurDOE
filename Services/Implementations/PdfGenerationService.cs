@@ -84,11 +84,63 @@ namespace GenerateurDOE.Services.Implementations
                                 "--disable-dev-shm-usage",
                                 "--disable-gpu",
                                 "--disable-web-security",
-                                "--allow-running-insecure-content"
+                                "--allow-running-insecure-content",
+                                "--disable-software-rasterizer",
+                                "--disable-background-timer-throttling",
+                                "--disable-backgrounding-occluded-windows",
+                                "--disable-renderer-backgrounding",
+                                "--disable-features=TranslateUI",
+                                "--disable-ipc-flooding-protection",
+                                "--no-first-run",
+                                "--no-default-browser-check",
+                                "--disable-default-apps",
+                                "--single-process",
+                                "--disable-features=VizDisplayCompositor",
+                                "--disable-extensions",
+                                "--disable-plugins",
+                                "--disable-sync",
+                                "--disable-translate",
+                                "--disable-background-networking",
+                                "--disable-breakpad",
+                                "--disable-component-update",
+                                "--disable-domain-reliability",
+                                "--disable-features=AutofillServerCommunication",
+                                "--disable-crash-reporter",
+                                "--user-data-dir=/tmp/chrome-user",
+                                "--data-path=/tmp/chrome-data",
+                                "--disk-cache-dir=/tmp/chrome-cache",
+                                "--crash-dumps-dir=/tmp/chrome-crashes",
+                                "--disable-logging",
+                                "--disable-gpu-logging",
+                                "--silent",
+                                "--no-user-gesture-required",
+                                "--disable-features=Logging",
+                                "--disable-logging-redirect",
+                                "--log-level=3",
+                                "--remote-debugging-port=0",
+                                "--disable-hang-monitor",
+                                "--disable-prompt-on-repost",
+                                "--disable-client-side-phishing-detection"
                             }
                         };
 
-                        await new BrowserFetcher().DownloadAsync();
+                        // Utiliser le Chrome installé via le système si la variable d'environnement est définie
+                        var executablePath = Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH");
+                        if (!string.IsNullOrEmpty(executablePath))
+                        {
+                            launchOptions.ExecutablePath = executablePath;
+                            _loggingService.LogInformation($"Utilisation de Chrome système : {executablePath}");
+                        }
+                        else
+                        {
+                            // Fallback : télécharger Chrome si pas d'exécutable système
+                            var skipDownload = Environment.GetEnvironmentVariable("PUPPETEER_SKIP_CHROMIUM_DOWNLOAD");
+                            if (string.IsNullOrEmpty(skipDownload) || !skipDownload.Equals("true", StringComparison.OrdinalIgnoreCase))
+                            {
+                                await new BrowserFetcher().DownloadAsync();
+                            }
+                        }
+
                         _browser = await Puppeteer.LaunchAsync(launchOptions);
                         
                         _loggingService.LogInformation("Browser Chromium initialisé pour PDF Generation");
@@ -376,59 +428,140 @@ namespace GenerateurDOE.Services.Implementations
         /// <returns>PDF final assemblé avec toutes les pages et signets</returns>
         public async Task<byte[]> AssemblePdfsAsync(IEnumerable<byte[]> pdfBytesList, PdfAssemblyOptions? options = null)
         {
-            options ??= new PdfAssemblyOptions();
-            var appSettings = await _configurationService.GetAppSettingsAsync();
+            _loggingService.LogInformation("Démarrage de l'assembly final des PDFs");
 
-            using var outputDocument = new PdfDocument();
-            outputDocument.Info.Title = "Document Assemblé";
-            outputDocument.Info.Author = appSettings.NomSociete;
-            outputDocument.Info.CreationDate = DateTime.Now;
-            
-            var pageCounter = 0;
-            var bookmarks = new List<(string title, int pageIndex)>();
-
-            foreach (var pdfBytes in pdfBytesList)
+            try
             {
-                using var inputStream = new MemoryStream(pdfBytes);
-                using var inputDocument = PdfReader.Open(inputStream, PdfDocumentOpenMode.Import);
-                
-                var startPage = pageCounter;
-                
-                for (int i = 0; i < inputDocument.PageCount; i++)
+                options ??= new PdfAssemblyOptions();
+                var appSettings = await _configurationService.GetAppSettingsAsync();
+
+                var pdfList = pdfBytesList.ToList();
+                _loggingService.LogInformation($"Assembly de {pdfList.Count} parties PDF");
+
+                using var outputDocument = new PdfDocument();
+                outputDocument.Info.Title = "Document Assemblé";
+                outputDocument.Info.Author = appSettings.NomSociete;
+                outputDocument.Info.CreationDate = DateTime.Now;
+
+                var pageCounter = 0;
+                var bookmarks = new List<(string title, int pageIndex)>();
+                var documentIndex = 0;
+
+                foreach (var pdfBytes in pdfList)
                 {
-                    var page = inputDocument.Pages[i];
-                    outputDocument.AddPage(page);
-                    pageCounter++;
+                    documentIndex++;
+
+                    try
+                    {
+                        _loggingService.LogInformation($"Traitement partie PDF {documentIndex}/{pdfList.Count} ({pdfBytes.Length} bytes)");
+
+                        if (pdfBytes == null || pdfBytes.Length == 0)
+                        {
+                            _loggingService.LogWarning($"Partie PDF {documentIndex} est vide, ignorée");
+                            continue;
+                        }
+
+                        using var inputStream = new MemoryStream(pdfBytes);
+                        using var inputDocument = PdfReader.Open(inputStream, PdfDocumentOpenMode.Import);
+
+                        _loggingService.LogInformation($"Partie PDF {documentIndex}: {inputDocument.PageCount} pages détectées");
+
+                        var startPage = pageCounter;
+
+                        for (int i = 0; i < inputDocument.PageCount; i++)
+                        {
+                            try
+                            {
+                                var page = inputDocument.Pages[i];
+                                outputDocument.AddPage(page);
+                                pageCounter++;
+                            }
+                            catch (Exception pageEx)
+                            {
+                                _loggingService.LogError($"Erreur lors de l'ajout de la page {i + 1} de la partie {documentIndex}: {pageEx.Message}");
+                                throw;
+                            }
+                        }
+
+                        // Ajouter bookmark si demandé
+                        if (options.AddBookmarks && inputDocument.PageCount > 0)
+                        {
+                            var title = inputDocument.Info.Title ?? $"Section {bookmarks.Count + 1}";
+                            bookmarks.Add((title, startPage));
+                            _loggingService.LogInformation($"Bookmark ajouté: '{title}' à la page {startPage + 1}");
+                        }
+                    }
+                    catch (Exception docEx)
+                    {
+                        _loggingService.LogError($"Erreur lors du traitement de la partie PDF {documentIndex}: {docEx.Message}");
+                        throw new Exception($"Erreur assembly partie PDF {documentIndex}: {docEx.Message}", docEx);
+                    }
                 }
 
-                // Ajouter bookmark si demandé
-                if (options.AddBookmarks && inputDocument.PageCount > 0)
+                _loggingService.LogInformation($"Assembly principal terminé: {pageCounter} pages au total");
+
+                // Ajouter les bookmarks
+                if (options.AddBookmarks && bookmarks.Any())
                 {
-                    var title = inputDocument.Info.Title ?? $"Section {bookmarks.Count + 1}";
-                    bookmarks.Add((title, startPage));
+                    try
+                    {
+                        _loggingService.LogInformation($"Ajout de {bookmarks.Count} signets");
+                        foreach (var bookmark in bookmarks)
+                        {
+                            if (bookmark.pageIndex < outputDocument.PageCount)
+                            {
+                                var outline = outputDocument.Outlines.Add(bookmark.title, outputDocument.Pages[bookmark.pageIndex]);
+                            }
+                            else
+                            {
+                                _loggingService.LogWarning($"Index page invalide pour le signet '{bookmark.title}': {bookmark.pageIndex} >= {outputDocument.PageCount}");
+                            }
+                        }
+                    }
+                    catch (Exception bookmarkEx)
+                    {
+                        _loggingService.LogError($"Erreur lors de l'ajout des signets: {bookmarkEx.Message}");
+                        // Continuer sans les signets plutôt que d'échouer complètement
+                    }
+                }
+
+                // Post-processing : Ajouter les pieds de page avec numérotation globale si activé
+                if (options.EnableFooterPostProcessing && options.DocumentForFooter != null)
+                {
+                    try
+                    {
+                        _loggingService.LogInformation("Démarrage du post-processing : Ajout des pieds de page avec numérotation globale");
+                        await AddFooterToAllPagesAsync(outputDocument, options.DocumentForFooter, true);
+                        _loggingService.LogInformation("Post-processing terminé avec succès");
+                    }
+                    catch (Exception footerEx)
+                    {
+                        _loggingService.LogError($"Erreur lors du post-processing des pieds de page: {footerEx.Message}");
+                        throw new Exception($"Erreur post-processing pieds de page: {footerEx.Message}", footerEx);
+                    }
+                }
+
+                // Sauvegarde du document final
+                try
+                {
+                    _loggingService.LogInformation("Sauvegarde du document final assemblé");
+                    using var outputStream = new MemoryStream();
+                    outputDocument.Save(outputStream);
+                    var result = outputStream.ToArray();
+                    _loggingService.LogInformation($"Assembly final réussi: {result.Length} bytes");
+                    return result;
+                }
+                catch (Exception saveEx)
+                {
+                    _loggingService.LogError($"Erreur lors de la sauvegarde du document final: {saveEx.Message}");
+                    throw new Exception($"Erreur sauvegarde document final: {saveEx.Message}", saveEx);
                 }
             }
-
-            // Ajouter les bookmarks
-            if (options.AddBookmarks && bookmarks.Any())
+            catch (Exception ex)
             {
-                foreach (var bookmark in bookmarks)
-                {
-                    var outline = outputDocument.Outlines.Add(bookmark.title, outputDocument.Pages[bookmark.pageIndex]);
-                }
+                _loggingService.LogError($"Erreur critique lors de l'assembly final des PDFs: {ex.Message}");
+                throw;
             }
-
-            // Post-processing : Ajouter les pieds de page avec numérotation globale si activé
-            if (options.EnableFooterPostProcessing && options.DocumentForFooter != null)
-            {
-                _loggingService.LogInformation("Démarrage du post-processing : Ajout des pieds de page avec numérotation globale");
-                await AddFooterToAllPagesAsync(outputDocument, options.DocumentForFooter, true);
-                _loggingService.LogInformation("Post-processing terminé avec succès");
-            }
-
-            using var outputStream = new MemoryStream();
-            outputDocument.Save(outputStream);
-            return outputStream.ToArray();
         }
 
         /// <summary>
@@ -1254,23 +1387,158 @@ namespace GenerateurDOE.Services.Implementations
         /// <param name="excludePageDeGarde">True pour exclure la page de garde (première page)</param>
         private async Task AddFooterToAllPagesAsync(PdfDocument document, DocumentGenere documentGenere, bool excludePageDeGarde = true)
         {
-            var appSettings = await _configurationService.GetAppSettingsAsync();
-            var nomChantier = documentGenere.Chantier?.NomProjet ?? "Chantier";
-            var typeDocument = GetTypeDocumentLabel(documentGenere.TypeDocument);
+            _loggingService.LogInformation("Début du post-processing des pieds de page");
+
+            // Vérifications null safety critiques
+            if (document == null)
+            {
+                _loggingService.LogError("Document PDF null lors du post-processing");
+                throw new ArgumentNullException(nameof(document), "Le document PDF ne peut pas être null");
+            }
+
+            if (documentGenere == null)
+            {
+                _loggingService.LogError("DocumentGenere null lors du post-processing");
+                throw new ArgumentNullException(nameof(documentGenere), "Le document généré ne peut pas être null");
+            }
+
+            if (document.Pages == null)
+            {
+                _loggingService.LogError("Collection Pages du document PDF est null");
+                throw new InvalidOperationException("La collection Pages du document PDF est null");
+            }
+
             var totalPages = document.PageCount;
+            if (totalPages == 0)
+            {
+                _loggingService.LogWarning("Document PDF vide, aucun pied de page à ajouter");
+                return;
+            }
+
+            var appSettings = await _configurationService.GetAppSettingsAsync();
+            if (appSettings == null)
+            {
+                _loggingService.LogError("AppSettings null lors du post-processing");
+                throw new InvalidOperationException("Les paramètres d'application ne peuvent pas être null");
+            }
+
+            // Gestion sécurisée des propriétés nullables
+            string nomChantier;
+            try
+            {
+                nomChantier = documentGenere.Chantier?.NomProjet ?? "Chantier";
+                if (string.IsNullOrWhiteSpace(nomChantier))
+                {
+                    nomChantier = "Chantier";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Erreur lors de l'accès au nom du chantier: {ex.Message}");
+                nomChantier = "Chantier";
+            }
+
+            string typeDocument;
+            try
+            {
+                typeDocument = GetTypeDocumentLabel(documentGenere.TypeDocument);
+                if (string.IsNullOrWhiteSpace(typeDocument))
+                {
+                    typeDocument = "Document";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Erreur lors de l'obtention du type de document: {ex.Message}");
+                typeDocument = "Document";
+            }
 
             var startPage = excludePageDeGarde ? 1 : 0; // Commencer à la page 2 si on exclut la page de garde
 
             _loggingService.LogInformation($"Post-processing : Ajout pied de page sur {totalPages - startPage} pages (exclusion page de garde: {excludePageDeGarde})");
+            _loggingService.LogInformation($"Informations pied de page : Chantier='{nomChantier}', Type='{typeDocument}'");
 
             for (int i = startPage; i < totalPages; i++)
             {
-                var page = document.Pages[i];
-                var pageNumber = i + 1; // Numérotation à partir de 1
-                AddFooterToPage(page, pageNumber, totalPages, nomChantier, typeDocument);
+                try
+                {
+                    if (i >= document.Pages.Count)
+                    {
+                        _loggingService.LogError($"Index page invalide: {i} >= {document.Pages.Count}");
+                        break;
+                    }
+
+                    var page = document.Pages[i];
+                    if (page == null)
+                    {
+                        _loggingService.LogWarning($"Page {i + 1} est null, ignorée");
+                        continue;
+                    }
+
+                    var pageNumber = i + 1; // Numérotation à partir de 1
+                    _loggingService.LogInformation($"Ajout pied de page à la page {pageNumber}/{totalPages}");
+
+                    AddFooterToPage(page, pageNumber, totalPages, nomChantier, typeDocument);
+                }
+                catch (Exception pageEx)
+                {
+                    _loggingService.LogError($"Erreur lors de l'ajout du pied de page à la page {i + 1}: {pageEx.Message}");
+                    throw new Exception($"Erreur pied de page page {i + 1}: {pageEx.Message}", pageEx);
+                }
             }
 
+            _loggingService.LogInformation("Post-processing des pieds de page terminé avec succès");
             await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Crée une font robuste avec fallback pour compatibilité multi-plateforme
+        /// Logique de fallback: Arial → Liberation Sans → DejaVu Sans → Sans-serif système
+        /// </summary>
+        /// <returns>Font PDFSharp compatible Linux/Windows</returns>
+        private PdfSharp.Drawing.XFont CreateRobustFont()
+        {
+            var fontFamilies = new[]
+            {
+                "Arial",                    // Windows standard
+                "Liberation Sans",          // Linux equivalent d'Arial (fonts-liberation)
+                "DejaVu Sans",             // Linux fallback populaire (fonts-dejavu)
+                "FreeSans",                // Free fonts (fonts-freefont-ttf)
+                "Helvetica",               // macOS/Unix standard
+                "sans-serif",              // Fallback générique
+                "Liberation Serif",        // Linux serif fallback (fonts-liberation)
+                "DejaVu Serif",           // Linux serif fallback (fonts-dejavu)
+                "FreeSerif",              // Free serif fonts (fonts-freefont-ttf)
+                "serif"                   // Fallback générique serif
+            };
+
+            foreach (var fontFamily in fontFamilies)
+            {
+                try
+                {
+                    var font = new PdfSharp.Drawing.XFont(fontFamily, 8, PdfSharp.Drawing.XFontStyleEx.Regular);
+                    _loggingService.LogInformation($"Font '{fontFamily}' chargée avec succès pour les pieds de page");
+                    return font;
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogWarning($"Font '{fontFamily}' non disponible: {ex.Message}");
+                    continue;
+                }
+            }
+
+            // ❌ Dernière tentative - font système par défaut
+            try
+            {
+                var defaultFont = new PdfSharp.Drawing.XFont("Generic Sans Serif", 8, PdfSharp.Drawing.XFontStyleEx.Regular);
+                _loggingService.LogWarning("Utilisation de la font système par défaut pour les pieds de page");
+                return defaultFont;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Impossible de créer une font pour les pieds de page: {ex.Message}");
+                throw new InvalidOperationException("Aucune font disponible pour les pieds de page", ex);
+            }
         }
 
         /// <summary>
@@ -1284,43 +1552,74 @@ namespace GenerateurDOE.Services.Implementations
         /// <param name="typeDocument">Type de document</param>
         private void AddFooterToPage(PdfPage page, int pageNumber, int totalPages, string nomChantier, string typeDocument)
         {
-            using var gfx = PdfSharp.Drawing.XGraphics.FromPdfPage(page);
+            // Vérifications null safety critiques
+            if (page == null)
+            {
+                _loggingService.LogError("Page PDF null lors de l'ajout du pied de page");
+                throw new ArgumentNullException(nameof(page), "La page PDF ne peut pas être null");
+            }
 
-            // Définir les couleurs et styles
-            var font = new PdfSharp.Drawing.XFont("Arial", 8, PdfSharp.Drawing.XFontStyleEx.Regular);
-            var textBrush = new PdfSharp.Drawing.XSolidBrush(PdfSharp.Drawing.XColor.FromArgb(102, 102, 102)); // #666 - texte gris foncé
-            var backgroundBrush = new PdfSharp.Drawing.XSolidBrush(PdfSharp.Drawing.XColor.FromArgb(245, 245, 245)); // #F5F5F5 - fond gris clair
+            if (string.IsNullOrWhiteSpace(nomChantier))
+            {
+                nomChantier = "Chantier";
+            }
 
-            // Position du pied de page
-            var pageWidth = page.Width;
-            var pageHeight = page.Height;
-            var footerHeight = 16; // Hauteur du rectangle de fond
-            var footerY = pageHeight - 25; // Position Y du rectangle de fond
-            var textY = pageHeight - 16; // Position Y du texte (centré dans le rectangle)
-            var leftMargin = 15; // Marge gauche
-            var rightMargin = 15; // Marge droite
+            if (string.IsNullOrWhiteSpace(typeDocument))
+            {
+                typeDocument = "Document";
+            }
 
-            // Dessiner le fond gris clair
-            var backgroundRect = new PdfSharp.Drawing.XRect(0, footerY, pageWidth, footerHeight);
-            gfx.DrawRectangle(backgroundBrush, backgroundRect);
+            try
+            {
+                using var gfx = PdfSharp.Drawing.XGraphics.FromPdfPage(page);
 
-            // Texte de gauche : Nom chantier + Type document
-            var leftText = $"{nomChantier} - {typeDocument}";
+                if (gfx == null)
+                {
+                    _loggingService.LogError("Impossible de créer le contexte graphique pour la page");
+                    throw new InvalidOperationException("Impossible de créer le contexte graphique pour la page");
+                }
 
-            // Texte de droite : Numérotation
-            var rightText = $"{pageNumber} / {totalPages}";
+                // ✅ Définir les couleurs et styles avec fallback font Linux-compatible
+                var font = CreateRobustFont();
+                var textBrush = new PdfSharp.Drawing.XSolidBrush(PdfSharp.Drawing.XColor.FromArgb(102, 102, 102)); // #666 - texte gris foncé
+                var backgroundBrush = new PdfSharp.Drawing.XSolidBrush(PdfSharp.Drawing.XColor.FromArgb(245, 245, 245)); // #F5F5F5 - fond gris clair
 
-            // Dessiner le texte de gauche
-            gfx.DrawString(leftText, font, textBrush, leftMargin, textY);
+                // Position du pied de page
+                var pageWidth = page.Width;
+                var pageHeight = page.Height;
+                var footerHeight = 16; // Hauteur du rectangle de fond
+                var footerY = pageHeight - 25; // Position Y du rectangle de fond
+                var textY = pageHeight - 16; // Position Y du texte (centré dans le rectangle)
+                var leftMargin = 15; // Marge gauche
+                var rightMargin = 15; // Marge droite
 
-            // Mesurer le texte de droite pour l'aligner à droite
-            var rightTextSize = gfx.MeasureString(rightText, font);
-            var rightX = pageWidth - rightMargin - rightTextSize.Width;
+                // Dessiner le fond gris clair
+                var backgroundRect = new PdfSharp.Drawing.XRect(0, footerY, pageWidth, footerHeight);
+                gfx.DrawRectangle(backgroundBrush, backgroundRect);
 
-            // Dessiner le texte de droite
-            gfx.DrawString(rightText, font, textBrush, rightX, textY);
+                // Texte de gauche : Nom chantier + Type document
+                var leftText = $"{nomChantier} - {typeDocument}";
 
-            _loggingService.LogInformation($"Pied de page avec fond gris clair ajouté à la page {pageNumber}/{totalPages}: '{leftText}' | '{rightText}'");
+                // Texte de droite : Numérotation
+                var rightText = $"{pageNumber} / {totalPages}";
+
+                // Dessiner le texte de gauche
+                gfx.DrawString(leftText, font, textBrush, leftMargin, textY);
+
+                // Mesurer le texte de droite pour l'aligner à droite
+                var rightTextSize = gfx.MeasureString(rightText, font);
+                var rightX = pageWidth - rightMargin - rightTextSize.Width;
+
+                // Dessiner le texte de droite
+                gfx.DrawString(rightText, font, textBrush, rightX, textY);
+
+                _loggingService.LogInformation($"Pied de page avec fond gris clair ajouté à la page {pageNumber}/{totalPages}: '{leftText}' | '{rightText}'");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Erreur lors de l'ajout du pied de page à la page {pageNumber}: {ex.Message}");
+                throw new Exception($"Erreur graphique pied de page: {ex.Message}", ex);
+            }
         }
 
         /// <summary>

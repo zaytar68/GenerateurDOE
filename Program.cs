@@ -17,12 +17,39 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.FromLogContext());
 
 // Add Entity Framework with DbContextFactory Pattern for optimal concurrency
+var databaseProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "SqlServer";
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
-        sqlOptions => sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
-    // ✅ QuerySplittingBehavior + DbContextFactory Pattern: résolution définitive des problèmes de concurrence
-    // Chaque opération aura sa propre instance de contexte isolée
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    switch (databaseProvider.ToUpper())
+    {
+        case "POSTGRESQL":
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+            {
+                npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                npgsqlOptions.CommandTimeout(300);
+            })
+            // ⚡ Configuration critique pour DateTime PostgreSQL
+            .EnableServiceProviderCaching()
+            .EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
+
+            // 🔧 Configuration pour utiliser TIMESTAMP WITHOUT TIME ZONE par défaut
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+            break;
+
+        case "SQLSERVER":
+        default:
+            options.UseSqlServer(connectionString, sqlOptions =>
+            {
+                sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                sqlOptions.CommandTimeout(300);
+            });
+            break;
+    }
+
+    // ✅ Multi-Database Support: PostgreSQL + SQL Server avec QuerySplittingBehavior optimisé
+    // DbContextFactory Pattern: résolution définitive des problèmes de concurrence
 });
 
 // Configuration des paramètres d'application
@@ -77,6 +104,9 @@ builder.Services.AddScoped<ILoadingStateService, LoadingStateService>();
 // Service de protection anti-concurrence DbContext (CORRECTION CRITIQUE)
 builder.Services.AddScoped<IOperationLockService, OperationLockService>();
 
+// Add health checks for Docker container monitoring
+builder.Services.AddHealthChecks();
+
 // Service de suppression centralisé avec validation et audit
 builder.Services.AddScoped<IDeletionService, DeletionService>();
 
@@ -93,19 +123,55 @@ builder.Services.AddScoped<IPdfPageCountService, PdfPageCountService>();
 // Template management services
 builder.Services.AddScoped<IPageGardeTemplateService, PageGardeTemplateService>();
 
+// Configure Kestrel to use HTTP only - Let Docker handle port mapping
+// Removed specific port binding to avoid conflicts with Docker port management
+
 var app = builder.Build();
 
-// Initialize default types on startup
+// Disable HTTPS redirection in production
+if (app.Environment.IsProduction())
+{
+    // Skip HTTPS redirection for Docker deployment
+}
+else
+{
+    // Only use HTTPS redirection in development
+    app.UseHttpsRedirection();
+}
+
+// Initialize database and default types on startup
 using (var scope = app.Services.CreateScope())
 {
-    var typeProduitService = scope.ServiceProvider.GetRequiredService<ITypeProduitService>();
-    await typeProduitService.InitializeDefaultTypesAsync();
-    
-    var typeDocumentService = scope.ServiceProvider.GetRequiredService<ITypeDocumentImportService>();
-    await typeDocumentService.InitializeDefaultTypesAsync();
-    
-    var typeSectionService = scope.ServiceProvider.GetRequiredService<ITypeSectionService>();
-    await typeSectionService.InitializeDefaultTypesAsync();
+    try
+    {
+        // Apply any pending database migrations
+        var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+        using var context = await contextFactory.CreateDbContextAsync();
+
+        Log.Information("Applying database migrations...");
+        await context.Database.MigrateAsync();
+
+        var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
+        Log.Information("Database initialized successfully with {MigrationCount} migrations applied",
+            appliedMigrations.Count());
+
+        // Initialize default types
+        var typeProduitService = scope.ServiceProvider.GetRequiredService<ITypeProduitService>();
+        await typeProduitService.InitializeDefaultTypesAsync();
+
+        var typeDocumentService = scope.ServiceProvider.GetRequiredService<ITypeDocumentImportService>();
+        await typeDocumentService.InitializeDefaultTypesAsync();
+
+        var typeSectionService = scope.ServiceProvider.GetRequiredService<ITypeSectionService>();
+        await typeSectionService.InitializeDefaultTypesAsync();
+
+        Log.Information("Default data initialization completed");
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "Critical error during database initialization");
+        throw;
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -116,7 +182,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirection disabled - handled above based on environment
 
 app.UseStaticFiles();
 
@@ -145,5 +211,8 @@ app.MapControllers();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
+// Health check endpoint for Docker container monitoring
+app.MapHealthChecks("/health");
 
 app.Run();

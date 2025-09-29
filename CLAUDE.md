@@ -483,3 +483,4 @@ La Phase 3 devient maintenant la priorité absolue avec les optimisations EF Cor
 - Possibilité de modifier le sommaire
 - Use dotnet watch
 - Crée et maintient un fichier changelog.md.
+- Synchronise le numéro de version du changlog avec appsettingd
