@@ -2,6 +2,7 @@
 @using GenerateurDOE.Services.Interfaces
 @using GenerateurDOE.Models
 @inject IDeletionService DeletionService
+@inject IBackupService BackupService
 @inject IJSRuntime JSRuntime
 
 <PageTitle>Maintenance du Système</PageTitle>
@@ -277,6 +278,120 @@
             </div>
         }
 
+        <!-- Sauvegarde Système -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <span class="oi oi-data-transfer-download" aria-hidden="true"></span>
+                            Sauvegarde Complète du Système
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info" role="alert">
+                            <h6 class="alert-heading">
+                                <span class="oi oi-info" aria-hidden="true"></span>
+                                Sauvegarde complète
+                            </h6>
+                            <p class="mb-0">
+                                Cette fonction créé une archive ZIP contenant :
+                                • Sauvegarde complète de la base de données (SQL)
+                                • Tous les fichiers PDF des fiches techniques
+                                • Toutes les images des méthodologies
+                            </p>
+                        </div>
+
+                        @if (backupProgress != null && isBackupRunning)
+                        {
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold">@backupProgress.CurrentOperation</span>
+                                    <span class="badge bg-primary">@backupProgress.ProgressPercentage%</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                         role="progressbar"
+                                         style="width: @backupProgress.ProgressPercentage%"
+                                         aria-valuenow="@backupProgress.ProgressPercentage"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    Démarré : @backupProgress.StartTime.ToString("HH:mm:ss")
+                                    @if (!string.IsNullOrEmpty(backupProgress.ErrorMessage))
+                                    {
+                                        <span class="text-danger">- Erreur : @backupProgress.ErrorMessage</span>
+                                    }
+                                </small>
+                            </div>
+                        }
+
+                        @if (backupResult != null)
+                        {
+                            <div class="mt-3">
+                                <div class="alert @(backupResult.Success ? "alert-success" : "alert-danger")" role="alert">
+                                    <h6 class="alert-heading">
+                                        <span class="oi oi-@(backupResult.Success ? "check" : "warning")" aria-hidden="true"></span>
+                                        @(backupResult.Success ? "Sauvegarde créée avec succès" : "Échec de la sauvegarde")
+                                    </h6>
+                                    @if (backupResult.Success)
+                                    {
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <strong>Fichier :</strong> @backupResult.FileName<br />
+                                                <strong>Taille :</strong> @FormatFileSize(backupResult.FileSizeBytes)<br />
+                                                <strong>Durée :</strong> @backupResult.Duration.TotalSeconds.ToString("F1")s<br />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <strong>Base de données :</strong> @backupResult.ContentInfo.DatabaseSizeMB MB<br />
+                                                <strong>PDFs :</strong> @backupResult.ContentInfo.PdfFilesCount fichiers (@backupResult.ContentInfo.PdfFolderSizeMB MB)<br />
+                                                <strong>Images :</strong> @backupResult.ContentInfo.ImageFilesCount fichiers (@backupResult.ContentInfo.ImageFolderSizeMB MB)<br />
+                                            </div>
+                                        </div>
+                                        <hr />
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-success" @onclick="() => DownloadBackup(backupResult.BackupId)">
+                                                <span class="oi oi-cloud-download" aria-hidden="true"></span>
+                                                Télécharger la sauvegarde
+                                            </button>
+                                            <small class="text-muted align-self-center">
+                                                Total non compressé : @backupResult.ContentInfo.TotalUncompressedSizeMB MB
+                                            </small>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <p class="mb-0 text-danger">
+                                            <strong>Erreur :</strong> @backupResult.ErrorMessage
+                                        </p>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-lg"
+                                    @onclick="StartBackup"
+                                    disabled="@isBackupRunning">
+                                <span class="oi oi-data-transfer-download" aria-hidden="true"></span>
+                                @if (isBackupRunning)
+                                {
+                                    <span class="spinner-border spinner-border-sm ms-1" role="status"></span>
+                                    <span>Sauvegarde en cours...</span>
+                                }
+                                else
+                                {
+                                    <span>Créer une Sauvegarde Complète</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Recommandations -->
         @if (integrityReport?.MaintenanceRecommendations.Any() == true)
         {
@@ -316,6 +431,12 @@
 
     private int orphanPdfsCount => integrityReport?.OrphansReport.OrphanImportPdfs.Count ?? 0;
     private int orphanDocsCount => integrityReport?.OrphansReport.OrphanDocuments.Count ?? 0;
+
+    // Variables pour la sauvegarde
+    private bool isBackupRunning = false;
+    private BackupStatus? backupProgress;
+    private BackupResult? backupResult;
+    private Timer? backupStatusTimer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -446,5 +567,75 @@
             len = len / 1024;
         }
         return $"{len:0.##} {sizes[order]}";
+    }
+
+    private async Task StartBackup()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            "Êtes-vous sûr de vouloir créer une sauvegarde complète ?\n\n" +
+            "Cette opération peut prendre plusieurs minutes selon la taille des données.\n" +
+            "Vous recevrez un fichier ZIP contenant :\n" +
+            "• La base de données complète (SQL)\n" +
+            "• Tous les fichiers PDF\n" +
+            "• Toutes les images\n\n" +
+            "Continuer ?");
+
+        if (!confirmed) return;
+
+        isBackupRunning = true;
+        backupResult = null;
+        backupProgress = null;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            // Appel direct au service BackupService (plus efficace que HTTP dans Blazor Server)
+            backupResult = await BackupService.CreateCompleteBackupAsync();
+
+            if (backupResult.Success)
+            {
+                successMessage = $"Sauvegarde créée avec succès ! Taille : {FormatFileSize(backupResult.FileSizeBytes)}";
+            }
+            else
+            {
+                errorMessage = backupResult.ErrorMessage ?? "Erreur inconnue lors de la création de la sauvegarde";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la création de sauvegarde : {ex.Message}";
+        }
+        finally
+        {
+            isBackupRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadBackup(string backupId)
+    {
+        try
+        {
+            // Méthode plus robuste pour déclencher le téléchargement
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.href = '/api/backup/download/{backupId}';
+                link.download = '';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            ");
+            successMessage = "Téléchargement de la sauvegarde démarré...";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors du téléchargement : {ex.Message}";
+        }
+    }
+
+    public void Dispose()
+    {
+        backupStatusTimer?.Dispose();
     }
 }

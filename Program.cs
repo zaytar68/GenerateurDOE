@@ -67,6 +67,9 @@ builder.Services.AddControllers();
 // Add HTTP Context Accessor for dynamic URL detection in PdfGenerationService
 builder.Services.AddHttpContextAccessor();
 
+// Add HttpClient for Blazor Server (required for API calls from Razor pages)
+builder.Services.AddHttpClient();
+
 // Add Radzen services
 builder.Services.AddScoped<Radzen.DialogService>();
 builder.Services.AddScoped<Radzen.NotificationService>();
@@ -120,6 +123,9 @@ builder.Services.AddScoped<IDeletionService, DeletionService>();
 
 // Service de téléchargement de documents factorisé
 builder.Services.AddScoped<IDocumentDownloadService, DocumentDownloadService>();
+
+// Service de sauvegarde complète (base de données + fichiers)
+builder.Services.AddScoped<IBackupService, BackupService>();
 
 // PDF Generation services
 builder.Services.AddScoped<IPdfGenerationService, PdfGenerationService>();
