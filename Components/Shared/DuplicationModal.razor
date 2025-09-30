@@ -80,7 +80,7 @@
     </div>
 
     <div class="form-group">
-        <label class="form-label required">Numéro de lot</label>
+        <label class="form-label">Numéro de lot</label>
         <RadzenTextBox @bind-Value="NumeroLot"
                       Placeholder="Ex: 01, 02A, 05..."
                       Style="width: 100%;"
@@ -92,7 +92,7 @@
     </div>
 
     <div class="form-group">
-        <label class="form-label required">Intitulé du lot</label>
+        <label class="form-label">Intitulé du lot</label>
         <RadzenTextArea @bind-Value="IntituleLot"
                        Placeholder="Description du lot..."
                        Style="width: 100%; min-height: 80px;"
@@ -202,23 +202,15 @@
             isValid = false;
         }
 
-        if (string.IsNullOrWhiteSpace(NumeroLot))
-        {
-            ErrorNumeroLot = "Le numéro de lot est requis.";
-            isValid = false;
-        }
-        else if (NumeroLot.Length > 50)
+        // NumeroLot : validation optionnelle (longueur uniquement si renseigné)
+        if (!string.IsNullOrWhiteSpace(NumeroLot) && NumeroLot.Length > 50)
         {
             ErrorNumeroLot = "Le numéro de lot ne peut pas dépasser 50 caractères.";
             isValid = false;
         }
 
-        if (string.IsNullOrWhiteSpace(IntituleLot))
-        {
-            ErrorIntituleLot = "L'intitulé du lot est requis.";
-            isValid = false;
-        }
-        else if (IntituleLot.Length > 300)
+        // IntituleLot : validation optionnelle (longueur uniquement si renseigné)
+        if (!string.IsNullOrWhiteSpace(IntituleLot) && IntituleLot.Length > 300)
         {
             ErrorIntituleLot = "L'intitulé du lot ne peut pas dépasser 300 caractères.";
             isValid = false;
@@ -242,8 +234,8 @@
             {
                 NomFichier = NomFichier.Trim(),
                 ChantierId = ChantierSelectionne!.Id,
-                NumeroLot = NumeroLot.Trim(),
-                IntituleLot = IntituleLot.Trim()
+                NumeroLot = string.IsNullOrWhiteSpace(NumeroLot) ? "" : NumeroLot.Trim(),
+                IntituleLot = string.IsNullOrWhiteSpace(IntituleLot) ? "" : IntituleLot.Trim()
             };
 
             DialogService.Close(result);
