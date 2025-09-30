@@ -507,19 +507,32 @@ public class DocumentRepositoryService : IDocumentRepositoryService
     /// <param name="pageSize">Taille de page (défaut 20)</param>
     /// <param name="chantierId">Filtre optionnel par chantier</param>
     /// <returns>Résultat paginé avec DTO optimisés et cache intelligent</returns>
-    public async Task<PagedResult<DocumentListDto>> GetPagedDocumentsAsync(int page = 1, int pageSize = 20, int? chantierId = null)
+    public async Task<PagedResult<DocumentListDto>> GetPagedDocumentsAsync(int page = 1, int pageSize = 20, int? chantierId = null, string? statusFilter = null)
     {
         using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
         var query = context.DocumentsGeneres.AsQueryable();
-        
+
         if (chantierId.HasValue)
         {
             query = query.Where(d => d.ChantierId == chantierId.Value);
         }
+
+        // Filtrage par statut
+        if (!string.IsNullOrEmpty(statusFilter))
+        {
+            if (statusFilter == "EnCours")
+            {
+                query = query.Where(d => d.EnCours == true);
+            }
+            else if (statusFilter == "Finalise")
+            {
+                query = query.Where(d => d.EnCours == false);
+            }
+        }
         
         // ⚡ FIX : Exécution séquentielle pour éviter concurrence sur le même contexte EF
-        // Requête pour le count total (mise en cache)
-        var cacheKey = $"{CACHE_KEY_PREFIX}Count_{chantierId ?? 0}";
+        // Requête pour le count total (mise en cache avec filtres)
+        var cacheKey = $"{CACHE_KEY_PREFIX}Count_{chantierId ?? 0}_{statusFilter ?? "all"}";
         var totalCount = await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);

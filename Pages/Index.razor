@@ -205,8 +205,9 @@
             // ⚡ Utilisation des nouvelles méthodes optimisées avec projections DTO
             // Performance: +30-50% vs chargement entités complètes
             pagedDocuments = await DocumentRepositoryService.GetPagedDocumentsAsync(
-                page: currentPage, 
-                pageSize: currentPageSize);
+                page: currentPage,
+                pageSize: currentPageSize,
+                statusFilter: string.IsNullOrEmpty(statusFilter) ? null : statusFilter);
         }
         catch (Exception ex)
         {
@@ -247,7 +248,6 @@
         {
             statusFilter = newFilter;
             currentPage = 1; // Reset à la première page
-            // TODO: Implémenter le filtrage par statut dans DocumentRepositoryService
             await LoadDocuments();
         }
     }

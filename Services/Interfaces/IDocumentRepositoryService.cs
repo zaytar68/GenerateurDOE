@@ -13,7 +13,7 @@ public interface IDocumentRepositoryService
     Task<List<DocumentSummaryDto>> GetDocumentSummariesByChantierId(int chantierId);
     
     // ⚡ NOUVELLES MÉTHODES OPTIMISÉES PHASE 3 - Performance +30-50%
-    Task<PagedResult<DocumentListDto>> GetPagedDocumentsAsync(int page = 1, int pageSize = 20, int? chantierId = null);
+    Task<PagedResult<DocumentListDto>> GetPagedDocumentsAsync(int page = 1, int pageSize = 20, int? chantierId = null, string? statusFilter = null);
     Task<PagedResult<ChantierSummaryDto>> GetPagedChantierSummariesAsync(int page = 1, int pageSize = 20, bool includeArchived = false);
     Task<PagedResult<FicheTechniqueSummaryDto>> GetPagedFicheTechniquesSummariesAsync(int page = 1, int pageSize = 20, string searchTerm = "");
     
