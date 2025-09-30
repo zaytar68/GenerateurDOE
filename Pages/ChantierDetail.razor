@@ -2,6 +2,7 @@
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
 @inject IChantierService chantierService
+@inject IDeletionService deletionService
 @inject IDocumentGenereService documentGenereService
 @inject IDocumentDownloadService documentDownloadService
 @inject IPdfProgressDialogService pdfProgressDialogService
@@ -292,29 +293,114 @@
         NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", "Fonctionnalité en cours de développement");
     }
 
+    /// <summary>
+    /// Supprime un chantier avec prévisualisation avancée de l'impact
+    /// Utilise le DeletionService robuste avec validation, gestion des fichiers et audit
+    /// </summary>
     private async Task SupprimerChantier()
     {
         if (chantier == null) return;
 
-        var result = await DialogService.Confirm(
-            $"Êtes-vous sûr de vouloir supprimer le chantier '{chantier.NomProjet}' ?",
-            "Confirmation de suppression",
-            new Radzen.ConfirmOptions { OkButtonText = "Supprimer", CancelButtonText = "Annuler" });
-
-        if (result == true)
+        try
         {
-            try
+            // 1. Obtenir l'impact de la suppression
+            var impact = await deletionService.GetChantierDeletionImpactAsync(chantier.Id);
+
+            // 2. Construire le message de confirmation détaillé
+            var confirmationMessage = $"Êtes-vous sûr de vouloir supprimer ce chantier ?\n\n" +
+                                    $"⚠️ IMPACT DE LA SUPPRESSION :\n" +
+                                    $"• {impact.DocumentsCount} document(s) généré(s)\n" +
+                                    $"• {impact.FichesTechniquesCount} fiche(s) technique(s)\n" +
+                                    $"• {impact.PdfFilesCount} fichier(s) PDF\n" +
+                                    $"• {impact.SectionsLibresCount} section(s) libre(s)\n" +
+                                    $"• {FormatFileSize(impact.TotalFileSize)} de données\n\n";
+
+            if (impact.Warnings.Any())
             {
-                await chantierService.DeleteAsync(chantier.Id);
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", "Chantier supprimé");
-                Navigation.NavigateTo("/chantiers");
+                confirmationMessage += $"🔸 AVERTISSEMENTS :\n";
+                foreach (var warning in impact.Warnings)
+                {
+                    confirmationMessage += $"• {warning}\n";
+                }
+                confirmationMessage += "\n";
             }
-            catch (Exception ex)
+
+            if (impact.AffectedItems.Any())
             {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                    $"Erreur lors de la suppression du chantier: {ex.Message}");
-                Console.WriteLine($"[ERROR] SupprimerChantier: {ex.Message}");
+                var displayItems = impact.AffectedItems.Take(5).ToList();
+                confirmationMessage += $"📋 ÉLÉMENTS CONCERNÉS :\n";
+                foreach (var item in displayItems)
+                {
+                    confirmationMessage += $"• {item}\n";
+                }
+                if (impact.AffectedItems.Count > 5)
+                {
+                    confirmationMessage += $"• ... et {impact.AffectedItems.Count - 5} autre(s)\n";
+                }
             }
+
+            confirmationMessage += "\n❌ Cette action est IRRÉVERSIBLE !";
+
+            // 3. Confirmation avec détails
+            var confirmResult = await DialogService.Confirm(
+                confirmationMessage,
+                "⚠️ SUPPRESSION DÉFINITIVE",
+                new Radzen.ConfirmOptions {
+                    OkButtonText = "🗑️ SUPPRIMER DÉFINITIVEMENT",
+                    CancelButtonText = "❌ Annuler",
+                    Width = "600px",
+                    Height = "500px"
+                });
+
+            if (confirmResult == true)
+            {
+                // 4. Notification de début d'opération
+                NotificationService.Notify(Radzen.NotificationSeverity.Info, "Suppression en cours...",
+                    $"Suppression de {impact.DocumentsCount} document(s) et {impact.PdfFilesCount} fichier(s)...");
+
+                // 5. Suppression avec options d'audit
+                var options = new DeletionOptions
+                {
+                    DeletePhysicalFiles = true,
+                    EnableAuditLogging = true,
+                    InitiatedBy = "Page Détail Chantier",
+                    Reason = "Suppression via interface de détail du chantier"
+                };
+
+                var result = await deletionService.DeleteChantierAsync(chantier.Id, options);
+
+                if (result.Success)
+                {
+                    // 6. Notification de succès détaillée
+                    var successMessage = $"Chantier supprimé avec succès !\n" +
+                                       $"• {result.FilesDeleted} fichier(s) supprimé(s)\n" +
+                                       $"• {result.RecordsDeleted} enregistrement(s) supprimé(s)\n" +
+                                       $"• Durée: {result.Duration.TotalSeconds:F2}s";
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "✅ Suppression Réussie", successMessage);
+
+                    // 7. Retour à la liste des chantiers
+                    Navigation.NavigateTo("/chantiers");
+                }
+                else
+                {
+                    // 8. Gestion des erreurs avec détails
+                    var errorMessage = "Échec de la suppression :\n" + string.Join("\n", result.Messages);
+                    NotificationService.Notify(Radzen.NotificationSeverity.Error, "❌ Erreur de Suppression", errorMessage);
+
+                    if (result.Exception != null)
+                    {
+                        Console.WriteLine($"[DEBUG] Deletion error: {result.Exception.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // 9. Gestion d'erreur globale
+            var errorMsg = $"Erreur inattendue lors de la suppression: {ex.Message}";
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "❌ Erreur Critique", errorMsg);
+            Console.WriteLine($"[ERROR] SupprimerChantier exception: {ex}");
         }
     }
 
@@ -414,6 +500,27 @@
     }
 
     // Méthodes utilitaires pour l'affichage
+
+    /// <summary>
+    /// Formate une taille de fichier en unités lisibles (B, KB, MB, GB)
+    /// </summary>
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size = size / 1024;
+        }
+
+        return $"{size:0.##} {sizes[order]}";
+    }
+
     private string GetTypeBadgeColor(TypeDocumentGenere type)
     {
         return type switch
