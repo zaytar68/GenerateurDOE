@@ -92,36 +92,28 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}"
 
   # ===================================================================
-  # Job 3: Trigger Portainer Webhook
+  # Job 3: Notification - Image Ready for Manual Deployment
   # ===================================================================
-  deploy-portainer:
-    name: 🎯 Deploy to Portainer
+  notify-image-ready:
+    name: 📢 Notify Image Ready
     runs-on: ubuntu-latest
     needs: [extract-version, build-and-push]
 
     steps:
-      - name: Trigger Portainer webhook
+      - name: Image ready for deployment
         run: |
-          echo "🔔 Déclenchement webhook Portainer..."
-          curl -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ needs.extract-version.outputs.version }}",
-              "Tag": "v${{ needs.extract-version.outputs.version }}"
-            }'
-          echo "✅ Webhook déclenché avec succès"
-
-      - name: Wait for deployment
-        run: |
-          echo "⏳ Attente du déploiement (30 secondes)..."
-          sleep 30
-
-      - name: Verify deployment (optional)
-        run: |
-          echo "🔍 Vérification du déploiement sur http://192.168.0.8:5000/health"
-          # Note: Cette étape échouera si l'hôte n'est pas accessible depuis GitHub Actions
-          # Décommentez si votre serveur est accessible publiquement
-          # curl -f http://192.168.0.8:5000/health || echo "⚠️ Health check non accessible"
+          echo "✅ Image Docker prête pour déploiement !"
+          echo "📦 Version: v${{ needs.extract-version.outputs.version }}"
+          echo "🐳 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo ""
+          echo "🎯 Prochaines étapes manuelles:"
+          echo "1. Ouvrir Portainer: http://192.168.0.8:9000"
+          echo "2. Aller dans Stacks → generateur-doe-production"
+          echo "3. Cliquer sur 'Update the stack'"
+          echo "4. Cocher 'Re-pull image'"
+          echo "5. Cliquer sur 'Update'"
+          echo ""
+          echo "⏱️ L'application redémarrera en 1-2 minutes"
 
   # ===================================================================
   # Job 4: Create Git Tag
@@ -129,7 +121,7 @@ jobs:
   create-tag:
     name: 🏷️ Create Git Tag
     runs-on: ubuntu-latest
-    needs: [extract-version, deploy-portainer]
+    needs: [extract-version, notify-image-ready]
     permissions:
       contents: write
 
@@ -196,11 +188,13 @@ jobs:
     steps:
       - name: Success notification
         run: |
-          echo "✅ Déploiement réussi!"
+          echo "✅ Build réussi! Image prête pour déploiement manuel"
           echo "📦 Version: v${{ needs.extract-version.outputs.version }}"
-          echo "🎯 Environnement: Production (192.168.0.8:5000)"
           echo "🏷️ Tag Git créé: v${{ needs.extract-version.outputs.version }}"
           echo "🐳 Image GHCR: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ needs.extract-version.outputs.version }}"
+          echo ""
+          echo "🎯 Action requise:"
+          echo "Ouvrez Portainer (http://192.168.0.8:9000) et cliquez sur 'Update stack' pour déployer"
 
           # Décommentez pour ajouter une notification Slack/Discord
           # - name: Slack Notification
@@ -216,12 +210,13 @@ jobs:
   notify-failure:
     name: 📢 Notification Failure
     runs-on: ubuntu-latest
-    needs: [extract-version, build-and-push, deploy-portainer]
+    needs: [extract-version, build-and-push, notify-image-ready]
     if: failure()
 
     steps:
       - name: Failure notification
         run: |
-          echo "❌ Échec du déploiement!"
+          echo "❌ Échec du build!"
           echo "📦 Version tentée: v${{ needs.extract-version.outputs.version }}"
           echo "🔍 Vérifiez les logs ci-dessus pour diagnostiquer le problème"
+          echo "⚠️ L'image Docker n'a pas été publiée sur GHCR"
