@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 
 namespace GenerateurDOE.Models;
 
@@ -20,7 +21,16 @@ public class AppSettings
     [RegularExpression(@"^\d+(\.\d+)?(KB|MB|GB)$", ErrorMessage = "Format invalide. Utilisez : 50MB, 100KB, 2GB")]
     public string TailleMaxFichierPDF { get; set; } = "50MB";
 
-    public string ApplicationVersion { get; set; } = "2.1.5";
+    /// <summary>
+    /// Version de l'application extraite automatiquement depuis l'assembly .NET
+    /// Source unique de vérité : GenerateurDOE.csproj <Version>
+    /// </summary>
+    public string ApplicationVersion =>
+        Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion
+        ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+        ?? "0.0.0";
 
     /// <summary>
     /// Configuration des styles PDF pour la génération de documents

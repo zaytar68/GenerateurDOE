@@ -5,6 +5,27 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] - 2025-10-24
+
+### ✨ **Source Unique de Version - Assembly Reflection**
+- **ApplicationVersion** : Suppression de la propriété dupliquée dans appsettings.json
+- **Lecture automatique** : Version extraite depuis l'assembly .NET via Reflection au runtime
+- **Source unique** : Seul le fichier GenerateurDOE.csproj <Version> nécessite maintenant une modification
+
+### 🔧 **Technique**
+- **AppSettings.cs** : ApplicationVersion est maintenant une propriété calculée (property expression)
+- **Assembly.GetExecutingAssembly()** : Utilisation de AssemblyInformationalVersionAttribute pour extraire la version
+- **Fallback triple** : InformationalVersion → Assembly.Version → "0.0.0" si aucune version disponible
+
+### ✅ **Avantages**
+- **1 seul fichier à modifier** : Uniquement GenerateurDOE.csproj (vs 2 fichiers avant)
+- **Pas de désynchronisation** : Impossible d'avoir une incohérence entre .csproj et appsettings.json
+- **Principe DRY** : "Don't Repeat Yourself" - respect du principe de source unique de vérité
+- **Compatibilité** : Fonctionne en développement local ET en production Docker
+
+### Supprimé
+- **appsettings.json** : Ligne "ApplicationVersion": "2.1.5" supprimée (redondante)
+
 ## [2.1.5] - 2025-10-24
 
 ### 🔧 **Correction Affichage Version & Configuration Docker**
