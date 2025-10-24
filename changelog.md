@@ -5,6 +5,17 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.5] - 2025-10-24
+
+### 🔧 **Correction Configuration Docker**
+- **Versioning Docker** : Suppression de `AppSettings__ApplicationVersion` hardcodée dans docker-compose.production.yml
+- **Automatisation** : La version est maintenant automatiquement synchronisée depuis appsettings.json embarqué dans l'image Docker
+- **Cohérence** : Évite les incohérences entre version déclarée et version réelle de l'application
+
+### Corrigé
+- **⚙️ docker-compose.production.yml** : Variable d'environnement ApplicationVersion supprimée (ligne 67)
+- **📝 Documentation** : Ajout commentaire explicatif sur la gestion automatique de la version
+
 ## [2.1.4] - 2025-10-24
 
 ### 🚀 **Pipeline CI/CD Complet Opérationnel**

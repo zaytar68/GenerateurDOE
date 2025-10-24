@@ -64,7 +64,7 @@ services:
       AppSettings__RepertoireStockagePDF: "/app/Documents/PDF"
       AppSettings__RepertoireStockageImages: "/app/Documents/Images"
       AppSettings__NomSociete: "Multisols"
-      AppSettings__ApplicationVersion: "2.1.4"
+      # Note: ApplicationVersion est définie dans appsettings.json embarqué dans l'image Docker
 
       # Database Provider
       DatabaseProvider: "PostgreSQL"

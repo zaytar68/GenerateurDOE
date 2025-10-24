@@ -321,14 +321,23 @@
         {
             isLoading = true;
             chargementSections = true;
-            
+
             // Load sequentially to avoid DbContext threading issues
             sections = (await SectionLibreService.GetAllAsync()).ToList();
             typesSections = (await TypeSectionService.GetActiveAsync()).ToList();
-            
+
+            // Initialiser le filtre avec le premier type actif si aucun filtre n'est sélectionné
+            if (filtreTypeSelectionne == 0 && typesSections.Any())
+            {
+                filtreTypeSelectionne = typesSections.First().Id;
+            }
+
             // Initialiser les sections filtrées et de recherche
             sectionsFiltrees = sections.ToList();
             sectionsRecherche = sections.ToList();
+
+            // Appliquer les filtres initiaux
+            AppliquerFiltres();
         }
         catch (Exception ex)
         {
