@@ -41,7 +41,6 @@
                     <div class="col-md-3">
                         <label for="filtreType" class="form-label">Filtrer par type</label>
                         <select @bind="filtreTypeSelectionne" @bind:after="AppliquerFiltres" class="form-select" id="filtreType">
-                            <option value="0">-- Tous les types --</option>
                             @foreach (var type in typesSections.Where(t => t.IsActive))
                             {
                                 <option value="@type.Id">@type.Nom</option>
@@ -374,6 +373,7 @@
 
             isSuccess = true;
             await ChargerDonnees();
+            AppliquerFiltres(); // Réappliquer les filtres après le rechargement
             FermerModal();
         }
         catch (Exception ex)
