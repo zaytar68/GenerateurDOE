@@ -1,0 +1,227 @@
+# ===================================================================
+# GitHub Actions - Déploiement Production Générateur DOE
+# ===================================================================
+# Workflow automatisé : Build → Push GHCR → Webhook Portainer
+# Déclenchement : Push sur branche 'production'
+# ===================================================================
+
+name: 🚀 Deploy to Production
+
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch: # Permet déclenchement manuel
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ===================================================================
+  # Job 1: Extract Version from .csproj
+  # ===================================================================
+  extract-version:
+    name: 📦 Extract Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from .csproj
+        id: get-version
+        run: |
+          VERSION=$(grep -oPm1 "(?<=<Version>)[^<]+" GenerateurDOE.csproj)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Version détectée: $VERSION"
+
+  # ===================================================================
+  # Job 2: Build and Push Docker Image
+  # ===================================================================
+  build-and-push:
+    name: 🏗️ Build & Push Docker
+    runs-on: ubuntu-latest
+    needs: extract-version
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=v${{ needs.extract-version.outputs.version }}
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.extract-version.outputs.version }}
+
+      - name: 📋 Image tags published
+        run: |
+          echo "✅ Images Docker publiées:"
+          echo "${{ steps.meta.outputs.tags }}"
+
+  # ===================================================================
+  # Job 3: Trigger Portainer Webhook
+  # ===================================================================
+  deploy-portainer:
+    name: 🎯 Deploy to Portainer
+    runs-on: ubuntu-latest
+    needs: [extract-version, build-and-push]
+
+    steps:
+      - name: Trigger Portainer webhook
+        run: |
+          echo "🔔 Déclenchement webhook Portainer..."
+          curl -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ needs.extract-version.outputs.version }}",
+              "Tag": "v${{ needs.extract-version.outputs.version }}"
+            }'
+          echo "✅ Webhook déclenché avec succès"
+
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Attente du déploiement (30 secondes)..."
+          sleep 30
+
+      - name: Verify deployment (optional)
+        run: |
+          echo "🔍 Vérification du déploiement sur http://192.168.0.8:5000/health"
+          # Note: Cette étape échouera si l'hôte n'est pas accessible depuis GitHub Actions
+          # Décommentez si votre serveur est accessible publiquement
+          # curl -f http://192.168.0.8:5000/health || echo "⚠️ Health check non accessible"
+
+  # ===================================================================
+  # Job 4: Create Git Tag
+  # ===================================================================
+  create-tag:
+    name: 🏷️ Create Git Tag
+    runs-on: ubuntu-latest
+    needs: [extract-version, deploy-portainer]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.extract-version.outputs.version }}"
+          TAG="v$VERSION"
+
+          # Vérifier si le tag existe déjà
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG existe déjà, mise à jour..."
+            git tag -d "$TAG"
+            git push origin ":refs/tags/$TAG"
+          fi
+
+          # Créer le tag
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "$TAG" -m "Release version $VERSION - Déploiement production"
+          git push origin "$TAG"
+
+          echo "✅ Tag $TAG créé et poussé"
+
+  # ===================================================================
+  # Job 5: Cleanup old images
+  # ===================================================================
+  cleanup-old-images:
+    name: 🧹 Cleanup Old Images
+    runs-on: ubuntu-latest
+    needs: create-tag
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old container images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: 'container'
+          min-versions-to-keep: 4
+          ignore-versions: '^(latest|v\d+\.\d+\.\d+)$'
+
+      - name: Cleanup summary
+        run: |
+          echo "🧹 Nettoyage terminé"
+          echo "📦 Conservation: 4 dernières versions + latest"
+          echo "🗑️ Anciennes images SHA supprimées"
+
+# ===================================================================
+# Notifications (optionnel)
+# ===================================================================
+  notify-success:
+    name: 📢 Notification Success
+    runs-on: ubuntu-latest
+    needs: [extract-version, cleanup-old-images]
+    if: success()
+
+    steps:
+      - name: Success notification
+        run: |
+          echo "✅ Déploiement réussi!"
+          echo "📦 Version: v${{ needs.extract-version.outputs.version }}"
+          echo "🎯 Environnement: Production (192.168.0.8:5000)"
+          echo "🏷️ Tag Git créé: v${{ needs.extract-version.outputs.version }}"
+          echo "🐳 Image GHCR: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ needs.extract-version.outputs.version }}"
+
+          # Décommentez pour ajouter une notification Slack/Discord
+          # - name: Slack Notification
+          #   uses: slackapi/slack-github-action@v1
+          #   with:
+          #     payload: |
+          #       {
+          #         "text": "✅ Générateur DOE v${{ needs.extract-version.outputs.version }} déployé en production!"
+          #       }
+          #   env:
+          #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  notify-failure:
+    name: 📢 Notification Failure
+    runs-on: ubuntu-latest
+    needs: [extract-version, build-and-push, deploy-portainer]
+    if: failure()
+
+    steps:
+      - name: Failure notification
+        run: |
+          echo "❌ Échec du déploiement!"
+          echo "📦 Version tentée: v${{ needs.extract-version.outputs.version }}"
+          echo "🔍 Vérifiez les logs ci-dessus pour diagnostiquer le problème"
