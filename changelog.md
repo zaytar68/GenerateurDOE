@@ -5,6 +5,36 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.4] - 2025-10-24
+
+### 🚀 **Pipeline CI/CD Complet Opérationnel**
+- **GitHub Actions** : Workflow automatisé pour build et push vers GHCR
+- **GHCR** : Images Docker publiées automatiquement avec tags `latest` et versionnés
+- **Déploiement manuel Portainer** : Update stack avec re-pull image
+- **Versioning automatique** : Extraction depuis .csproj et création tags Git
+
+### ✨ **Fonctionnalités**
+- **Migrations désactivées** : Pas de migrations automatiques au démarrage (gestion manuelle)
+- **Vérification connexion DB** : Health check PostgreSQL au démarrage
+- **Documentation complète** : Guides de déploiement, setup Portainer, guide rapide
+
+### 🔧 **Technique**
+- Workflow GitHub Actions optimisé (5 jobs : version, build, notify, tag, cleanup)
+- Configuration docker-compose.production.yml finalisée
+- Capabilities Chrome/Puppeteer configurées (SYS_ADMIN, seccomp:unconfined)
+- Nettoyage automatique anciennes images GHCR (conservation 4 dernières)
+
+### 📚 **Documentation**
+- Guide de déploiement rapide (docs/DEPLOIEMENT_RAPIDE.md)
+- Documentation technique complète (docs/DEPLOYMENT.md)
+- Guide setup Portainer (docs/PORTAINER_SETUP.md)
+- README avec badges de statut
+
+### Corrigé
+- **🔥 Migrations PostgreSQL** : Désactivation migrations auto (conflit SQL Server/PostgreSQL)
+- **🐳 Image GHCR** : Configuration capabilities Chrome pour éviter exit code 139
+- **📋 Workflow GitHub Actions** : Adaptation pour déploiement manuel (pas de webhook Portainer CE)
+
 ## [2.1.0] - 2025-09-24
 
 ### ✨ **Fonctionnalité Majeure - Pied de page avec surimpression**

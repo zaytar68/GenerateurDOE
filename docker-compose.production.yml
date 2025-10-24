@@ -1,8 +1,8 @@
 # ===================================================================
-# Docker Compose Production - Générateur DOE v2.1.3
+# Docker Compose Production - Générateur DOE
 # ===================================================================
-# Configuration optimisée pour déploiement automatisé via Portainer
-# Image source: GitHub Container Registry (GHCR)
+# Configuration pour déploiement via Portainer avec image GHCR
+# Déploiement: Manuel via Portainer après build GitHub Actions
 # ===================================================================
 
 version: '3.8'
@@ -13,29 +13,19 @@ services:
   # ===================================================================
   postgres:
     image: postgres:16-alpine
-    container_name: generateur-doe-postgres-prod
-    hostname: postgres-prod
+    container_name: generateur-doe-postgres
+    hostname: postgres
     restart: unless-stopped
-
-    labels:
-      - "io.portainer.accesscontrol.teams=generateur-doe-team"
-      - "traefik.enable=false"
-      - "com.docker.compose.project=generateur-doe-production"
-      - "com.docker.compose.service=database"
-      - "portainer.description=PostgreSQL Database Production - Générateur DOE"
 
     environment:
       POSTGRES_DB: GenerateurDOE_Prod
       POSTGRES_USER: generateur_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-GenerateurDOE2025!}
+      POSTGRES_PASSWORD: GenerateurDOE2025!
       PGDATA: /var/lib/postgresql/data
-      # PostgreSQL Performance Tuning
-      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=fr_FR.UTF-8"
 
     volumes:
       - /data/generateur-doe-data/postgres:/var/lib/postgresql/data
       - /data/generateur-doe-data/backups:/var/backups
-      - ./init-scripts:/docker-entrypoint-initdb.d:ro
 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U generateur_user -d GenerateurDOE_Prod"]
@@ -45,41 +35,17 @@ services:
       start_period: 60s
 
     network_mode: host
-
-    # Security: Run as custom user
     user: "1001:1001"
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
-
   # ===================================================================
-  # Générateur DOE Application Service - Production
+  # Générateur DOE Application Service
   # ===================================================================
   generateur-doe:
-    # 🚀 Image depuis GitHub Container Registry (GHCR)
+    # Image depuis GitHub Container Registry (GHCR)
     image: ghcr.io/zaytar68/generateurdoe:latest
-    container_name: generateur-doe-app-prod
-    hostname: generateur-doe-prod
+    container_name: generateur-doe-app
+    hostname: generateur-doe
     restart: unless-stopped
-
-    labels:
-      - "io.portainer.accesscontrol.teams=generateur-doe-team"
-      - "traefik.enable=true"
-      - "traefik.http.routers.generateur-doe-prod.rule=Host(`generateur-doe.local`)"
-      - "traefik.http.services.generateur-doe-prod.loadbalancer.server.port=5000"
-      - "com.docker.compose.project=generateur-doe-production"
-      - "com.docker.compose.service=application"
-      - "portainer.description=Application Générateur DOE - Production GHCR"
-      - "portainer.logo=https://via.placeholder.com/100x100.png?text=DOE"
-      # 🔄 Webhook Portainer pour auto-update
-      - "com.centurylinklabs.watchtower.enable=true"
 
     depends_on:
       postgres:
@@ -90,16 +56,15 @@ services:
       ASPNETCORE_ENVIRONMENT: "Production"
       ASPNETCORE_URLS: "http://+:5000"
       DOTNET_RUNNING_IN_CONTAINER: "true"
-      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "false"
 
       # PostgreSQL Connection String
-      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=GenerateurDOE_Prod;Username=generateur_user;Password=${POSTGRES_PASSWORD:-GenerateurDOE2025!};SSL Mode=Prefer;Trust Server Certificate=true;Command Timeout=300;Pooling=true;Min Pool Size=1;Max Pool Size=20;"
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=GenerateurDOE_Prod;Username=generateur_user;Password=GenerateurDOE2025!;SSL Mode=Prefer;Trust Server Certificate=true;Command Timeout=300;"
 
       # Application Settings
       AppSettings__RepertoireStockagePDF: "/app/Documents/PDF"
       AppSettings__RepertoireStockageImages: "/app/Documents/Images"
       AppSettings__NomSociete: "Multisols"
-      AppSettings__ApplicationVersion: "2.1.3"
+      AppSettings__ApplicationVersion: "2.1.4"
 
       # Database Provider
       DatabaseProvider: "PostgreSQL"
@@ -107,7 +72,6 @@ services:
       # Serilog Configuration
       Serilog__WriteTo__0__Args__path: "/app/Logs/app-.log"
       Serilog__MinimumLevel__Default: "Information"
-      Serilog__MinimumLevel__Override__Microsoft: "Warning"
 
       # PuppeteerSharp Configuration
       PUPPETEER_EXECUTABLE_PATH: "/usr/bin/google-chrome-stable"
@@ -116,12 +80,7 @@ services:
       # PostgreSQL specific settings
       Npgsql__EnableLegacyTimestampBehavior: "true"
 
-      # Production Optimizations
-      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
-      COMPlus_EnableDiagnostics: "0" # Disable debugging in production
-
     volumes:
-      # Persistent storage
       - /data/generateur-doe-data/documents/pdf:/app/Documents/PDF
       - /data/generateur-doe-data/documents/images:/app/Documents/Images
       - /data/generateur-doe-data/logs:/app/Logs
@@ -133,59 +92,32 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s # Plus de temps pour Puppeteer en production
+      start_period: 120s
 
     network_mode: host
-
-    # Security: Run as non-root user
     user: "1000:1000"
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 2G # Plus de RAM pour Puppeteer
-          cpus: '2.0'
-        reservations:
-          memory: 1G
-          cpus: '1.0'
-
-      # Rolling update strategy
-      update_config:
-        parallelism: 1
-        delay: 10s
-        failure_action: rollback
-        order: start-first
-
-      # Rollback configuration
-      rollback_config:
-        parallelism: 1
-        delay: 5s
+    # Capabilities requises pour Chrome/Puppeteer
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
 
   # ===================================================================
-  # pgAdmin for PostgreSQL Management (Production)
+  # pgAdmin for PostgreSQL Management
   # ===================================================================
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: generateur-doe-pgadmin-prod
-    hostname: pgadmin-prod
+    container_name: generateur-doe-pgadmin
+    hostname: pgadmin
     restart: unless-stopped
-    profiles:
-      - tools # Activé uniquement si besoin: docker compose --profile tools up
-
-    labels:
-      - "io.portainer.accesscontrol.teams=generateur-doe-team"
-      - "traefik.enable=false"
-      - "com.docker.compose.project=generateur-doe-production"
-      - "com.docker.compose.service=pgadmin"
-      - "portainer.description=pgAdmin4 Production - Gestion PostgreSQL"
 
     depends_on:
       - postgres
 
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-cedric.tirolf@multisols.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-GenerateurDOE2025!}
+      PGADMIN_DEFAULT_EMAIL: cedric.tirolf@multisols.com
+      PGADMIN_DEFAULT_PASSWORD: GenerateurDOE2025!
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
       PGADMIN_DISABLE_POSTFIX: 'true'
@@ -203,36 +135,25 @@ services:
 
     network_mode: host
 
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-        reservations:
-          memory: 128M
-          cpus: '0.25'
-
 # ===================================================================
-# Configuration Notes
+# Notes de Déploiement
 # ===================================================================
 #
-# 🔐 Secrets Management:
-# - Les secrets peuvent être définis dans un fichier .env à la racine
-# - Exemple: POSTGRES_PASSWORD=VotreMotDePasseSecurise
+# 🚀 Workflow de Déploiement:
+# 1. Code → git push origin production
+# 2. GitHub Actions build automatiquement l'image GHCR
+# 3. Attendre 5-10 minutes (build terminé)
+# 4. Portainer: Stacks → Update stack → Re-pull image
+# 5. Application redémarre en 1-2 minutes
 #
-# 🚀 Déploiement:
-# - L'image est automatiquement pull depuis GHCR via GitHub Actions
-# - Portainer webhook déclenche le redéploiement automatique
+# 📊 Suivi des Versions:
+# - Version dans appsettings.json et .csproj synchronisée
+# - Tags Git créés automatiquement (v2.1.4)
+# - Images GHCR taguées: latest + v2.1.4
 #
-# 🔄 Rollback:
-# - En cas d'échec, rollback automatique vers version précédente
-# - Conserver 4 dernières versions dans GHCR pour rollback manuel
-#
-# 📊 Monitoring:
-# - Health checks sur tous les services
-# - Logs centralisés dans /data/generateur-doe-data/logs
-#
-# 🎯 Activation pgAdmin:
-# - docker compose --profile tools up -d
+# 🔐 Sécurité:
+# - Migrations désactivées (gestion manuelle)
+# - Chrome sandboxed avec cap_add SYS_ADMIN
+# - Users non-root (1000:1000, 1001:1001)
 #
 # ===================================================================
