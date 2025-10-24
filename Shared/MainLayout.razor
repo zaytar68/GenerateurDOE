@@ -1,6 +1,7 @@
 ﻿@inherits LayoutComponentBase
 @using GenerateurDOE.Models
-
+@using Microsoft.Extensions.Options
+@inject IOptions<AppSettings> AppSettingsOptions
 
 <PageTitle>GenerateurDOE</PageTitle>
 
@@ -11,7 +12,7 @@
 
     <main>
         <div class="top-row px-4">
-            <span class="app-title">GenerateurDOE pour @appSettings.NomSociete - @appSettings.ApplicationVersion</span>            
+            <span class="app-title">GenerateurDOE pour @AppSettingsOptions.Value.NomSociete - @AppSettingsOptions.Value.ApplicationVersion</span>
         </div>
 
         <article class="content px-4 main-content">
@@ -19,7 +20,3 @@
         </article>
     </main>
 </div>
-
-@code {
-    private AppSettings appSettings = new();
-}

@@ -19,8 +19,8 @@ public class AppSettings
     [Required(ErrorMessage = "La taille maximale des fichiers PDF est requise")]
     [RegularExpression(@"^\d+(\.\d+)?(KB|MB|GB)$", ErrorMessage = "Format invalide. Utilisez : 50MB, 100KB, 2GB")]
     public string TailleMaxFichierPDF { get; set; } = "50MB";
-    
-    public string ApplicationVersion { get; set; } = "2.1.3";
+
+    public string ApplicationVersion { get; set; } = "2.1.5";
 
     /// <summary>
     /// Configuration des styles PDF pour la génération de documents

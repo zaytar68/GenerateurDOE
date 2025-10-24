@@ -7,14 +7,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [2.1.5] - 2025-10-24
 
-### 🔧 **Correction Configuration Docker**
+### 🔧 **Correction Affichage Version & Configuration Docker**
 - **Versioning Docker** : Suppression de `AppSettings__ApplicationVersion` hardcodée dans docker-compose.production.yml
+- **Header Application** : Injection correcte de `IOptions<AppSettings>` dans MainLayout.razor pour affichage version dynamique
 - **Automatisation** : La version est maintenant automatiquement synchronisée depuis appsettings.json embarqué dans l'image Docker
 - **Cohérence** : Évite les incohérences entre version déclarée et version réelle de l'application
 
 ### Corrigé
+- **🐛 MainLayout.razor** : Correction injection AppSettings (était `new()` vide, maintenant injecté via `IOptions<AppSettings>`)
+- **🔢 AppSettings.cs** : Version par défaut mise à jour de "2.1.3" → "2.1.5"
 - **⚙️ docker-compose.production.yml** : Variable d'environnement ApplicationVersion supprimée (ligne 67)
 - **📝 Documentation** : Ajout commentaire explicatif sur la gestion automatique de la version
+
+### ✨ Amélioration
+- **Header dynamique** : La version affichée dans le header provient maintenant de la configuration réelle (appsettings.json ou variables d'environnement Docker)
 
 ## [2.1.4] - 2025-10-24
 
