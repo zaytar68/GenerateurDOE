@@ -158,16 +158,24 @@ using (var scope = app.Services.CreateScope())
 {
     try
     {
-        // Apply any pending database migrations
+        // ⚠️ MIGRATIONS DÉSACTIVÉES - À gérer manuellement si nécessaire
+        // Les migrations automatiques au démarrage peuvent causer des conflits
+        // Pour appliquer des migrations manuellement : dotnet ef database update
+
         var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
         using var context = await contextFactory.CreateDbContextAsync();
 
-        Log.Information("Applying database migrations...");
-        await context.Database.MigrateAsync();
+        Log.Information("Vérification de la connexion à la base de données...");
 
-        var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
-        Log.Information("Database initialized successfully with {MigrationCount} migrations applied",
-            appliedMigrations.Count());
+        // Vérifier que la base de données est accessible
+        var canConnect = await context.Database.CanConnectAsync();
+        if (!canConnect)
+        {
+            Log.Error("Impossible de se connecter à la base de données !");
+            throw new Exception("Database connection failed");
+        }
+
+        Log.Information("✅ Connexion à la base de données réussie");
 
         // Initialize default types
         var typeProduitService = scope.ServiceProvider.GetRequiredService<ITypeProduitService>();
