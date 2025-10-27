@@ -5,6 +5,23 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.8] - 2025-10-27
+
+### 🐛 **Correction Affichage Version**
+- **Problème résolu** : Version affichée avec hash Git complet en développement ("2.1.7+632d162aab1108d4b1dcb2cc57f9ba29e2fff5ac")
+- **Solution** : Utilisation de `Assembly.GetName().Version.ToString(3)` au lieu de `AssemblyInformationalVersionAttribute`
+- **Résultat** : Affichage propre "2.1.8" au lieu du hash Git complet
+
+### 🔧 **Technique**
+- **AppSettings.cs** : ApplicationVersion utilise maintenant `Assembly.GetName().Version?.ToString(3)`
+- **Format** : ToString(3) retourne uniquement Major.Minor.Patch (ex: 2.1.8)
+- **Comportement** : AssemblyInformationalVersion inclut le hash Git en mode développement avec MSBuild
+
+### ✅ **Avantages**
+- **Affichage cohérent** : Version propre en développement et production
+- **Lisibilité** : Format concis "2.1.8" dans le header de l'application
+- **Source unique** : Toujours extrait depuis GenerateurDOE.csproj <Version>
+
 ## [2.1.7] - 2025-10-27
 
 ### ✨ **Système de Sauvegarde avec Types Sélectionnables**

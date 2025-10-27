@@ -19,7 +19,9 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 
 // Add Entity Framework with DbContextFactory Pattern for optimal concurrency
 var databaseProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "SqlServer";
-builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+
+// Configuration partagée pour DbContext
+Action<DbContextOptionsBuilder> configureDbContext = options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -56,10 +58,17 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
             });
             break;
     }
+};
 
-    // ✅ Multi-Database Support: PostgreSQL + SQL Server + SQLite avec QuerySplittingBehavior optimisé
-    // DbContextFactory Pattern: résolution définitive des problèmes de concurrence
-});
+// ✅ Enregistrement DbContextFactory pour les services optimisés (pattern recommandé)
+builder.Services.AddDbContextFactory<ApplicationDbContext>(configureDbContext);
+
+// ✅ Enregistrement ApplicationDbContext en Scoped pour compatibilité Radzen et legacy code
+builder.Services.AddDbContext<ApplicationDbContext>(configureDbContext, ServiceLifetime.Scoped);
+
+// ✅ Multi-Database Support: PostgreSQL + SQL Server + SQLite avec QuerySplittingBehavior optimisé
+// DbContextFactory Pattern: résolution définitive des problèmes de concurrence
+// ApplicationDbContext Scoped: compatibilité totale avec Radzen et composants tiers
 
 // Configuration des paramètres d'application
 builder.Services.Configure<AppSettings>(

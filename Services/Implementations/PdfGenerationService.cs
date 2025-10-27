@@ -74,9 +74,34 @@ namespace GenerateurDOE.Services.Implementations
                 {
                     if (_browser == null)
                     {
+                        _loggingService.LogInformation("Initialisation du navigateur Chromium pour génération PDF...");
+
+                        // Utiliser le Chrome installé via le système si la variable d'environnement est définie
+                        var executablePath = Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH");
+                        if (string.IsNullOrEmpty(executablePath))
+                        {
+                            // Fallback : télécharger Chrome si pas d'exécutable système
+                            var skipDownload = Environment.GetEnvironmentVariable("PUPPETEER_SKIP_CHROMIUM_DOWNLOAD");
+                            if (string.IsNullOrEmpty(skipDownload) || !skipDownload.Equals("true", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _loggingService.LogInformation("Téléchargement de Chromium en cours (si nécessaire)...");
+                                var browserFetcher = new BrowserFetcher();
+                                var installedBrowser = await browserFetcher.DownloadAsync();
+                                // PuppeteerSharp 15.x: InstalledBrowser.GetExecutablePath()
+                                executablePath = installedBrowser.GetExecutablePath();
+                                _loggingService.LogInformation($"Chromium téléchargé : {executablePath}");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService.LogInformation($"Utilisation de Chrome système : {executablePath}");
+                        }
+
                         var launchOptions = new LaunchOptions
                         {
                             Headless = true,
+                            ExecutablePath = !string.IsNullOrEmpty(executablePath) ? executablePath : null,
+                            Timeout = 90000, // ⚡ Augmenté à 90 secondes pour le premier lancement
                             Args = new[]
                             {
                                 "--no-sandbox",
@@ -124,26 +149,10 @@ namespace GenerateurDOE.Services.Implementations
                             }
                         };
 
-                        // Utiliser le Chrome installé via le système si la variable d'environnement est définie
-                        var executablePath = Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH");
-                        if (!string.IsNullOrEmpty(executablePath))
-                        {
-                            launchOptions.ExecutablePath = executablePath;
-                            _loggingService.LogInformation($"Utilisation de Chrome système : {executablePath}");
-                        }
-                        else
-                        {
-                            // Fallback : télécharger Chrome si pas d'exécutable système
-                            var skipDownload = Environment.GetEnvironmentVariable("PUPPETEER_SKIP_CHROMIUM_DOWNLOAD");
-                            if (string.IsNullOrEmpty(skipDownload) || !skipDownload.Equals("true", StringComparison.OrdinalIgnoreCase))
-                            {
-                                await new BrowserFetcher().DownloadAsync();
-                            }
-                        }
-
+                        _loggingService.LogInformation($"Lancement de Chromium avec timeout de {launchOptions.Timeout}ms...");
                         _browser = await Puppeteer.LaunchAsync(launchOptions);
-                        
-                        _loggingService.LogInformation("Browser Chromium initialisé pour PDF Generation");
+
+                        _loggingService.LogInformation("✅ Browser Chromium initialisé avec succès pour PDF Generation");
                     }
                 }
                 finally
@@ -367,13 +376,13 @@ namespace GenerateurDOE.Services.Implementations
             using var page = await browser.NewPageAsync();
             await page.SetContentAsync(htmlContent);
 
-            // Attendre le chargement complet (images, CSS) - timeout plus long pour les images base64
-            await page.WaitForTimeoutAsync(5000);
+            // ⚡ Attendre le chargement complet (images, CSS) - timeout réduit pour éviter "Target closed"
+            await page.WaitForTimeoutAsync(2000);
 
             // Attendre spécifiquement que les images soient chargées
             try
             {
-                await page.WaitForSelectorAsync("img", new WaitForSelectorOptions { Timeout = 3000 });
+                await page.WaitForSelectorAsync("img", new WaitForSelectorOptions { Timeout = 1500 });
                 _loggingService.LogInformation("Images détectées dans le HTML");
             }
             catch (Exception)
@@ -1134,12 +1143,12 @@ namespace GenerateurDOE.Services.Implementations
             {
                 foreach (var section in container.Items.OrderBy(sl => sl.Ordre))
                 {
-                    // Convertir les URLs relatives des images en URLs absolues
-                    var convertedContent = ConvertRelativeImagesToAbsolute(section.SectionLibre.ContenuHtml);
+                    // ✅ Utiliser le contenu effectif (personnalisé ou par défaut)
+                    var convertedContent = ConvertRelativeImagesToAbsolute(section.GetContenuEffectif());
 
                     html.AppendLine($@"
                     <div class='section'>
-                        <div class='section-title'>{section.SectionLibre.Titre}</div>
+                        <div class='section-title'>{section.GetTitreEffectif()}</div>
                         <div class='section-content'>{convertedContent}</div>
                     </div>");
                 }
