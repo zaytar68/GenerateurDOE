@@ -24,12 +24,10 @@ public class AppSettings
     /// <summary>
     /// Version de l'application extraite automatiquement depuis l'assembly .NET
     /// Source unique de vérité : GenerateurDOE.csproj <Version>
+    /// Format: Major.Minor.Patch (ex: 2.1.7)
     /// </summary>
     public string ApplicationVersion =>
-        Assembly.GetExecutingAssembly()
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion
-        ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
         ?? "0.0.0";
 
     /// <summary>
