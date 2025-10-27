@@ -32,6 +32,14 @@
     <NoWarn>1591,8032</NoWarn>
   </PropertyGroup>
 
+  <!-- Exclude Migrations_backup from compilation -->
+  <ItemGroup>
+    <Compile Remove="Migrations_backup\**" />
+    <Content Remove="Migrations_backup\**" />
+    <EmbeddedResource Remove="Migrations_backup\**" />
+    <None Remove="Migrations_backup\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.41.3" />
     <!-- DataProtection Extensions for Docker persistence -->

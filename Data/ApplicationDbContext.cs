@@ -241,20 +241,21 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<FTElement>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.PositionMarche).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PositionMarche).HasMaxLength(100); // Optionnel selon instructions utilisateur
+            entity.Property(e => e.Commentaire).HasMaxLength(500);
             entity.Property(e => e.Ordre).IsRequired();
             entity.Property(e => e.DateCreation).HasDefaultValueSql(timestampSql);
-            
+
             entity.HasOne(d => d.FTConteneur)
                 .WithMany(p => p.Elements)
                 .HasForeignKey(d => d.FTConteneursId)
                 .OnDelete(DeleteBehavior.Cascade);
-                
+
             entity.HasOne(d => d.FicheTechnique)
                 .WithMany()
                 .HasForeignKey(d => d.FicheTechniqueId)
                 .OnDelete(DeleteBehavior.Restrict);
-                
+
             entity.HasOne(d => d.ImportPDF)
                 .WithMany()
                 .HasForeignKey(d => d.ImportPDFId)
