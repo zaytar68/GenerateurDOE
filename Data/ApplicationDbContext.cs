@@ -43,7 +43,13 @@ public class ApplicationDbContext : DbContext
     {
         // Détection du provider pour utiliser la syntaxe correcte
         var providerName = Database.ProviderName;
-        return providerName?.Contains("Npgsql") == true ? "CURRENT_TIMESTAMP" : "GETDATE()";
+
+        if (providerName?.Contains("Npgsql") == true)
+            return "CURRENT_TIMESTAMP";  // PostgreSQL
+        else if (providerName?.Contains("Sqlite") == true)
+            return "CURRENT_TIMESTAMP";  // SQLite supporte CURRENT_TIMESTAMP
+        else
+            return "GETDATE()";  // SQL Server
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -39,6 +39,14 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             break;
 
+        case "SQLITE":
+            options.UseSqlite(connectionString, sqliteOptions =>
+            {
+                sqliteOptions.CommandTimeout(300);
+            })
+            .EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
+            break;
+
         case "SQLSERVER":
         default:
             options.UseSqlServer(connectionString, sqlOptions =>
@@ -49,7 +57,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
             break;
     }
 
-    // ✅ Multi-Database Support: PostgreSQL + SQL Server avec QuerySplittingBehavior optimisé
+    // ✅ Multi-Database Support: PostgreSQL + SQL Server + SQLite avec QuerySplittingBehavior optimisé
     // DbContextFactory Pattern: résolution définitive des problèmes de concurrence
 });
 
@@ -167,15 +175,30 @@ using (var scope = app.Services.CreateScope())
 
         Log.Information("Vérification de la connexion à la base de données...");
 
-        // Vérifier que la base de données est accessible
-        var canConnect = await context.Database.CanConnectAsync();
-        if (!canConnect)
-        {
-            Log.Error("Impossible de se connecter à la base de données !");
-            throw new Exception("Database connection failed");
-        }
+        // ✅ Pour SQLite en développement : créer la base si elle n'existe pas
+        var currentProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "SqlServer";
+        var isDevEnvironment = app.Environment.IsDevelopment();
 
-        Log.Information("✅ Connexion à la base de données réussie");
+        Log.Information($"Provider détecté: {currentProvider}, Environnement: {app.Environment.EnvironmentName}");
+
+        if (currentProvider.ToUpper() == "SQLITE" && isDevEnvironment)
+        {
+            Log.Information("Mode développement SQLite : création automatique de la base si nécessaire");
+            await context.Database.EnsureCreatedAsync();
+            Log.Information("✅ Base de données SQLite prête");
+        }
+        else
+        {
+            // Vérifier que la base de données est accessible (Production)
+            var canConnect = await context.Database.CanConnectAsync();
+            if (!canConnect)
+            {
+                Log.Error("Impossible de se connecter à la base de données !");
+                throw new Exception("Database connection failed");
+            }
+
+            Log.Information("✅ Connexion à la base de données réussie");
+        }
 
         // Initialize default types
         var typeProduitService = scope.ServiceProvider.GetRequiredService<ITypeProduitService>();

@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link href="css/site.css" rel="stylesheet" />
+    <link href="GenerateurDOE.styles.css" rel="stylesheet" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="icon" href="favicon.ico">
+    <link rel="manifest" href="site.webmanifest">
+    
+    <!-- Radzen Blazor CSS -->
+    <link href="_content/Radzen.Blazor/css/material-base.css" rel="stylesheet">
+    <!-- Style personnalisé -->
+    <link href="css/custom.css" rel="stylesheet" />
+    
+    <!--Blazor:{"type":"server","prerenderId":"11e9ad27048f47aa8147dc2cf2e17f0d","key":{"locationHash":"77D12F14A8105320B1AAED6AE7E689DA0EC4483270A645E84079EAA0FFDF550D:0","formattedComponentKey":""},"sequence":0,"descriptor":"CfDJ8H9UKT7ZdQtFkc/Fv\u002Bf0F6ShjDCr2j7D15j4TJtRAuGx20rhFnzTfPaFEfmi8eNvru5TZxobb8dwO5mFyUgGE4Xl0eaPNPh7eL7SCpCBUK1ZcYIiB1sMEIEPdlTIPl1lbPF01S1ETNQBnI5yZM/0dq\u002Bp43zHaUnw8EWTo1TgALQ02x3Suj1I\u002Bfv6ey6rMuEtV0V1YZcKQYncmK30j9qhRq9KQ5Si7p7\u002BMJln6ajYCCBGKnEkpOkuvITCy0Qivk\u002Bj7WV2GwOMtn3tPLrHvWGBvq7Si9MTdscJ0y3/\u002Bvg5DdDXNM3Ym6RwqAxiVl7jLG3Fgesc9MGtfX\u002BzAT52dpwwUSUfhJhaziNoP7B2NJbvZURCmymLd8I6fbjifjneTFSL\u002Bc5FK7e/Rb\u002BbQXKdUtgACyq6RgxZKgWgPUd9bde/vNBUHU3\u002BsTpxvVs8wn03nOWj4kmtQvdpbGtS/zCa8CI9jK1aACqOM\u002BBE1GHEpYdWemIvRGp0cYJCH84BAbjMA1ZFDHfhm/27bLb7L1IZig\u002BmbBQijSmCqfspbvJO0589FUihXbXPrRBXhEauv/ygMnx3\u002Buw3eJjy1qPzw\u002ByxjvkAZZw="}--><title>Fiches Techniques</title><!--Blazor:{"prerenderId":"11e9ad27048f47aa8147dc2cf2e17f0d"}-->
+</head>
+<body>
+    <!--Blazor:{"type":"server","prerenderId":"9a028a76a59e4c8c8adc7af2e7406801","key":{"locationHash":"EBD6A05060E9F1855F6D56FA8A65697C92A90F3BC2CACFFE0129CE3C336D6D95:0","formattedComponentKey":""},"sequence":1,"descriptor":"CfDJ8H9UKT7ZdQtFkc/Fv\u002Bf0F6QdGRhOSYckGpDgwWWaMJx61SCL3i1iHQPDo5cWYh3GrIsdGMAaFSGTDY101fOi2MlPZc6f24LYqYI13Vmjoo3Rx8P0DI/1qZAaPE6g4pGaLQp90jS1ORiv611jox60U9KSicdRIGVykDrBNGLPqPtIY9yU1O1SVOeW3/SoQ4ESwvj88lm64FVlYxjNo3V37bbjSAURU/nRjewdkUTJqw0DCyRsoytsPl1lulv1lBpTqpz\u002BPvnTFcV5KnPMhOJEZamTJDEq8IbWU3V2htYVNFIqifePtirsj4P/vLqz6cR0h3Xck613PWoDq5ID24O5amP0nZLaKTt6q4u4xeCo16gcDS2yj3GkKIN/XlVJNYpydAgby6iba1QKj9wr0Z6w2jqnAQscab/f0w7yxbHq8Yxu5LhXmnboqtlPO1b5q8XXloUqcAtzlw92EmRDQYZuwagtTx18GNj1ugC66cRY7zj4YKYpY7yDEKfjXu4DtwUJprEYpYVNAF66ctlfrPSxcRc="}-->
+
+<div class="page" b-3a8coihbcd><div class="sidebar" b-3a8coihbcd><div class="top-row ps-3 navbar navbar-dark" b-ohzj2t9h3n><div class="container-fluid" b-ohzj2t9h3n><img src="android-chrome-512x512.png" alt="Logo" width="30" height="30" class="me-2" b-ohzj2t9h3n>
+        <a class="navbar-brand" href b-ohzj2t9h3n>GenerateurDOE</a>
+        <button title="Navigation menu" class="navbar-toggler" b-ohzj2t9h3n><span class="navbar-toggler-icon" b-ohzj2t9h3n></span></button></div></div>
+
+<div class="collapse nav-scrollable" b-ohzj2t9h3n><nav class="flex-column" b-ohzj2t9h3n><div class="nav-item px-3" b-ohzj2t9h3n><a href="" class="nav-link"><span class="oi oi-home" aria-hidden="true" b-ohzj2t9h3n></span> Accueil
+            </a></div>       
+        <div class="nav-item px-3" b-ohzj2t9h3n><a href="chantiers" class="nav-link"><span class="oi oi-wrench" aria-hidden="true" b-ohzj2t9h3n></span> Chantiers
+            </a></div>
+        <div class="nav-item px-3" b-ohzj2t9h3n><a href="fiches-techniques" class="nav-link active" aria-current="page"><span class="oi oi-document" aria-hidden="true" b-ohzj2t9h3n></span> Fiches Techniques
+            </a></div>
+        
+        <div class="nav-item px-3" b-ohzj2t9h3n><a href="sections-libres" class="nav-link"><span class="oi oi-list" aria-hidden="true" b-ohzj2t9h3n></span> Sections Libres
+            </a></div>
+
+        <div class="nav-item px-3" b-ohzj2t9h3n><a href="templates/page-garde" class="nav-link"><span class="oi oi-document" aria-hidden="true" b-ohzj2t9h3n></span> Pages de Garde
+            </a></div>
+
+        <div class="nav-item px-3" b-ohzj2t9h3n><a href="configuration" class="nav-link"><span class="oi oi-cog" aria-hidden="true" b-ohzj2t9h3n></span> Configuration
+            </a></div>
+
+        <div class="nav-item px-3" b-ohzj2t9h3n><a href="maintenance" class="nav-link"><span class="oi oi-wrench" aria-hidden="true" b-ohzj2t9h3n></span> Maintenance
+            </a></div></nav></div></div>
+
+    <main b-3a8coihbcd><div class="top-row px-4" b-3a8coihbcd><span class="app-title" b-3a8coihbcd>GenerateurDOE pour Multisols - 2.1.6&#x2B;802ff892452eabcb6115ef834e54c2d3efa5ca09</span></div>
+
+        <article class="content px-4 main-content" b-3a8coihbcd>
+
+<div class="container-fluid"><div class="row"><div class="col-12"><div class="d-flex justify-content-between align-items-center mb-4"><h2>Gestion des Fiches Techniques</h2>
+                <button class="btn btn-primary"><i class="oi oi-plus"></i> Nouvelle Fiche
+                </button></div>
+
+            
+            <div class="card mb-4"><div class="card-body"><div class="row"><div class="col-md-8"><div class="autocomplete-container"><div class="position-relative"><input type="text" class="form-control  " value="" placeholder="Rechercher par produit, fabricant ou type..." autocomplete="off" /></div></div>
+
+<style>
+    .autocomplete-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        max-height: 300px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    .autocomplete-item {
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f8f9fa;
+        transition: background-color 0.15s ease-in-out;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #e9ecef;
+    }
+
+    .autocomplete-item.no-results {
+        color: #6c757d;
+        font-style: italic;
+        cursor: default;
+    }
+
+    .autocomplete-item.no-results:hover {
+        background-color: transparent;
+    }
+
+    .autocomplete-item.add-new {
+        color: #0066cc;
+        font-weight: 500;
+        border-left: 3px solid #0066cc;
+        background-color: #f8f9ff;
+    }
+
+    .autocomplete-item.add-new:hover {
+        background-color: #e6f2ff;
+        color: #004499;
+    }
+</style></div>
+                        <div class="col-md-4"><button class="btn btn-outline-secondary"><i class="oi oi-x"></i> Effacer
+                            </button></div></div></div></div>
+
+            
+            <div class="card"><div class="card-body"><div class="text-center text-muted"><p>Aucune fiche technique trouvée.</p></div></div></div></div></div></div>
+
+
+<div class="modal fade " tabindex="-1" style=""><div class="modal-dialog modal-lg"><div class="modal-content"><form method="post" action="/fiches-techniques"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8H9UKT7ZdQtFkc_Fv-f0F6ShEz2jxozMkj_sTVxap18qqJtK12pGppKfnp79guf-QiNrsdQMmkTztTmwsBFBRqaMyYRPzDkYpAhfIL0rf2GlT1AkL5Ygsjhd1iTVzTKMb3Dayi4hOqOUC2kbz59Rzz0" />
+                <div class="modal-header"><h5 class="modal-title">Nouvelle Fiche Technique</h5>
+                    <button type="button" class="btn-close"></button></div>
+                <div class="modal-body"><div class="row"><div class="col-md-6"><div class="mb-3"><label class="form-label">Nom du Produit *</label>
+                                <input name="ficheEnCours.NomProduit" class="form-control valid" value="" />
+                                </div></div>
+                        <div class="col-md-6"><div class="mb-3"><label class="form-label">Nom du Fabricant *</label>
+                                <div class="input-group"><select class="form-select" value=""><option value>-- Sélectionner un fabricant --</option></select>
+                                    <button type="button" class="btn btn-outline-primary"><i class="oi oi-plus"></i></button></div>
+                                </div></div></div>
+                    <div class="mb-3"><label class="form-label">Type de Produit *</label>
+                        <div class="input-group"><select class="form-select" value=""><option value>-- Sélectionner un type de produit --</option><option value="Bande d&#x27;&#xE9;veil &#xE0; la vigilance">Bande d&#x27;&#xE9;veil &#xE0; la vigilance</option><option value="Barri&#xE8;re anti remont&#xE9;es d&#x27;humidit&#xE9;">Barri&#xE8;re anti remont&#xE9;es d&#x27;humidit&#xE9;</option><option value="Carrelage">Carrelage</option><option value="Colle carrelage">Colle carrelage</option><option value="Colle parquet">Colle parquet</option><option value="Colle rev&#xEA;tement">Colle rev&#xEA;tement</option><option value="Couvre joint de dilatation">Couvre joint de dilatation</option><option value="Dalle moquette">Dalle moquette</option><option value="Etanch&#xE9;it&#xE9; murale">Etanch&#xE9;it&#xE9; murale</option><option value="Etanch&#xE9;it&#xE9; sol">Etanch&#xE9;it&#xE9; sol</option><option value="Fa&#xEF;ence">Fa&#xEF;ence</option><option value="Moquette">Moquette</option><option value="Natte d&#x27;&#xE9;tanch&#xE9;it&#xE9;">Natte d&#x27;&#xE9;tanch&#xE9;it&#xE9;</option><option value="Natte de d&#xE9;solidarisation">Natte de d&#xE9;solidarisation</option><option value="Nez de marche">Nez de marche</option><option value="Primaire">Primaire</option><option value="Ragr&#xE9;age">Ragr&#xE9;age</option><option value="Rev&#xEA;tement de sol PVC">Rev&#xEA;tement de sol PVC</option><option value="Rev&#xEA;tement de sol caoutchouc">Rev&#xEA;tement de sol caoutchouc</option><option value="Rev&#xEA;tement de sol linoleum">Rev&#xEA;tement de sol linoleum</option><option value="Tapis">Tapis</option><option value="&#xC9;tanch&#xE9;it&#xE9;">&#xC9;tanch&#xE9;it&#xE9;</option></select>
+                            <button type="button" class="btn btn-outline-primary"><i class="oi oi-plus"></i></button></div>
+                        </div>
+                    <div class="mb-3"><label class="form-label">Description</label>
+                        <textarea rows="3" name="ficheEnCours.Description" class="form-control valid"></textarea>
+                        </div></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-primary">                        Sauvegarder
+                    </button></div></form></div></div></div>
+
+
+<div class="modal fade " tabindex="-1" style=""><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirmer la suppression</h5>
+                <button type="button" class="btn-close"></button></div>
+            <div class="modal-body"></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary">Annuler</button>
+                <button type="button" class="btn btn-danger">                    Supprimer définitivement
+                </button></div></div></div></div>
+
+
+<div class="modal fade " tabindex="-1" style=""><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">
+                    Gestion des PDF - </h5>
+                <button type="button" class="btn-close"></button></div>
+            <div class="modal-body"><div class="card mb-4"><div class="card-header"><h6 class="mb-0"><i class="oi oi-cloud-upload"></i> Ajouter des fichiers PDF</h6></div>
+                    <div class="card-body"><div class="upload-zone border border-2 border-dashed p-4 text-center" style="min-height: 150px; border-color: #dee2e6 !important;"><input multiple accept=".pdf" class="d-none" id="fileInput" type="file" />
+                            <label for="fileInput" class="d-block" style="cursor: pointer;"><i class="oi oi-cloud-upload display-4 text-muted mb-3"></i>
+                                    <p class="mb-2"><strong>Cliquez ici ou glissez-déposez vos fichiers PDF</strong></p>
+                                    <p class="text-muted mb-0">Taille maximum : 10MB par fichier</p></label></div>
+                        <small class="text-muted">
+                            Seuls les fichiers PDF sont acceptés. Vous pourrez définir le type de document après l'upload.
+                        </small></div></div>
+
+                
+                <div class="card"><div class="card-header"><h6 class="mb-0"><i class="oi oi-document"></i> 
+                            Documents PDF (0)
+                        </h6></div>
+                    <div class="card-body"><div class="text-center text-muted py-4"><i class="oi oi-document display-4"></i>
+                                <p class="mt-3">Aucun document PDF associé à cette fiche.</p></div></div></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary">
+                    Fermer
+                </button></div></div></div></div>
+
+
+<div class="modal fade " tabindex="-1" style=""><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Nouveau Fabricant</h5>
+                <button type="button" class="btn-close"></button></div>
+            <div class="modal-body"><div class="mb-3"><label class="form-label">Nom du fabricant *</label>
+                    <input type="text" class="form-control" placeholder="Saisir le nom du fabricant" value="" /></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary">Annuler</button>
+                <button type="button" class="btn btn-primary" disabled>
+                    Ajouter
+                </button></div></div></div></div>
+
+
+<div class="modal fade " tabindex="-1" style=""><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Nouveau Type de Produit</h5>
+                <button type="button" class="btn-close"></button></div>
+            <div class="modal-body"><div class="mb-3"><label class="form-label">Nom du type de produit *</label>
+                    <input type="text" class="form-control" placeholder="Saisir le nom du type" value="" /></div>
+                <div class="mb-3"><label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" placeholder="Description optionnelle"></textarea></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary">Annuler</button>
+                <button type="button" class="btn btn-primary" disabled>                    Créer
+                </button></div></div></div></div></article></main></div>
+        
+
+
+<div aria-live="polite" class="rz-notification"></div>
+
+<!--Blazor:{"prerenderId":"9a028a76a59e4c8c8adc7af2e7406801"}-->
+
+    <div id="blazor-error-ui">
+        
+        
+            An unhandled exception has occurred. See browser dev tools for details.
+        
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="_framework/blazor.server.js"></script>
+    
+    <!-- Radzen Blazor JS -->
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+
+    <!-- Page Garde Editor JS -->
+    <script src="/js/page-garde-editor.js"></script>
+
+    <!-- SortableJS pour drag & drop -->
+    <script src="/js/sortable.min.js"></script>
+    <script src="/js/section-drag-drop.js"></script>
+</body>
+</html>

@@ -230,6 +230,11 @@ CordovaApp.projitems*
 *.ldf
 *.ndf
 
+# SQLite database files (Development)
+*.db
+*.db-shm
+*.db-wal
+
 # Business Intelligence projects
 *.rdl.data
 *.bim.layout

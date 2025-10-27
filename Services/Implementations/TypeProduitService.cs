@@ -168,16 +168,28 @@ public class TypeProduitService : ITypeProduitService
         {
             var defaultTypes = new[]
             {
-                new TypeProduit { Nom = "Isolant thermique", Description = "Matériaux d'isolation thermique" },
-                new TypeProduit { Nom = "Isolant phonique", Description = "Matériaux d'isolation phonique" },
-                new TypeProduit { Nom = "Revêtement sol", Description = "Revêtements de sol" },
-                new TypeProduit { Nom = "Revêtement mur", Description = "Revêtements muraux" },
-                new TypeProduit { Nom = "Menuiserie", Description = "Portes, fenêtres, volets" },
-                new TypeProduit { Nom = "Plomberie", Description = "Équipements sanitaires et plomberie" },
-                new TypeProduit { Nom = "Électricité", Description = "Équipements électriques" },
-                new TypeProduit { Nom = "Chauffage", Description = "Systèmes de chauffage" },
-                new TypeProduit { Nom = "Ventilation", Description = "Systèmes de ventilation" },
-                new TypeProduit { Nom = "Étanchéité", Description = "Produits d'étanchéité" }
+                new TypeProduit { Nom = "Carrelage", Description = "Revêtements de sols et murs" },
+                new TypeProduit { Nom = "Étanchéité", Description = "Produits d'étanchéité et imperméabilisation" },
+                new TypeProduit { Nom = "Primaire", Description = "Primaires d'accrochage" },
+                new TypeProduit { Nom = "Faïence", Description = "Carrelage mural" },
+                new TypeProduit { Nom = "Ragréage", Description = "Enduits de ragréage" },
+                new TypeProduit { Nom = "Revêtement de sol PVC", Description = "Revêtements PVC en lés ou dalles" },
+                new TypeProduit { Nom = "Revêtement de sol linoleum", Description = "Revêtements linoleum" },
+                new TypeProduit { Nom = "Revêtement de sol caoutchouc", Description = "Revêtements caoutchouc" },
+                new TypeProduit { Nom = "Bande d'éveil à la vigilance", Description = "BEV" },
+                new TypeProduit { Nom = "Barrière anti remontées d'humidité", Description = "Produits anti-humidité" },
+                new TypeProduit { Nom = "Colle carrelage", Description = "Colles pour carrelage" },
+                new TypeProduit { Nom = "Colle parquet", Description = "Colles pour parquet" },
+                new TypeProduit { Nom = "Colle revêtement", Description = "Colles pour revêtements souples" },
+                new TypeProduit { Nom = "Couvre joint de dilatation", Description = "Profilés de dilatation" },
+                new TypeProduit { Nom = "Dalle moquette", Description = "Dalles moquette" },
+                new TypeProduit { Nom = "Moquette", Description = "Moquette en lés" },
+                new TypeProduit { Nom = "Etanchéité murale", Description = "Étanchéité pour murs" },
+                new TypeProduit { Nom = "Etanchéité sol", Description = "Étanchéité pour sols" },
+                new TypeProduit { Nom = "Natte de désolidarisation", Description = "Nattes de désolidarisation" },
+                new TypeProduit { Nom = "Natte d'étanchéité", Description = "Nattes d'étanchéité" },
+                new TypeProduit { Nom = "Nez de marche", Description = "Profilés nez de marche" },
+                new TypeProduit { Nom = "Tapis", Description = "Tapis" }
             };
 
             context.TypesProduits.AddRange(defaultTypes);

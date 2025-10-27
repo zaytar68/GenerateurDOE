@@ -166,12 +166,16 @@ public class TypeDocumentImportService : ITypeDocumentImportService
         {
             var defaultTypes = new[]
             {
-                new TypeDocumentImport { Nom = "Fiche Technique", Description = "Documents techniques des produits" },
-                new TypeDocumentImport { Nom = "Nuancier", Description = "Nuanciers de couleurs et finitions" },
-                new TypeDocumentImport { Nom = "Brochure", Description = "Brochures commerciales" },
-                new TypeDocumentImport { Nom = "Classement Feu", Description = "Documents de classement au feu" },
-                new TypeDocumentImport { Nom = "Classement UPEC", Description = "Documents de classement UPEC" },
-                new TypeDocumentImport { Nom = "Autre", Description = "Autres types de documents" }
+                new TypeDocumentImport { Nom = "Fiche technique", Description = "Fiche technique produit standard" },
+                new TypeDocumentImport { Nom = "Notice de pose", Description = "Instructions d'installation et de pose" },
+                new TypeDocumentImport { Nom = "Certificat UPEC", Description = "Certificats et homologations" },
+                new TypeDocumentImport { Nom = "Garantie", Description = "Documents de garantie constructeur" },
+                new TypeDocumentImport { Nom = "Avis technique", Description = "Avis techniques officiels" },
+                new TypeDocumentImport { Nom = "PV d'essai", Description = "Procès-verbaux d'essais et tests" },
+                new TypeDocumentImport { Nom = "FDS", Description = "Fiche de données de sécurité" },
+                new TypeDocumentImport { Nom = "FDES", Description = "Fiche de Déclaration Environnementale et sanitaire" },
+                new TypeDocumentImport { Nom = "Entretien", Description = "Notice d'entretien" },
+                new TypeDocumentImport { Nom = "Brochure", Description = "Brochure commerciale" }
             };
 
             context.TypesDocuments.AddRange(defaultTypes);

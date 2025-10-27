@@ -161,7 +161,11 @@ public class TypeSectionService : ITypeSectionService
             {
                 new TypeSection { Nom = "Introduction", Description = "Section d'introduction du document" },
                 new TypeSection { Nom = "Méthodologie", Description = "Description des méthodes employées" },
+                new TypeSection { Nom = "Principes de mise en oeuvre", Description = "Description des méthodes de travail" },
                 new TypeSection { Nom = "Présentation société", Description = "Présentation de l'entreprise" },
+                new TypeSection { Nom = "Planning", Description = "Planning d'exécution des travaux" },
+                new TypeSection { Nom = "Matériaux", Description = "Description des matériaux utilisés" },
+                new TypeSection { Nom = "Sécurité", Description = "Mesures de sécurité et prévention" },
                 new TypeSection { Nom = "Références chantier", Description = "Références et expériences sur des chantiers similaires" },
                 new TypeSection { Nom = "Démarche environnementale", Description = "Approche et mesures environnementales du projet" },
                 new TypeSection { Nom = "Conclusion", Description = "Section de conclusion" },
@@ -192,6 +196,10 @@ public class TypeSectionService : ITypeSectionService
 
         var newTypes = new[]
         {
+            new { Nom = "Principes de mise en oeuvre", Description = "Description des méthodes de travail" },
+            new { Nom = "Planning", Description = "Planning d'exécution des travaux" },
+            new { Nom = "Matériaux", Description = "Description des matériaux utilisés" },
+            new { Nom = "Sécurité", Description = "Mesures de sécurité et prévention" },
             new { Nom = "Références chantier", Description = "Références et expériences sur des chantiers similaires" },
             new { Nom = "Démarche environnementale", Description = "Approche et mesures environnementales du projet" }
         };
