@@ -4,10 +4,31 @@ namespace GenerateurDOE.Services.Interfaces;
 
 public interface IBackupService
 {
-    Task<BackupResult> CreateCompleteBackupAsync();
+    Task<BackupResult> CreateCompleteBackupAsync(BackupType backupType = BackupType.Complete);
     Task<BackupStatus> GetBackupStatusAsync(string backupId);
     Task<bool> CleanupOldBackupsAsync(TimeSpan maxAge);
     Task<string> GetBackupFilePathAsync(string backupId);
+}
+
+/// <summary>
+/// Type de sauvegarde de base de données
+/// </summary>
+public enum BackupType
+{
+    /// <summary>
+    /// Sauvegarde complète : structure (DDL) + données (DML)
+    /// </summary>
+    Complete,
+
+    /// <summary>
+    /// Structure uniquement : CREATE TABLE, indexes, contraintes, etc.
+    /// </summary>
+    SchemaOnly,
+
+    /// <summary>
+    /// Données uniquement : INSERT statements sans structure
+    /// </summary>
+    DataOnly
 }
 
 public class BackupResult

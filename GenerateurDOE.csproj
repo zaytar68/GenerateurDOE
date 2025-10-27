@@ -5,9 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- Version Information -->
-    <Version>2.1.6</Version>
-    <AssemblyVersion>2.1.6</AssemblyVersion>
-    <FileVersion>2.1.6</FileVersion>
+    <Version>2.1.7</Version>
+    <AssemblyVersion>2.1.7</AssemblyVersion>
+    <FileVersion>2.1.7</FileVersion>
     <Product>Générateur DOE</Product>
     <Company>Multisols</Company>
     <Copyright>© 2025 Multisols</Copyright>
@@ -38,6 +38,7 @@
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="8.0.10" />
     <!-- Database Providers -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

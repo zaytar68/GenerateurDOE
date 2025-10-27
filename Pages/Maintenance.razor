@@ -292,14 +292,31 @@
                         <div class="alert alert-info" role="alert">
                             <h6 class="alert-heading">
                                 <span class="oi oi-info" aria-hidden="true"></span>
-                                Sauvegarde complète
+                                Sauvegarde complète du système
                             </h6>
                             <p class="mb-0">
                                 Cette fonction créé une archive ZIP contenant :
-                                • Sauvegarde complète de la base de données (SQL)
+                                • Sauvegarde de la base de données (SQL) avec le type sélectionné ci-dessous
                                 • Tous les fichiers PDF des fiches techniques
                                 • Toutes les images des méthodologies
                             </p>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="backupTypeSelect" class="form-label fw-bold">
+                                    <span class="oi oi-database" aria-hidden="true"></span>
+                                    Type de sauvegarde de base de données :
+                                </label>
+                                <select id="backupTypeSelect" class="form-select" @bind="selectedBackupType">
+                                    <option value="@BackupType.Complete">Complète (Structure + Données)</option>
+                                    <option value="@BackupType.SchemaOnly">Structure uniquement (DDL)</option>
+                                    <option value="@BackupType.DataOnly">Données uniquement (DML)</option>
+                                </select>
+                                <small class="form-text text-muted mt-1 d-block">
+                                    @GetBackupTypeDescription(selectedBackupType)
+                                </small>
+                            </div>
                         </div>
 
                         @if (backupProgress != null && isBackupRunning)
@@ -437,6 +454,7 @@
     private BackupStatus? backupProgress;
     private BackupResult? backupResult;
     private Timer? backupStatusTimer;
+    private BackupType selectedBackupType = BackupType.Complete;
 
     protected override async Task OnInitializedAsync()
     {
@@ -571,11 +589,20 @@
 
     private async Task StartBackup()
     {
+        var backupTypeLabel = selectedBackupType switch
+        {
+            BackupType.Complete => "Complète (Structure + Données)",
+            BackupType.SchemaOnly => "Structure uniquement (DDL)",
+            BackupType.DataOnly => "Données uniquement (DML)",
+            _ => "Complète"
+        };
+
         var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
-            "Êtes-vous sûr de vouloir créer une sauvegarde complète ?\n\n" +
+            $"Êtes-vous sûr de vouloir créer une sauvegarde ?\n\n" +
+            $"Type de sauvegarde base de données : {backupTypeLabel}\n\n" +
             "Cette opération peut prendre plusieurs minutes selon la taille des données.\n" +
             "Vous recevrez un fichier ZIP contenant :\n" +
-            "• La base de données complète (SQL)\n" +
+            $"• La base de données ({backupTypeLabel})\n" +
             "• Tous les fichiers PDF\n" +
             "• Toutes les images\n\n" +
             "Continuer ?");
@@ -583,19 +610,20 @@
         if (!confirmed) return;
 
         isBackupRunning = true;
-        backupResult = null;
+        // Note: On ne réinitialise PAS backupResult ici pour éviter que le bouton de téléchargement
+        // de la sauvegarde précédente disparaisse. Il sera écrasé par le nouveau résultat une fois terminé.
         backupProgress = null;
         errorMessage = null;
         successMessage = null;
 
         try
         {
-            // Appel direct au service BackupService (plus efficace que HTTP dans Blazor Server)
-            backupResult = await BackupService.CreateCompleteBackupAsync();
+            // Appel direct au service BackupService avec le type de sauvegarde sélectionné
+            backupResult = await BackupService.CreateCompleteBackupAsync(selectedBackupType);
 
             if (backupResult.Success)
             {
-                successMessage = $"Sauvegarde créée avec succès ! Taille : {FormatFileSize(backupResult.FileSizeBytes)}";
+                successMessage = $"Sauvegarde ({backupTypeLabel}) créée avec succès ! Taille : {FormatFileSize(backupResult.FileSizeBytes)}";
             }
             else
             {
@@ -632,6 +660,17 @@
         {
             errorMessage = $"Erreur lors du téléchargement : {ex.Message}";
         }
+    }
+
+    private string GetBackupTypeDescription(BackupType backupType)
+    {
+        return backupType switch
+        {
+            BackupType.Complete => "Sauvegarde complète : CREATE TABLE + INSERT statements (recommandé)",
+            BackupType.SchemaOnly => "Structure uniquement : CREATE TABLE, indexes, contraintes (pour migration/dev)",
+            BackupType.DataOnly => "Données uniquement : INSERT statements sans structure (pour transfert de données)",
+            _ => "Type de sauvegarde inconnu"
+        };
     }
 
     public void Dispose()

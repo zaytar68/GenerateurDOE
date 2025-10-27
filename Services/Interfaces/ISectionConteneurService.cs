@@ -31,4 +31,9 @@ public interface ISectionConteneurService
 
     // Méthode pour réorganiser les conteneurs
     Task<bool> ReorderConteneurAsync(int conteneurId, int nouvelOrdre);
+
+    // 🆕 Méthodes pour la personnalisation des sections
+    Task<SectionConteneurItem> PersonnaliserItemAsync(int itemId, string? titrePersonnalise, string contenuHtmlPersonnalise);
+    Task<SectionConteneurItem> ResetItemToDefaultAsync(int itemId);
+    Task<SectionConteneurItem> GetItemByIdAsync(int itemId);
 }

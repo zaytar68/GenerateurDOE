@@ -171,13 +171,25 @@
                                                         <div class="flex-grow-1">
                                                             <div class="d-flex justify-content-between align-items-start">
                                                                 <div>
-                                                                    <strong>@(section.Titre)</strong>
+                                                                    <strong>@item.GetTitreEffectif()</strong>
                                                                     <span class="badge bg-secondary ms-2 small">@item.Ordre</span>
+                                                                    @if (item.EstPersonnalise)
+                                                                    {
+                                                                        <span class="badge bg-warning text-dark ms-2 small">
+                                                                            <span class="oi oi-pencil"></span> Personnalisé
+                                                                        </span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span class="badge bg-info ms-2 small">
+                                                                            <span class="oi oi-document"></span> Défaut
+                                                                        </span>
+                                                                    }
                                                                     <br>
                                                                     <small class="text-muted section-preview">
-                                                                        @if (!string.IsNullOrWhiteSpace(section.ContenuHtml))
+                                                                        @if (!string.IsNullOrWhiteSpace(item.GetContenuEffectif()))
                                                                         {
-                                                                            @((MarkupString)TronquerHtml(section.ContenuHtml, 100))
+                                                                            @((MarkupString)TronquerHtml(item.GetContenuEffectif(), 100))
                                                                         }
                                                                     </small>
                                                                 </div>
@@ -198,12 +210,14 @@
                                                     </div>
                                                 </div>
                                                 <div class="btn-group ms-2">
-                                                    <button class="btn btn-outline-secondary btn-sm" 
-                                                            @onclick="() => EditerSection(section)">
+                                                    <button class="btn btn-outline-primary btn-sm"
+                                                            @onclick="() => EditerSection(item)"
+                                                            title="Personnaliser pour ce document">
                                                         <span class="oi oi-pencil"></span>
                                                     </button>
-                                                    <button class="btn btn-outline-danger btn-sm" 
-                                                            @onclick="() => RetirerSectionItem(conteneur, item)">
+                                                    <button class="btn btn-outline-danger btn-sm"
+                                                            @onclick="() => RetirerSectionItem(conteneur, item)"
+                                                            title="Retirer du document">
                                                         <span class="oi oi-minus"></span>
                                                     </button>
                                                 </div>
@@ -494,12 +508,50 @@ new Radzen.DialogOptions
         }
     }
 
-    private void EditerSection(SectionLibre section)
+    private async Task EditerSection(SectionConteneurItem item)
     {
-        // Navigation vers la page d'édition des sections libres
-        // TODO: Implémenter selon les besoins
-        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", 
-            "Édition directe des sections en cours de développement");
+        try
+        {
+            var result = await DialogService.OpenAsync<SectionLibreEditDialog>(
+                "Personnaliser la Section pour ce Document",
+                new Dictionary<string, object>
+                {
+                    { "ItemId", item.Id }
+                },
+                new Radzen.DialogOptions
+                {
+                    Width = "900px",
+                    Height = "auto",
+                    Resizable = true,
+                    Draggable = true,
+                    CloseDialogOnOverlayClick = false,
+                    ShowClose = true
+                }
+            );
+
+            if (result != null && result is SectionConteneurItem)
+            {
+                var updatedItem = (SectionConteneurItem)result;
+
+                // Recharger le conteneur pour afficher les modifications
+                var conteneur = SectionsConteneurs.FirstOrDefault(sc => sc.Id == item.SectionConteneursId);
+                if (conteneur != null)
+                {
+                    await RechargerConteneur(conteneur);
+
+                    var message = updatedItem.EstPersonnalise
+                        ? "Section personnalisée avec succès !"
+                        : "Section réinitialisée au contenu par défaut !";
+
+                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès", message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de l'édition : {ex.Message}");
+        }
     }
 
     // Nouvelles méthodes pour gérer les SectionConteneurItem

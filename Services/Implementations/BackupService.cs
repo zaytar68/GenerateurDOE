@@ -38,7 +38,7 @@ public class BackupService : IBackupService
         Directory.CreateDirectory(_tempBackupDirectory);
     }
 
-    public async Task<BackupResult> CreateCompleteBackupAsync()
+    public async Task<BackupResult> CreateCompleteBackupAsync(BackupType backupType = BackupType.Complete)
     {
         var backupId = Guid.NewGuid().ToString("N")[..12];
         var startTime = DateTime.UtcNow;
@@ -55,7 +55,7 @@ public class BackupService : IBackupService
 
         try
         {
-            _logger.LogInformation("Démarrage de la sauvegarde complète avec l'ID: {BackupId}", backupId);
+            _logger.LogInformation("Démarrage de la sauvegarde ({BackupType}) avec l'ID: {BackupId}", backupType, backupId);
 
             // Étape 1: Obtenir les paramètres de configuration
             var appSettings = await _configurationService.GetAppSettingsAsync().ConfigureAwait(false);
@@ -70,7 +70,7 @@ public class BackupService : IBackupService
             await UpdateStatusAsync(backupId, BackupState.BackingUpDatabase, 10,
                 "Création de la sauvegarde de base de données...").ConfigureAwait(false);
 
-            var sqlBackupPath = await CreateDatabaseBackupAsync(backupId).ConfigureAwait(false);
+            var sqlBackupPath = await CreateDatabaseBackupAsync(backupId, backupType).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(sqlBackupPath))
             {
                 var sqlFileInfo = new FileInfo(sqlBackupPath);
@@ -172,7 +172,7 @@ public class BackupService : IBackupService
         }
     }
 
-    private async Task<string?> CreateDatabaseBackupAsync(string backupId)
+    private async Task<string?> CreateDatabaseBackupAsync(string backupId, BackupType backupType)
     {
         try
         {
@@ -190,11 +190,11 @@ public class BackupService : IBackupService
 
             if (providerName?.Contains("SqlServer") == true)
             {
-                return await CreateSqlServerBackupAsync(connectionString, timestamp, backupId).ConfigureAwait(false);
+                return await CreateSqlServerBackupAsync(connectionString, timestamp, backupId, backupType).ConfigureAwait(false);
             }
             else if (providerName?.Contains("Npgsql") == true)
             {
-                return await CreatePostgreSqlBackupAsync(connectionString, timestamp, backupId).ConfigureAwait(false);
+                return await CreatePostgreSqlBackupAsync(connectionString, timestamp, backupId, backupType).ConfigureAwait(false);
             }
             else
             {
@@ -209,7 +209,7 @@ public class BackupService : IBackupService
         }
     }
 
-    private async Task<string?> CreateSqlServerBackupAsync(string connectionString, string timestamp, string backupId)
+    private async Task<string?> CreateSqlServerBackupAsync(string connectionString, string timestamp, string backupId, BackupType backupType)
     {
         try
         {
@@ -235,7 +235,7 @@ public class BackupService : IBackupService
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
             // Ensuite créer un script SQL pour plus de portabilité
-            await CreateSqlScriptFromDatabaseAsync(connection, databaseName, sqlBackupPath, backupId).ConfigureAwait(false);
+            await CreateSqlScriptFromDatabaseAsync(connection, databaseName, sqlBackupPath, backupId, backupType).ConfigureAwait(false);
 
             // Supprimer le fichier .bak et garder seulement le .sql
             if (File.Exists(backupFilePath))
@@ -252,12 +252,13 @@ public class BackupService : IBackupService
         }
     }
 
-    private async Task CreateSqlScriptFromDatabaseAsync(SqlConnection connection, string databaseName, string outputPath, string backupId)
+    private async Task CreateSqlScriptFromDatabaseAsync(SqlConnection connection, string databaseName, string outputPath, string backupId, BackupType backupType)
     {
         try
         {
             using var writer = new StreamWriter(outputPath);
-            await writer.WriteLineAsync($"-- Sauvegarde de la base de données {databaseName}").ConfigureAwait(false);
+            await writer.WriteLineAsync($"-- Sauvegarde SQL Server de la base de données {databaseName}").ConfigureAwait(false);
+            await writer.WriteLineAsync($"-- Type: {backupType}").ConfigureAwait(false);
             await writer.WriteLineAsync($"-- Générée le {DateTime.Now:yyyy-MM-dd HH:mm:ss}").ConfigureAwait(false);
             await writer.WriteLineAsync($"-- ID de sauvegarde: {backupId}").ConfigureAwait(false);
             await writer.WriteLineAsync().ConfigureAwait(false);
@@ -282,37 +283,118 @@ public class BackupService : IBackupService
             }
             tablesReader.Close();
 
-            // Pour chaque table, générer les INSERT statements
-            foreach (var tableName in tables)
+            // Générer la structure (DDL) si nécessaire
+            if (backupType == BackupType.Complete || backupType == BackupType.SchemaOnly)
             {
-                await writer.WriteLineAsync($"-- Données de la table {tableName}").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- STRUCTURE DE LA BASE DE DONNÉES (DDL)").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync().ConfigureAwait(false);
 
-                var selectQuery = $"SELECT * FROM [{tableName}]";
-                using var dataCmd = new SqlCommand(selectQuery, connection);
-                using var dataReader = await dataCmd.ExecuteReaderAsync().ConfigureAwait(false);
-
-                if (dataReader.HasRows)
+                foreach (var tableName in tables)
                 {
-                    var columnNames = new List<string>();
-                    for (int i = 0; i < dataReader.FieldCount; i++)
-                    {
-                        columnNames.Add(dataReader.GetName(i));
-                    }
+                    await writer.WriteLineAsync($"-- Structure de la table {tableName}").ConfigureAwait(false);
+                    await writer.WriteLineAsync($"IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[{tableName}]') AND type in (N'U'))").ConfigureAwait(false);
+                    await writer.WriteLineAsync($"DROP TABLE [dbo].[{tableName}];").ConfigureAwait(false);
+                    await writer.WriteLineAsync("GO").ConfigureAwait(false);
+                    await writer.WriteLineAsync().ConfigureAwait(false);
 
-                    while (await dataReader.ReadAsync().ConfigureAwait(false))
+                    // Récupérer la définition de la table
+                    var getCreateTableQuery = $@"
+                        SELECT
+                            c.name AS ColumnName,
+                            t.name AS DataType,
+                            c.max_length,
+                            c.precision,
+                            c.scale,
+                            c.is_nullable,
+                            c.is_identity
+                        FROM sys.columns c
+                        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+                        WHERE c.object_id = OBJECT_ID('[{tableName}]')
+                        ORDER BY c.column_id";
+
+                    using var schemaCmd = new SqlCommand(getCreateTableQuery, connection);
+                    using var schemaReader = await schemaCmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    var columns = new List<string>();
+                    while (await schemaReader.ReadAsync().ConfigureAwait(false))
                     {
-                        var values = new List<string>();
-                        for (int i = 0; i < dataReader.FieldCount; i++)
+                        var columnName = schemaReader.GetString(0);
+                        var dataType = schemaReader.GetString(1);
+                        var maxLength = schemaReader.GetInt16(2);
+                        var precision = schemaReader.GetByte(3);
+                        var scale = schemaReader.GetByte(4);
+                        var isNullable = schemaReader.GetBoolean(5);
+                        var isIdentity = schemaReader.GetBoolean(6);
+
+                        var columnDef = $"[{columnName}] {dataType}";
+
+                        // Gérer les types de données avec taille
+                        if (dataType == "nvarchar" || dataType == "varchar")
                         {
-                            var value = dataReader.IsDBNull(i) ? "NULL" : $"'{dataReader.GetValue(i).ToString()?.Replace("'", "''")}'";
-                            values.Add(value);
+                            columnDef += maxLength == -1 ? "(MAX)" : $"({maxLength})";
+                        }
+                        else if (dataType == "decimal" || dataType == "numeric")
+                        {
+                            columnDef += $"({precision},{scale})";
                         }
 
-                        await writer.WriteLineAsync($"INSERT INTO [{tableName}] ({string.Join(", ", columnNames.Select(c => $"[{c}]"))}) VALUES ({string.Join(", ", values)});").ConfigureAwait(false);
-                    }
-                }
+                        if (isIdentity)
+                            columnDef += " IDENTITY(1,1)";
 
+                        columnDef += isNullable ? " NULL" : " NOT NULL";
+
+                        columns.Add(columnDef);
+                    }
+
+                    await writer.WriteLineAsync($"CREATE TABLE [dbo].[{tableName}] (").ConfigureAwait(false);
+                    await writer.WriteLineAsync($"    {string.Join($",{Environment.NewLine}    ", columns)}").ConfigureAwait(false);
+                    await writer.WriteLineAsync(");").ConfigureAwait(false);
+                    await writer.WriteLineAsync("GO").ConfigureAwait(false);
+                    await writer.WriteLineAsync().ConfigureAwait(false);
+                }
+            }
+
+            // Générer les données (DML) si nécessaire
+            if (backupType == BackupType.Complete || backupType == BackupType.DataOnly)
+            {
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- DONNÉES DE LA BASE (DML)").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
                 await writer.WriteLineAsync().ConfigureAwait(false);
+
+                foreach (var tableName in tables)
+                {
+                    await writer.WriteLineAsync($"-- Données de la table {tableName}").ConfigureAwait(false);
+
+                    var selectQuery = $"SELECT * FROM [{tableName}]";
+                    using var dataCmd = new SqlCommand(selectQuery, connection);
+                    using var dataReader = await dataCmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    if (dataReader.HasRows)
+                    {
+                        var columnNames = new List<string>();
+                        for (int i = 0; i < dataReader.FieldCount; i++)
+                        {
+                            columnNames.Add(dataReader.GetName(i));
+                        }
+
+                        while (await dataReader.ReadAsync().ConfigureAwait(false))
+                        {
+                            var values = new List<string>();
+                            for (int i = 0; i < dataReader.FieldCount; i++)
+                            {
+                                var value = dataReader.IsDBNull(i) ? "NULL" : $"'{dataReader.GetValue(i).ToString()?.Replace("'", "''")}'";
+                                values.Add(value);
+                            }
+
+                            await writer.WriteLineAsync($"INSERT INTO [{tableName}] ({string.Join(", ", columnNames.Select(c => $"[{c}]"))}) VALUES ({string.Join(", ", values)});").ConfigureAwait(false);
+                        }
+                    }
+
+                    await writer.WriteLineAsync().ConfigureAwait(false);
+                }
             }
         }
         catch (Exception ex)
@@ -322,7 +404,7 @@ public class BackupService : IBackupService
         }
     }
 
-    private async Task<string?> CreatePostgreSqlBackupAsync(string connectionString, string timestamp, string backupId)
+    private async Task<string?> CreatePostgreSqlBackupAsync(string connectionString, string timestamp, string backupId, BackupType backupType)
     {
         try
         {
@@ -338,10 +420,23 @@ public class BackupService : IBackupService
             // D'abord essayer pg_dump si disponible
             try
             {
+                // Adapter les arguments pg_dump selon le type de sauvegarde
+                var arguments = $"--host={host} --port={port} --username={username} --dbname={databaseName} --verbose --clean --no-owner --no-acl --format=plain";
+
+                if (backupType == BackupType.SchemaOnly)
+                {
+                    arguments += " --schema-only";
+                }
+                else if (backupType == BackupType.DataOnly)
+                {
+                    arguments += " --data-only";
+                }
+                // Complete = par défaut (structure + données)
+
                 var processInfo = new ProcessStartInfo
                 {
                     FileName = "pg_dump",
-                    Arguments = $"--host={host} --port={port} --username={username} --dbname={databaseName} --verbose --clean --no-owner --no-acl --format=plain",
+                    Arguments = arguments,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -368,16 +463,17 @@ public class BackupService : IBackupService
 
                 // Ajouter en-tête au fichier SQL PostgreSQL pour cohérence
                 var sqlHeader = $@"-- Sauvegarde PostgreSQL de la base de données {databaseName}
+-- Type: {backupType}
 -- Générée le {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 -- ID de sauvegarde: {backupId}
--- Commande: pg_dump --host={host} --port={port} --username={username} --dbname={databaseName}
+-- Commande: pg_dump {arguments}
 
 {output}";
 
                 await File.WriteAllTextAsync(backupFilePath, sqlHeader).ConfigureAwait(false);
 
-                _logger.LogInformation("Sauvegarde PostgreSQL créée avec pg_dump: {BackupPath}, Taille: {Size} KB",
-                    backupFilePath, new FileInfo(backupFilePath).Length / 1024);
+                _logger.LogInformation("Sauvegarde PostgreSQL ({BackupType}) créée avec pg_dump: {BackupPath}, Taille: {Size} KB",
+                    backupType, backupFilePath, new FileInfo(backupFilePath).Length / 1024);
 
                 return backupFilePath;
             }
@@ -386,7 +482,7 @@ public class BackupService : IBackupService
                 _logger.LogWarning(pgDumpEx, "pg_dump non disponible, utilisation de la méthode de fallback pour PostgreSQL");
 
                 // Méthode de fallback : extraction manuelle des données via Npgsql
-                return await CreatePostgreSqlBackupManualAsync(connectionString, timestamp, backupId, backupFilePath).ConfigureAwait(false);
+                return await CreatePostgreSqlBackupManualAsync(connectionString, timestamp, backupId, backupFilePath, backupType).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -396,7 +492,7 @@ public class BackupService : IBackupService
         }
     }
 
-    private async Task<string?> CreatePostgreSqlBackupManualAsync(string connectionString, string timestamp, string backupId, string backupFilePath)
+    private async Task<string?> CreatePostgreSqlBackupManualAsync(string connectionString, string timestamp, string backupId, string backupFilePath, BackupType backupType)
     {
         try
         {
@@ -407,6 +503,7 @@ public class BackupService : IBackupService
 
             using var writer = new StreamWriter(backupFilePath);
             await writer.WriteLineAsync($"-- Sauvegarde PostgreSQL de la base de données {databaseName}").ConfigureAwait(false);
+            await writer.WriteLineAsync($"-- Type: {backupType}").ConfigureAwait(false);
             await writer.WriteLineAsync($"-- Générée le {DateTime.Now:yyyy-MM-dd HH:mm:ss}").ConfigureAwait(false);
             await writer.WriteLineAsync($"-- ID de sauvegarde: {backupId}").ConfigureAwait(false);
             await writer.WriteLineAsync($"-- Méthode: Extraction manuelle via Npgsql (pg_dump non disponible)").ConfigureAwait(false);
@@ -430,55 +527,142 @@ public class BackupService : IBackupService
             }
             tablesReader.Close();
 
-            // Pour chaque table, générer les INSERT statements
-            foreach (var tableName in tables)
+            // Générer la structure (DDL) si nécessaire
+            if (backupType == BackupType.Complete || backupType == BackupType.SchemaOnly)
             {
-                await writer.WriteLineAsync($"-- Données de la table {tableName}").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- STRUCTURE DE LA BASE DE DONNÉES (DDL)").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync().ConfigureAwait(false);
 
-                var selectQuery = $"SELECT * FROM \"{tableName}\"";
-                using var dataCmd = new Npgsql.NpgsqlCommand(selectQuery, connection);
-                using var dataReader = await dataCmd.ExecuteReaderAsync().ConfigureAwait(false);
-
-                if (dataReader.HasRows)
+                foreach (var tableName in tables)
                 {
-                    var columnNames = new List<string>();
-                    for (int i = 0; i < dataReader.FieldCount; i++)
-                    {
-                        columnNames.Add(dataReader.GetName(i));
-                    }
+                    await writer.WriteLineAsync($"-- Structure de la table {tableName}").ConfigureAwait(false);
+                    await writer.WriteLineAsync($"DROP TABLE IF EXISTS \"{tableName}\" CASCADE;").ConfigureAwait(false);
+                    await writer.WriteLineAsync().ConfigureAwait(false);
 
-                    while (await dataReader.ReadAsync().ConfigureAwait(false))
+                    // Récupérer la définition de la table
+                    var getCreateTableQuery = $@"
+                        SELECT
+                            column_name,
+                            data_type,
+                            character_maximum_length,
+                            numeric_precision,
+                            numeric_scale,
+                            is_nullable,
+                            column_default
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                        AND table_name = '{tableName}'
+                        ORDER BY ordinal_position";
+
+                    using var schemaCmd = new Npgsql.NpgsqlCommand(getCreateTableQuery, connection);
+                    using var schemaReader = await schemaCmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    var columns = new List<string>();
+                    while (await schemaReader.ReadAsync().ConfigureAwait(false))
                     {
-                        var values = new List<string>();
-                        for (int i = 0; i < dataReader.FieldCount; i++)
+                        var columnName = schemaReader.GetString(0);
+                        var dataType = schemaReader.GetString(1);
+                        var charMaxLength = schemaReader.IsDBNull(2) ? (int?)null : schemaReader.GetInt32(2);
+                        var numericPrecision = schemaReader.IsDBNull(3) ? (int?)null : schemaReader.GetInt32(3);
+                        var numericScale = schemaReader.IsDBNull(4) ? (int?)null : schemaReader.GetInt32(4);
+                        var isNullable = schemaReader.GetString(5);
+                        var columnDefault = schemaReader.IsDBNull(6) ? null : schemaReader.GetString(6);
+
+                        var columnDef = $"\"{columnName}\" {dataType}";
+
+                        // Gérer les types de données avec taille
+                        if (charMaxLength.HasValue && (dataType == "character varying" || dataType == "varchar"))
                         {
-                            if (dataReader.IsDBNull(i))
-                            {
-                                values.Add("NULL");
-                            }
+                            columnDef = $"\"{columnName}\" varchar({charMaxLength})";
+                        }
+                        else if (dataType == "character" && charMaxLength.HasValue)
+                        {
+                            columnDef = $"\"{columnName}\" char({charMaxLength})";
+                        }
+                        else if ((dataType == "numeric" || dataType == "decimal") && numericPrecision.HasValue)
+                        {
+                            if (numericScale.HasValue)
+                                columnDef = $"\"{columnName}\" numeric({numericPrecision},{numericScale})";
                             else
-                            {
-                                var value = dataReader.GetValue(i);
-                                var formattedValue = value switch
-                                {
-                                    string s => $"'{s.Replace("'", "''")}'",
-                                    DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
-                                    bool b => b ? "TRUE" : "FALSE",
-                                    _ => $"'{value.ToString()?.Replace("'", "''") ?? ""}'"
-                                };
-                                values.Add(formattedValue);
-                            }
+                                columnDef = $"\"{columnName}\" numeric({numericPrecision})";
                         }
 
-                        await writer.WriteLineAsync($"INSERT INTO \"{tableName}\" ({string.Join(", ", columnNames.Select(c => $"\"{c}\""))}) VALUES ({string.Join(", ", values)});").ConfigureAwait(false);
-                    }
-                }
+                        if (columnDefault != null)
+                        {
+                            columnDef += $" DEFAULT {columnDefault}";
+                        }
 
-                await writer.WriteLineAsync().ConfigureAwait(false);
+                        columnDef += isNullable == "YES" ? " NULL" : " NOT NULL";
+
+                        columns.Add(columnDef);
+                    }
+
+                    await writer.WriteLineAsync($"CREATE TABLE \"{tableName}\" (").ConfigureAwait(false);
+                    await writer.WriteLineAsync($"    {string.Join($",{Environment.NewLine}    ", columns)}").ConfigureAwait(false);
+                    await writer.WriteLineAsync(");").ConfigureAwait(false);
+                    await writer.WriteLineAsync().ConfigureAwait(false);
+                }
             }
 
-            _logger.LogInformation("Sauvegarde PostgreSQL manuelle créée: {BackupPath}, Taille: {Size} KB",
-                backupFilePath, new FileInfo(backupFilePath).Length / 1024);
+            // Générer les données (DML) si nécessaire
+            if (backupType == BackupType.Complete || backupType == BackupType.DataOnly)
+            {
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- DONNÉES DE LA BASE (DML)").ConfigureAwait(false);
+                await writer.WriteLineAsync("-- ============================================").ConfigureAwait(false);
+                await writer.WriteLineAsync().ConfigureAwait(false);
+
+                foreach (var tableName in tables)
+                {
+                    await writer.WriteLineAsync($"-- Données de la table {tableName}").ConfigureAwait(false);
+
+                    var selectQuery = $"SELECT * FROM \"{tableName}\"";
+                    using var dataCmd = new Npgsql.NpgsqlCommand(selectQuery, connection);
+                    using var dataReader = await dataCmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    if (dataReader.HasRows)
+                    {
+                        var columnNames = new List<string>();
+                        for (int i = 0; i < dataReader.FieldCount; i++)
+                        {
+                            columnNames.Add(dataReader.GetName(i));
+                        }
+
+                        while (await dataReader.ReadAsync().ConfigureAwait(false))
+                        {
+                            var values = new List<string>();
+                            for (int i = 0; i < dataReader.FieldCount; i++)
+                            {
+                                if (dataReader.IsDBNull(i))
+                                {
+                                    values.Add("NULL");
+                                }
+                                else
+                                {
+                                    var value = dataReader.GetValue(i);
+                                    var formattedValue = value switch
+                                    {
+                                        string s => $"'{s.Replace("'", "''")}'",
+                                        DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
+                                        bool b => b ? "TRUE" : "FALSE",
+                                        _ => $"'{value.ToString()?.Replace("'", "''") ?? ""}'"
+                                    };
+                                    values.Add(formattedValue);
+                                }
+                            }
+
+                            await writer.WriteLineAsync($"INSERT INTO \"{tableName}\" ({string.Join(", ", columnNames.Select(c => $"\"{c}\""))}) VALUES ({string.Join(", ", values)});").ConfigureAwait(false);
+                        }
+                    }
+
+                    await writer.WriteLineAsync().ConfigureAwait(false);
+                }
+            }
+
+            _logger.LogInformation("Sauvegarde PostgreSQL manuelle ({BackupType}) créée: {BackupPath}, Taille: {Size} KB",
+                backupType, backupFilePath, new FileInfo(backupFilePath).Length / 1024);
 
             return backupFilePath;
         }

@@ -7,6 +7,7 @@
 @inject ITypeSectionService TypeSectionService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Sections Libres</PageTitle>
 
@@ -399,37 +400,66 @@
 
     private async Task SupprimerSection(SectionLibre section)
     {
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
-            $"Êtes-vous sûr de vouloir supprimer la section '{section.Titre}' ?");
-        
-        if (confirmed)
+        try
         {
-            try
+            // Vérifier combien de documents utilisent cette section
+            var usageCount = await SectionLibreService.CountUsagesInDocumentsAsync(section.Id);
+
+            string message = $"Êtes-vous sûr de vouloir supprimer la section '{section.Titre}' ?";
+
+            if (usageCount > 0)
             {
-                var success = await SectionLibreService.DeleteAsync(section.Id);
-                if (success)
+                message += $"\n\n⚠️ ATTENTION : Cette section est utilisée dans {usageCount} document(s).\n" +
+                           "La suppression entraînera également la suppression de toutes les références et personnalisations associées dans ces documents.";
+            }
+
+            // Utiliser DialogService pour avoir une meilleure UI
+            var confirmed = await DialogService.Confirm(
+                message,
+                "Confirmation de suppression",
+                new Radzen.ConfirmOptions
                 {
-                    await ChargerDonnees();
-                    statusMessage = "Section supprimée avec succès !";
-                    isSuccess = true;
-                    
-                    // Si on était en train d'éditer cette section, fermer la modal
-                    if (sectionEnEdition?.Id == section.Id)
+                    OkButtonText = "Supprimer",
+                    CancelButtonText = "Annuler"
+                }
+            );
+
+            if (confirmed == true)
+            {
+                try
+                {
+                    var success = await SectionLibreService.DeleteAsync(section.Id);
+                    if (success)
                     {
-                        FermerModal();
+                        await ChargerDonnees();
+                        statusMessage = usageCount > 0
+                            ? $"Section supprimée avec succès ! {usageCount} référence(s) dans les documents ont également été supprimées."
+                            : "Section supprimée avec succès !";
+                        isSuccess = true;
+
+                        // Si on était en train d'éditer cette section, fermer la modal
+                        if (sectionEnEdition?.Id == section.Id)
+                        {
+                            FermerModal();
+                        }
+                    }
+                    else
+                    {
+                        statusMessage = "Erreur lors de la suppression.";
+                        isSuccess = false;
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    statusMessage = "Erreur lors de la suppression.";
+                    statusMessage = $"Erreur lors de la suppression : {ex.Message}";
                     isSuccess = false;
                 }
             }
-            catch (Exception ex)
-            {
-                statusMessage = $"Erreur lors de la suppression : {ex.Message}";
-                isSuccess = false;
-            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Erreur lors de la vérification : {ex.Message}";
+            isSuccess = false;
         }
     }
 

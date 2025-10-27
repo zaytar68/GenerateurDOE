@@ -369,4 +369,75 @@ public class SectionConteneurService : ISectionConteneurService
 
         return true;
     }
+
+    /// <summary>
+    /// Récupère un SectionConteneurItem par son ID avec ses relations
+    /// </summary>
+    public async Task<SectionConteneurItem> GetItemByIdAsync(int itemId)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var item = await context.SectionConteneurItems
+            .Include(i => i.SectionLibre)
+            .ThenInclude(sl => sl.TypeSection)
+            .Include(i => i.SectionConteneur)
+            .FirstOrDefaultAsync(i => i.Id == itemId).ConfigureAwait(false);
+
+        if (item == null)
+            throw new InvalidOperationException($"SectionConteneurItem {itemId} introuvable");
+
+        return item;
+    }
+
+    /// <summary>
+    /// Personnalise le contenu d'un item pour un document spécifique
+    /// </summary>
+    public async Task<SectionConteneurItem> PersonnaliserItemAsync(int itemId, string? titrePersonnalise, string contenuHtmlPersonnalise)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var item = await context.SectionConteneurItems
+            .Include(i => i.SectionLibre)
+            .FirstOrDefaultAsync(i => i.Id == itemId).ConfigureAwait(false);
+
+        if (item == null)
+            throw new InvalidOperationException($"SectionConteneurItem {itemId} introuvable");
+
+        // Mettre à jour les champs de personnalisation
+        item.TitrePersonnalise = string.IsNullOrWhiteSpace(titrePersonnalise) ? null : titrePersonnalise;
+        item.ContenuHtmlPersonnalise = contenuHtmlPersonnalise;
+        item.DateModificationPersonnalisation = DateTime.Now;
+
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
+        _loggingService.LogInformation($"SectionConteneurItem {itemId} personnalisé pour le document");
+
+        return item;
+    }
+
+    /// <summary>
+    /// Réinitialise un item à son contenu par défaut (supprime la personnalisation)
+    /// </summary>
+    public async Task<SectionConteneurItem> ResetItemToDefaultAsync(int itemId)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        var item = await context.SectionConteneurItems
+            .Include(i => i.SectionLibre)
+            .FirstOrDefaultAsync(i => i.Id == itemId).ConfigureAwait(false);
+
+        if (item == null)
+            throw new InvalidOperationException($"SectionConteneurItem {itemId} introuvable");
+
+        // Réinitialiser les champs de personnalisation
+        item.TitrePersonnalise = null;
+        item.ContenuHtmlPersonnalise = null;
+        item.DateModificationPersonnalisation = null;
+
+        await context.SaveChangesAsync().ConfigureAwait(false);
+
+        _loggingService.LogInformation($"SectionConteneurItem {itemId} réinitialisé au contenu par défaut");
+
+        return item;
+    }
 }

@@ -14,4 +14,7 @@ public interface ISectionLibreService
     Task<bool> ReorderAsync(int sectionId, int newOrder);
     Task<IEnumerable<SectionLibre>> GetOrderedSectionsAsync();
     Task<int> GetNextOrderAsync();
+
+    // 🆕 Méthode pour compter les usages dans les documents
+    Task<int> CountUsagesInDocumentsAsync(int sectionLibreId);
 }

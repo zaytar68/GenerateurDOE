@@ -229,4 +229,16 @@ public class SectionLibreService : ISectionLibreService
 
         await context.SaveChangesAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Compte combien de documents utilisent une section libre spécifique
+    /// </summary>
+    public async Task<int> CountUsagesInDocumentsAsync(int sectionLibreId)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        return await context.SectionConteneurItems
+            .Where(i => i.SectionLibreId == sectionLibreId)
+            .CountAsync().ConfigureAwait(false);
+    }
 }

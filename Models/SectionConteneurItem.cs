@@ -19,4 +19,20 @@ public class SectionConteneurItem
     [Required(ErrorMessage = "La section libre est requise")]
     public int SectionLibreId { get; set; }
     public virtual SectionLibre SectionLibre { get; set; } = null!;
+
+    // 🆕 Champs de personnalisation (nullable = utilise la valeur par défaut de SectionLibre)
+    [StringLength(200, ErrorMessage = "Le titre personnalisé ne peut pas dépasser 200 caractères")]
+    public string? TitrePersonnalise { get; set; }
+
+    [StringLength(int.MaxValue, ErrorMessage = "Le contenu HTML personnalisé est trop volumineux")]
+    public string? ContenuHtmlPersonnalise { get; set; }
+
+    public DateTime? DateModificationPersonnalisation { get; set; }
+
+    // 🆕 Méthodes helper pour accéder au contenu effectif (personnalisé ou par défaut)
+    public string GetTitreEffectif() => TitrePersonnalise ?? SectionLibre?.Titre ?? string.Empty;
+
+    public string GetContenuEffectif() => ContenuHtmlPersonnalise ?? SectionLibre?.ContenuHtml ?? string.Empty;
+
+    public bool EstPersonnalise => !string.IsNullOrEmpty(ContenuHtmlPersonnalise);
 }

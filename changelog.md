@@ -5,6 +5,27 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.7] - 2025-10-27
+
+### ✨ **Système de Sauvegarde avec Types Sélectionnables**
+- **BackupType enum** : 3 options de sauvegarde (Complete, SchemaOnly, DataOnly)
+- **Génération DDL** : Extraction structure (CREATE TABLE) pour SQL Server et PostgreSQL
+- **Interface UI améliorée** : Sélecteur de type de sauvegarde avec descriptions
+- **Support pg_dump conditionnel** : Flags --schema-only et --data-only selon le type
+
+### Technique
+- **IBackupService** : Signature CreateCompleteBackupAsync avec paramètre BackupType
+- **BackupService SQL Server** : Génération DDL via sys.columns avec types complets (nvarchar, decimal, IDENTITY)
+- **BackupService PostgreSQL** : Support pg_dump + fallback manuel via information_schema
+- **Maintenance.razor** : Dropdown avec 3 types et descriptions contextuelles
+
+### Corrigé
+- **🐛 Bouton téléchargement** : Fix bouton qui disparaissait entre deux sauvegardes
+- **📊 Structure + Données** : Les sauvegardes incluent maintenant la structure de la base (pas seulement les INSERT)
+
+### Limitations
+- **SQLite** : Non supporté en développement (fonctionnel uniquement pour PostgreSQL en production)
+
 ## [2.1.6] - 2025-10-24
 
 ### ✨ **Source Unique de Version - Assembly Reflection**
