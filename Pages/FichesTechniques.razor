@@ -9,6 +9,7 @@
 @inject ITypeProduitService TypeProduitService
 @inject ITypeDocumentImportService TypeDocumentImportService
 @inject ILoadingStateService LoadingStateService
+@inject IConfigurationService ConfigurationService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
@@ -277,7 +278,7 @@
                                 {
                                     <i class="oi oi-cloud-upload display-4 text-muted mb-3"></i>
                                     <p class="mb-2"><strong>Cliquez ici ou glissez-déposez vos fichiers PDF</strong></p>
-                                    <p class="text-muted mb-0">Taille maximum : 10MB par fichier</p>
+                                    <p class="text-muted mb-0">Taille maximum : @tailleMaxFichierLabel par fichier</p>
                                 }
                             </label>
                         </div>
@@ -457,8 +458,13 @@
     private string nouveauTypeProduitDescription = string.Empty;
     private bool creationTypeProduitEnCours = false;
 
+    // Configuration taille fichiers
+    private long tailleMaxFichierBytes = 10 * 1024 * 1024; // 10MB par défaut
+    private string tailleMaxFichierLabel = "10MB"; // Pour l'affichage dans l'UI
+
     protected override async Task OnInitializedAsync()
     {
+        await ChargerConfiguration();
         await ChargerDonnees();
 
         // Vérifier si on doit ouvrir le modal de création automatiquement
@@ -472,6 +478,22 @@
         }
     }
 
+    private async Task ChargerConfiguration()
+    {
+        try
+        {
+            var appSettings = await ConfigurationService.GetAppSettingsAsync();
+            tailleMaxFichierBytes = ConfigurationService.ParseTailleMaxFichierToBytes(appSettings.TailleMaxFichierPDF);
+            tailleMaxFichierLabel = appSettings.TailleMaxFichierPDF;
+        }
+        catch
+        {
+            // Garder les valeurs par défaut en cas d'erreur
+            tailleMaxFichierBytes = 10 * 1024 * 1024;
+            tailleMaxFichierLabel = "10MB";
+        }
+    }
+
     private async Task ChargerDonnees()
     {
         chargement = true;
@@ -481,7 +503,7 @@
             typesProduits = (await TypeProduitService.GetActiveAsync()).ToList();
             typesDocumentsListe = (await TypeDocumentImportService.GetActiveAsync()).ToList();
             fichesFiltrees = fiches.OrderBy(f => f.NomFabricant).ThenBy(f => f.NomProduit).ToList();
-            
+
             // Extraire les fabricants uniques pour l'autocomplétion (gardé pour les formulaires)
             fabricantsDisponibles = fiches
                 .Select(f => f.NomFabricant)
@@ -658,11 +680,11 @@
         {
             foreach (var file in e.GetMultipleFiles())
             {
-                if (file.ContentType == "application/pdf" && file.Size <= 10 * 1024 * 1024) // 10MB max
+                if (file.ContentType == "application/pdf" && file.Size <= tailleMaxFichierBytes)
                 {
                     try
                     {
-                        using var stream = file.OpenReadStream(10 * 1024 * 1024);
+                        using var stream = file.OpenReadStream(tailleMaxFichierBytes);
                         var cheminFichier = await FicheTechniqueService.SavePDFFileAsync(stream, file.Name);
                         
                         // Utiliser le premier type de document disponible par défaut

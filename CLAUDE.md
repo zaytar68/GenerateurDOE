@@ -113,7 +113,8 @@ Use entity framework.
 
 ### Sécurité
 - Validation des types de fichiers pour uploads
-- Limitation de taille des fichiers (10MB pour PDF)
+- Limitation de taille des fichiers configurable via AppSettings.TailleMaxFichierPDF (format: "50MB", "2GB", etc.)
+- Configuration dynamique lue par ConfigurationService.ParseTailleMaxFichierToBytes()
 - Noms de fichiers sécurisés avec GUID pour éviter les conflits
 - Vérification basique des chemins pour prévenir les attaques path traversal
 

@@ -9,10 +9,9 @@ public class ImageService : IImageService
     private readonly IConfigurationService _configurationService;
     private readonly ILogger<ImageService> _logger;
     private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-    private readonly string[] _allowedMimeTypes = { 
-        "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp" 
+    private readonly string[] _allowedMimeTypes = {
+        "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"
     };
-    private const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
 
     public ImageService(IConfigurationService configurationService, ILogger<ImageService> logger)
     {
@@ -26,6 +25,10 @@ public class ImageService : IImageService
 
         try
         {
+            // Lire la configuration de taille maximale
+            var appSettings = await _configurationService.GetAppSettingsAsync();
+            var maxFileSize = _configurationService.ParseTailleMaxFichierToBytes(appSettings.TailleMaxFichierPDF);
+
             // Validation du fichier
             if (imageFile == null || imageFile.Length == 0)
             {
@@ -33,9 +36,9 @@ public class ImageService : IImageService
                 return result;
             }
 
-            if (imageFile.Length > MaxFileSize)
+            if (imageFile.Length > maxFileSize)
             {
-                result.ErrorMessage = $"Le fichier est trop volumineux (max {MaxFileSize / (1024 * 1024)} MB)";
+                result.ErrorMessage = $"Le fichier est trop volumineux (max {appSettings.TailleMaxFichierPDF})";
                 return result;
             }
 
@@ -45,8 +48,7 @@ public class ImageService : IImageService
                 return result;
             }
 
-            // Obtenir le répertoire de stockage depuis la configuration
-            var appSettings = await _configurationService.GetAppSettingsAsync();
+            // Obtenir le répertoire de stockage depuis la configuration (déjà chargée plus haut)
             var imagesDirectory = appSettings.RepertoireStockageImages;
 
             if (string.IsNullOrEmpty(imagesDirectory))

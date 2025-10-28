@@ -5,6 +5,28 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-10-28
+
+### ✨ **Configuration Dynamique Taille Fichiers**
+- **Taille maximale configurable** : Les limites de taille pour les fichiers PDF et images sont maintenant configurables via `appsettings.json`
+- **Format flexible** : Support des formats "50MB", "2GB", "500KB" avec validation automatique
+- **Parser centralisé** : Nouvelle méthode `ConfigurationService.ParseTailleMaxFichierToBytes()` pour conversion string → bytes
+
+### 🔧 **Technique**
+- **IConfigurationService** : Ajout méthode `ParseTailleMaxFichierToBytes(string)` avec regex validation
+- **FichesTechniques.razor** : Lecture dynamique de la configuration au démarrage (méthode `ChargerConfiguration()`)
+- **ImageService.cs** : Suppression constante hardcodée, utilisation configuration dynamique
+- **AppSettings.TailleMaxFichierPDF** : Configuration existante (100MB) maintenant utilisée dans le code
+
+### ✅ **Avantages**
+- **Plus de recompilation** : Modification de la limite sans rebuild de l'application
+- **Validation robuste** : Regex `^\d+(\.\d+)?(KB|MB|GB)$` avec fallback 10MB
+- **Cache optimisé** : Configuration mise en cache 30 minutes via L1 cache
+- **Expérience validée** : Tests réussis avec PDF volumineux et personnalisation sections
+
+### 📝 **Documentation**
+- **CLAUDE.md** : Section Sécurité mise à jour avec configuration dynamique
+
 ## [2.1.8] - 2025-10-27
 
 ### 🐛 **Correction Affichage Version**

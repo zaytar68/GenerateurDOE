@@ -201,4 +201,42 @@ public class ConfigurationService : IConfigurationService
 
         return dirInfo;
     }
+
+    /// <summary>
+    /// Parse une chaîne de taille de fichier (ex: "50MB", "2GB", "100KB") en bytes
+    /// </summary>
+    /// <param name="tailleFichier">Chaîne avec format: nombre + unité (KB, MB, GB)</param>
+    /// <returns>Taille en bytes</returns>
+    public long ParseTailleMaxFichierToBytes(string tailleFichier)
+    {
+        if (string.IsNullOrWhiteSpace(tailleFichier))
+            return 10 * 1024 * 1024; // Valeur par défaut: 10MB
+
+        try
+        {
+            // Extraire le nombre et l'unité avec regex
+            var match = System.Text.RegularExpressions.Regex.Match(
+                tailleFichier,
+                @"^(\d+(?:\.\d+)?)(KB|MB|GB)$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (!match.Success)
+                return 10 * 1024 * 1024; // Valeur par défaut: 10MB
+
+            var nombre = double.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var unite = match.Groups[2].Value.ToUpper();
+
+            return unite switch
+            {
+                "KB" => (long)(nombre * 1024),
+                "MB" => (long)(nombre * 1024 * 1024),
+                "GB" => (long)(nombre * 1024 * 1024 * 1024),
+                _ => 10 * 1024 * 1024 // Valeur par défaut: 10MB
+            };
+        }
+        catch
+        {
+            return 10 * 1024 * 1024; // Valeur par défaut en cas d'erreur: 10MB
+        }
+    }
 }

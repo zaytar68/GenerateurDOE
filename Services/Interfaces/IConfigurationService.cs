@@ -10,6 +10,11 @@ public interface IConfigurationService
     Task<bool> CreateDirectoryAsync(string directoryPath);
     Task<bool> TestDirectoryWriteAccessAsync(string directoryPath);
     Task<CustomDirectoryInfo> GetDirectoryInfoAsync(string directoryPath);
+
+    /// <summary>
+    /// Parse une chaîne de taille de fichier (ex: "50MB", "2GB") en bytes
+    /// </summary>
+    long ParseTailleMaxFichierToBytes(string tailleFichier);
 }
 
 public class CustomDirectoryInfo
