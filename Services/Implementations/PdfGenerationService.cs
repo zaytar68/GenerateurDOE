@@ -67,6 +67,36 @@ namespace GenerateurDOE.Services.Implementations
         /// <returns>Instance de navigateur PuppeteerSharp configurée</returns>
         private async Task<IBrowser> GetBrowserAsync()
         {
+            // ⚡ NOUVEAU : Vérifier la santé du browser existant
+            if (_browser != null)
+            {
+                try
+                {
+                    if (!_browser.IsConnected || _browser.IsClosed)
+                    {
+                        _loggingService.LogWarning("🔄 Browser existant détecté comme fermé/déconnecté, recréation forcée...");
+                        try
+                        {
+                            await _browser.CloseAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogWarning($"Erreur lors de la fermeture du browser corrompu : {ex.Message}");
+                        }
+                        _browser = null;
+                    }
+                    else
+                    {
+                        _loggingService.LogInformation("✅ Browser existant en bonne santé, réutilisation");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogWarning($"Erreur lors de la vérification de santé du browser : {ex.Message}, recréation...");
+                    _browser = null;
+                }
+            }
+
             if (_browser == null)
             {
                 await _browserSemaphore.WaitAsync();
@@ -101,51 +131,15 @@ namespace GenerateurDOE.Services.Implementations
                         {
                             Headless = true,
                             ExecutablePath = !string.IsNullOrEmpty(executablePath) ? executablePath : null,
-                            Timeout = 90000, // ⚡ Augmenté à 90 secondes pour le premier lancement
+                            Timeout = 90000,
+                            LogProcess = true,
+                            DumpIO = true,
                             Args = new[]
                             {
                                 "--no-sandbox",
                                 "--disable-setuid-sandbox",
                                 "--disable-dev-shm-usage",
-                                "--disable-gpu",
-                                "--disable-web-security",
-                                "--allow-running-insecure-content",
-                                "--disable-software-rasterizer",
-                                "--disable-background-timer-throttling",
-                                "--disable-backgrounding-occluded-windows",
-                                "--disable-renderer-backgrounding",
-                                "--disable-features=TranslateUI",
-                                "--disable-ipc-flooding-protection",
-                                "--no-first-run",
-                                "--no-default-browser-check",
-                                "--disable-default-apps",
-                                "--single-process",
-                                "--disable-features=VizDisplayCompositor",
-                                "--disable-extensions",
-                                "--disable-plugins",
-                                "--disable-sync",
-                                "--disable-translate",
-                                "--disable-background-networking",
-                                "--disable-breakpad",
-                                "--disable-component-update",
-                                "--disable-domain-reliability",
-                                "--disable-features=AutofillServerCommunication",
-                                "--disable-crash-reporter",
-                                "--user-data-dir=/tmp/chrome-user",
-                                "--data-path=/tmp/chrome-data",
-                                "--disk-cache-dir=/tmp/chrome-cache",
-                                "--crash-dumps-dir=/tmp/chrome-crashes",
-                                "--disable-logging",
-                                "--disable-gpu-logging",
-                                "--silent",
-                                "--no-user-gesture-required",
-                                "--disable-features=Logging",
-                                "--disable-logging-redirect",
-                                "--log-level=3",
-                                "--remote-debugging-port=0",
-                                "--disable-hang-monitor",
-                                "--disable-prompt-on-repost",
-                                "--disable-client-side-phishing-detection"
+                                "--disable-gpu"
                             }
                         };
 
@@ -372,60 +366,106 @@ namespace GenerateurDOE.Services.Implementations
             options ??= new PdfGenerationOptions();
             var appSettings = await _configurationService.GetAppSettingsAsync();
             var browser = await GetBrowserAsync();
-            
-            using var page = await browser.NewPageAsync();
-            await page.SetContentAsync(htmlContent);
 
-            // ⚡ Attendre le chargement complet (images, CSS) - timeout réduit pour éviter "Target closed"
-            await page.WaitForTimeoutAsync(2000);
-
-            // Attendre spécifiquement que les images soient chargées
+            // ⚡ MODIFIÉ : Gestion explicite du cycle de vie de la page avec try/finally
+            IPage? page = null;
             try
             {
-                await page.WaitForSelectorAsync("img", new WaitForSelectorOptions { Timeout = 1500 });
-                _loggingService.LogInformation("Images détectées dans le HTML");
-            }
-            catch (Exception)
-            {
-                _loggingService.LogInformation("Aucune image détectée ou timeout d'attente atteint");
-            }
-            
-            // Choisir le template de pied de page approprié (sauf si post-processing activé)
-            string footerTemplate = "";
-            bool displayFooter = options.DisplayHeaderFooter;
+                page = await browser.NewPageAsync().ConfigureAwait(false);
+                await page.SetContentAsync(htmlContent).ConfigureAwait(false);
 
-            if (options.DisableFooterForPostProcessing)
-            {
-                // Post-processing activé : désactiver les pieds de page PuppeteerSharp
-                displayFooter = false;
-                footerTemplate = "";
-                _loggingService.LogInformation("Pied de page désactivé - sera ajouté en post-processing via PDFSharp");
-            }
-            else
-            {
-                // Comportement normal : utiliser les templates de pied de page
-                footerTemplate = options.FooterTemplate ??
-                    (document != null ? GetDocumentFooterTemplate(document, appSettings) : GetDefaultFooterTemplate());
-            }
+                // ⚡ Attendre le chargement complet (images, CSS) - timeout augmenté pour stabilité
+                await page.WaitForTimeoutAsync(5000).ConfigureAwait(false);
 
-            var pdfOptions = new PdfOptions
-            {
-                Format = PaperFormat.A4,
-                DisplayHeaderFooter = displayFooter,
-                HeaderTemplate = options.HeaderTemplate ?? GetDefaultHeaderTemplate(appSettings),
-                FooterTemplate = footerTemplate,
-                PrintBackground = options.PrintBackground,
-                MarginOptions = new MarginOptions
+                // Attendre spécifiquement que les images soient chargées
+                try
                 {
-                    Top = options.MarginTop,
-                    Bottom = options.MarginBottom,
-                    Left = options.MarginLeft,
-                    Right = options.MarginRight
-                },
-                Scale = options.Scale
-            };
+                    await page.WaitForSelectorAsync("img", new WaitForSelectorOptions { Timeout = 3000 }).ConfigureAwait(false);
+                    _loggingService.LogInformation("Images détectées dans le HTML");
+                }
+                catch (Exception)
+                {
+                    _loggingService.LogInformation("Aucune image détectée ou timeout d'attente atteint");
+                }
 
-            return await page.PdfDataAsync(pdfOptions);
+                // Choisir le template de pied de page approprié (sauf si post-processing activé)
+                string footerTemplate = "";
+                bool displayFooter = options.DisplayHeaderFooter;
+
+                if (options.DisableFooterForPostProcessing)
+                {
+                    // Post-processing activé : désactiver les pieds de page PuppeteerSharp
+                    displayFooter = false;
+                    footerTemplate = "";
+                    _loggingService.LogInformation("Pied de page désactivé - sera ajouté en post-processing via PDFSharp");
+                }
+                else
+                {
+                    // Comportement normal : utiliser les templates de pied de page
+                    footerTemplate = options.FooterTemplate ??
+                        (document != null ? GetDocumentFooterTemplate(document, appSettings) : GetDefaultFooterTemplate());
+                }
+
+                // ⚡ CRITIQUE : Attendre que les fonts web soient chargées avant génération PDF
+                try
+                {
+                    await page.EvaluateExpressionHandleAsync("document.fonts.ready").ConfigureAwait(false);
+                    _loggingService.LogInformation("✅ Fonts web chargées avec succès");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogWarning($"⚠️ Timeout lors de l'attente des fonts : {ex.Message}");
+                }
+
+                var pdfOptions = new PdfOptions
+                {
+                    Format = PaperFormat.A4,
+                    DisplayHeaderFooter = displayFooter,
+                    HeaderTemplate = options.HeaderTemplate ?? GetDefaultHeaderTemplate(appSettings),
+                    FooterTemplate = footerTemplate,
+                    PrintBackground = options.PrintBackground,
+                    MarginOptions = new MarginOptions
+                    {
+                        Top = options.MarginTop,
+                        Bottom = options.MarginBottom,
+                        Left = options.MarginLeft,
+                        Right = options.MarginRight
+                    },
+                    Scale = options.Scale
+                };
+
+                _loggingService.LogInformation("⚡ Début conversion HTML→PDF avec PuppeteerSharp...");
+                var pdfBytes = await page.PdfDataAsync(pdfOptions).ConfigureAwait(false);
+                _loggingService.LogInformation($"✅ PDF généré avec succès ({pdfBytes.Length} bytes)");
+
+                return pdfBytes;
+            }
+            catch (TargetClosedException ex)
+            {
+                _loggingService.LogError(ex, $"❌ ERREUR Target Closed lors de la génération PDF - Browser potentiellement corrompu");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError(ex, $"❌ Erreur lors de la conversion HTML→PDF : {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                // ⚡ Fermeture explicite et sécurisée de la page
+                if (page != null)
+                {
+                    try
+                    {
+                        await page.CloseAsync().ConfigureAwait(false);
+                        _loggingService.LogInformation("✅ Page Chromium fermée proprement");
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogWarning($"⚠️ Erreur lors de la fermeture de la page : {ex.Message}");
+                    }
+                }
+            }
         }
 
         /// <summary>
