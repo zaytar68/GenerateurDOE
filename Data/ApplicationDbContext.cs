@@ -89,11 +89,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CheminFichier).HasMaxLength(500).IsRequired();
             entity.Property(e => e.NomFichierOriginal).HasMaxLength(255).IsRequired();
             entity.HasOne(d => d.TypeDocumentImport)
-                .WithMany()
+                .WithMany(t => t.ImportsPDF)
                 .HasForeignKey(d => d.TypeDocumentImportId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.Property(e => e.DateImport).HasDefaultValueSql(timestampSql);
-            
+
             entity.HasOne(d => d.FicheTechnique)
                 .WithMany(p => p.ImportsPDF)
                 .HasForeignKey(d => d.FicheTechniqueId)

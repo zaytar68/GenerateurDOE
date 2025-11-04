@@ -17,7 +17,7 @@ public class TypeDocumentImport
     
     public DateTime DateCreation { get; set; } = DateTime.Now;
     public DateTime DateModification { get; set; } = DateTime.Now;
-    
-    // TODO: sera ajouté après la migration
-    // public virtual ICollection<ImportPDF> ImportsPDF { get; set; } = new List<ImportPDF>();
+
+    // Navigation property : documents PDF utilisant ce type
+    public virtual ICollection<ImportPDF> ImportsPDF { get; set; } = new List<ImportPDF>();
 }

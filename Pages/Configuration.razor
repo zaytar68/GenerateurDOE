@@ -188,7 +188,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <button class="btn btn-primary" @onclick="AjouterTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduit.Nom) || ajoutEnCours)">
+                                        <button type="button" class="btn btn-primary" @onclick="AjouterTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduit.Nom) || ajoutEnCours)">
                                             @if (ajoutEnCours)
                                             {
                                                 <span class="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -255,10 +255,10 @@
                                                             @if (typeEnEdition?.Id == type.Id)
                                                             {
                                                                 <div class="btn-group btn-group-sm">
-                                                                    <button class="btn btn-success btn-sm" @onclick="SauvegarderTypeEdition" disabled="@isSaving">
+                                                                    <button type="button" class="btn btn-success btn-sm" @onclick="SauvegarderTypeEdition" disabled="@isSaving">
                                                                         <span class="oi oi-check"></span>
                                                                     </button>
-                                                                    <button class="btn btn-secondary btn-sm" @onclick="AnnulerEdition">
+                                                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="AnnulerEdition">
                                                                         <span class="oi oi-x"></span>
                                                                     </button>
                                                                 </div>
@@ -266,14 +266,14 @@
                                                             else
                                                             {
                                                                 <div class="btn-group btn-group-sm">
-                                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => CommencerEdition(type)" title="Modifier">
+                                                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => CommencerEdition(type)" title="Modifier">
                                                                         <span class="oi oi-pencil"></span>
                                                                     </button>
-                                                                    <button class="btn btn-outline-@(type.IsActive ? "warning" : "success") btn-sm" 
+                                                                    <button type="button" class="btn btn-outline-@(type.IsActive ? "warning" : "success") btn-sm"
                                                                             @onclick="() => ToggleActifType(type)" title="@(type.IsActive ? "Désactiver" : "Activer")">
                                                                         <span class="oi oi-@(type.IsActive ? "ban" : "check")"></span>
                                                                     </button>
-                                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => SupprimerType(type)" 
+                                                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => SupprimerType(type)"
                                                                             title="Supprimer" disabled="@(type.FichesTechniques.Count > 0)">
                                                                         <span class="oi oi-trash"></span>
                                                                     </button>
@@ -318,7 +318,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <button class="btn btn-primary" @onclick="AjouterTypeDocument" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeDocument.Nom) || ajoutDocumentEnCours)">
+                                        <button type="button" class="btn btn-primary" @onclick="AjouterTypeDocument" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeDocument.Nom) || ajoutDocumentEnCours)">
                                             @if (ajoutDocumentEnCours)
                                             {
                                                 <span class="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -379,16 +379,16 @@
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            <span class="badge bg-info">0</span>
+                                                            <span class="badge bg-info">@type.ImportsPDF.Count</span>
                                                         </td>
                                                         <td>
                                                             @if (typeDocumentEnEdition?.Id == type.Id)
                                                             {
                                                                 <div class="btn-group btn-group-sm">
-                                                                    <button class="btn btn-success btn-sm" @onclick="SauvegarderTypeDocumentEdition" disabled="@isSaving">
+                                                                    <button type="button" class="btn btn-success btn-sm" @onclick="SauvegarderTypeDocumentEdition" disabled="@isSaving">
                                                                         <span class="oi oi-check"></span>
                                                                     </button>
-                                                                    <button class="btn btn-secondary btn-sm" @onclick="AnnulerEditionDocument">
+                                                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="AnnulerEditionDocument">
                                                                         <span class="oi oi-x"></span>
                                                                     </button>
                                                                 </div>
@@ -396,15 +396,15 @@
                                                             else
                                                             {
                                                                 <div class="btn-group btn-group-sm">
-                                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => CommencerEditionDocument(type)" title="Modifier">
+                                                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => CommencerEditionDocument(type)" title="Modifier">
                                                                         <span class="oi oi-pencil"></span>
                                                                     </button>
-                                                                    <button class="btn btn-outline-@(type.IsActive ? "warning" : "success") btn-sm" 
+                                                                    <button type="button" class="btn btn-outline-@(type.IsActive ? "warning" : "success") btn-sm"
                                                                             @onclick="() => ToggleActifTypeDocument(type)" title="@(type.IsActive ? "Désactiver" : "Activer")">
                                                                         <span class="oi oi-@(type.IsActive ? "ban" : "check")"></span>
                                                                     </button>
-                                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => SupprimerTypeDocument(type)" 
-                                                                            title="Supprimer" disabled="false">
+                                                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => SupprimerTypeDocument(type)"
+                                                                            title="Supprimer" disabled="@(type.ImportsPDF.Count > 0)">
                                                                         <span class="oi oi-trash"></span>
                                                                     </button>
                                                                 </div>
@@ -794,6 +794,7 @@
         finally
         {
             chargementTypes = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -809,24 +810,28 @@
             {
                 statusMessage = "Ce type de produit existe déjà.";
                 isSuccess = false;
+                StateHasChanged();
                 return;
             }
 
             await TypeProduitService.CreateAsync(nouveauTypeProduit);
             nouveauTypeProduit = new TypeProduit();
             await ChargerTypesProduits();
-            
+
             statusMessage = "Type de produit ajouté avec succès !";
             isSuccess = true;
+            StateHasChanged();
         }
         catch (Exception ex)
         {
             statusMessage = $"Erreur lors de l'ajout : {ex.Message}";
             isSuccess = false;
+            StateHasChanged();
         }
         finally
         {
             ajoutEnCours = false;
+            StateHasChanged();
         }
     }
 
@@ -860,17 +865,20 @@
                 typeEnEdition = null;
                 statusMessage = "Type de produit modifié avec succès !";
                 isSuccess = true;
+                StateHasChanged();
             }
             else
             {
                 statusMessage = "Erreur lors de la modification.";
                 isSuccess = false;
+                StateHasChanged();
             }
         }
         catch (Exception ex)
         {
             statusMessage = $"Erreur lors de la modification : {ex.Message}";
             isSuccess = false;
+            StateHasChanged();
         }
     }
 
@@ -884,17 +892,20 @@
                 await ChargerTypesProduits();
                 statusMessage = $"Type de produit {(type.IsActive ? "désactivé" : "activé")} avec succès !";
                 isSuccess = true;
+                StateHasChanged();
             }
             else
             {
                 statusMessage = "Erreur lors du changement de statut.";
                 isSuccess = false;
+                StateHasChanged();
             }
         }
         catch (Exception ex)
         {
             statusMessage = $"Erreur : {ex.Message}";
             isSuccess = false;
+            StateHasChanged();
         }
     }
 
@@ -904,12 +915,13 @@
         {
             statusMessage = "Impossible de supprimer ce type : il est utilisé par des fiches techniques.";
             isSuccess = false;
+            StateHasChanged();
             return;
         }
 
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
             $"Êtes-vous sûr de vouloir supprimer le type '{type.Nom}' ?");
-        
+
         if (confirmed)
         {
             try
@@ -920,17 +932,20 @@
                     await ChargerTypesProduits();
                     statusMessage = "Type de produit supprimé avec succès !";
                     isSuccess = true;
+                    StateHasChanged();
                 }
                 else
                 {
                     statusMessage = "Erreur lors de la suppression.";
                     isSuccess = false;
+                    StateHasChanged();
                 }
             }
             catch (Exception ex)
             {
                 statusMessage = $"Erreur lors de la suppression : {ex.Message}";
                 isSuccess = false;
+                StateHasChanged();
             }
         }
     }
@@ -951,6 +966,7 @@
         finally
         {
             chargementTypesDocuments = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -966,24 +982,28 @@
             {
                 statusMessage = "Ce type de document existe déjà.";
                 isSuccess = false;
+                StateHasChanged();
                 return;
             }
 
             await TypeDocumentService.CreateAsync(nouveauTypeDocument);
             nouveauTypeDocument = new TypeDocumentImport();
             await ChargerTypesDocuments();
-            
+
             statusMessage = "Type de document ajouté avec succès !";
             isSuccess = true;
+            StateHasChanged();
         }
         catch (Exception ex)
         {
             statusMessage = $"Erreur lors de l'ajout : {ex.Message}";
             isSuccess = false;
+            StateHasChanged();
         }
         finally
         {
             ajoutDocumentEnCours = false;
+            StateHasChanged();
         }
     }
 
@@ -1017,17 +1037,20 @@
                 typeDocumentEnEdition = null;
                 statusMessage = "Type de document modifié avec succès !";
                 isSuccess = true;
+                StateHasChanged();
             }
             else
             {
                 statusMessage = "Erreur lors de la modification.";
                 isSuccess = false;
+                StateHasChanged();
             }
         }
         catch (Exception ex)
         {
             statusMessage = $"Erreur lors de la modification : {ex.Message}";
             isSuccess = false;
+            StateHasChanged();
         }
     }
 
@@ -1041,17 +1064,20 @@
                 await ChargerTypesDocuments();
                 statusMessage = $"Type de document {(type.IsActive ? "désactivé" : "activé")} avec succès !";
                 isSuccess = true;
+                StateHasChanged();
             }
             else
             {
                 statusMessage = "Erreur lors du changement de statut.";
                 isSuccess = false;
+                StateHasChanged();
             }
         }
         catch (Exception ex)
         {
             statusMessage = $"Erreur : {ex.Message}";
             isSuccess = false;
+            StateHasChanged();
         }
     }
 
@@ -1061,12 +1087,13 @@
         {
             statusMessage = "Impossible de supprimer ce type : il est utilisé par des documents PDF.";
             isSuccess = false;
+            StateHasChanged();
             return;
         }
 
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
             $"Êtes-vous sûr de vouloir supprimer le type '{type.Nom}' ?");
-        
+
         if (confirmed)
         {
             try
@@ -1077,17 +1104,20 @@
                     await ChargerTypesDocuments();
                     statusMessage = "Type de document supprimé avec succès !";
                     isSuccess = true;
+                    StateHasChanged();
                 }
                 else
                 {
                     statusMessage = "Erreur lors de la suppression.";
                     isSuccess = false;
+                    StateHasChanged();
                 }
             }
             catch (Exception ex)
             {
                 statusMessage = $"Erreur lors de la suppression : {ex.Message}";
                 isSuccess = false;
+                StateHasChanged();
             }
         }
     }

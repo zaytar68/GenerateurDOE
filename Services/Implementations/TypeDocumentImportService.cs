@@ -24,6 +24,7 @@ public class TypeDocumentImportService : ITypeDocumentImportService
         {
             using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
             return await context.TypesDocuments
+                .Include(t => t.ImportsPDF)
                 .OrderBy(t => t.Nom)
                 .ToListAsync().ConfigureAwait(false);
         }, TimeSpan.FromHours(1));
@@ -142,12 +143,15 @@ public class TypeDocumentImportService : ITypeDocumentImportService
         }
     }
 
-    public Task<bool> CanDeleteAsync(int id)
+    public async Task<bool> CanDeleteAsync(int id)
     {
-        // TODO: Pour l'instant, on ne peut pas vérifier l'usage car on utilise encore l'enum TypeDocument
-        var usageCount = 0;
-            
-        return Task.FromResult(usageCount == 0);
+        using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+        // Vérifier si ce type de document est utilisé par des ImportPDF
+        var usageCount = await context.ImportsPDF
+            .CountAsync(i => i.TypeDocumentImportId == id).ConfigureAwait(false);
+
+        return usageCount == 0;
     }
 
     public async Task<bool> ExistsAsync(string nom)

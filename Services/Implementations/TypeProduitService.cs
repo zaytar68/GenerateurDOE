@@ -24,6 +24,7 @@ public class TypeProduitService : ITypeProduitService
         {
             using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
             return await context.TypesProduits
+                .Include(t => t.FichesTechniques)
                 .OrderBy(t => t.Nom)
                 .ToListAsync().ConfigureAwait(false);
         }, TimeSpan.FromHours(1));
