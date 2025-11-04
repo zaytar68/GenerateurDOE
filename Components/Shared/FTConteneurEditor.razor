@@ -1,8 +1,12 @@
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
+@using Microsoft.AspNetCore.Components.Forms
 @inject IFTConteneurService ftConteneurService
 @inject IFicheTechniqueService ficheTechniqueService
 @inject IOperationLockService operationLockService
+@inject ITypeProduitService typeProduitService
+@inject ITypeDocumentImportService typeDocumentImportService
+@inject IConfigurationService configurationService
 @inject Radzen.NotificationService NotificationService
 @inject Radzen.DialogService DialogService
 
@@ -66,25 +70,32 @@
                 <div class="row">
                     <div class="col-md-3">
                         <label class="form-label">Fiche Technique</label>
-                        <AutoComplete T="FicheTechnique"
-                                      Items="fichesDisponibles"
-                                      DisplaySelector="GetFicheDisplayText"
-                                      Placeholder="Rechercher une fiche technique..."
-                                      Value="@searchText"
-                                      OnItemSelected="OnFicheTechniqueSelected"
-                                      OnTextChanged="OnSearchTextChanged"
-                                      MinSearchLength="1">
-                            <ItemTemplate Context="fiche">
-                                <div>
-                                    <strong>@fiche.NomProduit</strong>
-                                    <small class="text-muted d-block">
-                                        <i class="oi oi-person me-1"></i>@fiche.NomFabricant
-                                        <span class="mx-2">•</span>
-                                        <i class="oi oi-tag me-1"></i>@fiche.TypeProduit
-                                    </small>
-                                </div>
-                            </ItemTemplate>
-                        </AutoComplete>
+                        <div class="input-group">
+                            <AutoComplete T="FicheTechnique"
+                                          Items="fichesDisponibles"
+                                          DisplaySelector="GetFicheDisplayText"
+                                          Placeholder="Rechercher une fiche technique..."
+                                          Value="@searchText"
+                                          OnItemSelected="OnFicheTechniqueSelected"
+                                          OnTextChanged="OnSearchTextChanged"
+                                          MinSearchLength="1">
+                                <ItemTemplate Context="fiche">
+                                    <div>
+                                        <strong>@fiche.NomProduit</strong>
+                                        <small class="text-muted d-block">
+                                            <i class="oi oi-person me-1"></i>@fiche.NomFabricant
+                                            <span class="mx-2">•</span>
+                                            <i class="oi oi-tag me-1"></i>@fiche.TypeProduit
+                                        </small>
+                                    </div>
+                                </ItemTemplate>
+                            </AutoComplete>
+                            <button type="button" class="btn btn-outline-success"
+                                    @onclick="OuvrirModalCreationFiche"
+                                    title="Créer une nouvelle fiche technique">
+                                <i class="oi oi-plus"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Position Marché (optionnel)</label>
@@ -275,6 +286,228 @@
     }
 </div>
 
+<!-- Modal Création Fiche Technique -->
+<div class="modal fade @(afficherModalCreationFiche ? "show d-block" : "")" tabindex="-1" style="@(afficherModalCreationFiche ? "background: rgba(0,0,0,0.5); z-index: 1060;" : "")">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <EditForm Model="nouvelleFiche" OnValidSubmit="SauvegarderNouvelleFiche">
+                <DataAnnotationsValidator />
+                <div class="modal-header">
+                    <h5 class="modal-title">Nouvelle Fiche Technique</h5>
+                    <button type="button" class="btn-close" @onclick="FermerModalCreationFiche"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Nom du Produit *</label>
+                                <InputText class="form-control" @bind-Value="nouvelleFiche.NomProduit" />
+                                <ValidationMessage For="@(() => nouvelleFiche.NomProduit)" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Nom du Fabricant *</label>
+                                <div class="input-group">
+                                    <select class="form-select" @bind="nouvelleFiche.NomFabricant">
+                                        <option value="">-- Sélectionner un fabricant --</option>
+                                        @foreach (var fabricant in fabricantsDisponibles)
+                                        {
+                                            <option value="@fabricant">@fabricant</option>
+                                        }
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary" @onclick="OuvrirModalNouveauFabricant">
+                                        <i class="oi oi-plus"></i>
+                                    </button>
+                                </div>
+                                <ValidationMessage For="@(() => nouvelleFiche.NomFabricant)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type de Produit *</label>
+                        <div class="input-group">
+                            <select class="form-select" @bind="nouvelleFiche.TypeProduit">
+                                <option value="">-- Sélectionner un type de produit --</option>
+                                @foreach (var typeProduit in typesProduits)
+                                {
+                                    <option value="@typeProduit.Nom">@typeProduit.Nom</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-outline-primary" @onclick="OuvrirModalNouveauTypeProduit">
+                                <i class="oi oi-plus"></i>
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => nouvelleFiche.TypeProduit)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" rows="3" @bind-Value="nouvelleFiche.Description" />
+                        <ValidationMessage For="@(() => nouvelleFiche.Description)" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="FermerModalCreationFiche">Annuler</button>
+                    <button type="submit" class="btn btn-primary" disabled="@sauvegardeNouvelleFiche">
+                        @if (sauvegardeNouvelleFiche)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Sauvegarder
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Gestion PDF pour nouvelle fiche -->
+<div class="modal fade @(afficherModalPDFNouvelleFiche ? "show d-block" : "")" tabindex="-1" style="@(afficherModalPDFNouvelleFiche ? "background: rgba(0,0,0,0.5); z-index: 1060;" : "")">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    Ajouter des PDF - @(ficheEnCoursCreation?.NomProduit)
+                </h5>
+                <button type="button" class="btn-close" @onclick="FermerModalPDFNouvelleFiche"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="oi oi-info"></i>
+                    Ajoutez des fichiers PDF pour cette nouvelle fiche technique. Vous pourrez également les ajouter plus tard.
+                </div>
+
+                <!-- Zone d'upload -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="oi oi-cloud-upload"></i> Ajouter des fichiers PDF</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-zone border border-2 border-dashed p-4 text-center"
+                             style="min-height: 150px;">
+                            <InputFile OnChange="OnFileSelectedNouvelleFiche" multiple accept=".pdf" class="d-none" id="fileInputNouvelleFiche" />
+                            <label for="fileInputNouvelleFiche" class="d-block" style="cursor: pointer;">
+                                @if (uploadEnCoursNouvelleFiche)
+                                {
+                                    <div class="spinner-border text-primary mb-3"></div>
+                                    <p class="mb-0 text-primary">Upload en cours...</p>
+                                }
+                                else
+                                {
+                                    <i class="oi oi-cloud-upload display-4 text-muted mb-3"></i>
+                                    <p class="mb-2"><strong>Cliquez ici ou glissez-déposez vos fichiers PDF</strong></p>
+                                    <p class="text-muted mb-0">Taille maximum : @tailleMaxFichierLabel par fichier</p>
+                                }
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liste des PDF ajoutés -->
+                @if (pdfsFicheNouvelle.Any())
+                {
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="oi oi-document"></i>
+                                Documents PDF ajoutés (@pdfsFicheNouvelle.Count)
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                @foreach (var pdf in pdfsFicheNouvelle)
+                                {
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="card h-100 border">
+                                            <div class="card-body p-3">
+                                                <h6 class="card-title text-truncate">@pdf.NomFichierOriginal</h6>
+                                                <select class="form-select form-select-sm mb-2" @bind="pdf.TypeDocumentImportId">
+                                                    @foreach (var typeDoc in typesDocuments)
+                                                    {
+                                                        <option value="@typeDoc.Id">@typeDoc.Nom</option>
+                                                    }
+                                                </select>
+                                                <small class="text-muted">@FormatTailleFichier(pdf.TailleFichier)</small>
+                                            </div>
+                                            <div class="card-footer p-2">
+                                                <button class="btn btn-outline-danger btn-sm w-100"
+                                                        @onclick="() => SupprimerPDFNouvelleFiche(pdf)">
+                                                    <i class="oi oi-trash"></i> Supprimer
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="FermerModalPDFNouvelleFiche">
+                    @(pdfsFicheNouvelle.Any() ? "Terminer" : "Passer cette étape")
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nouveau Fabricant -->
+<div class="modal fade @(afficherModalNouveauFabricant ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauFabricant ? "background: rgba(0,0,0,0.5); z-index: 1070;" : "")">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau Fabricant</h5>
+                <button type="button" class="btn-close" @onclick="FermerModalNouveauFabricant"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nom du fabricant *</label>
+                    <input type="text" class="form-control" @bind="nouveauFabricantNom" placeholder="Saisir le nom du fabricant" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauFabricant">Annuler</button>
+                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauFabricant" disabled="@(string.IsNullOrWhiteSpace(nouveauFabricantNom))">
+                    Ajouter
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nouveau Type Produit -->
+<div class="modal fade @(afficherModalNouveauTypeProduit ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauTypeProduit ? "background: rgba(0,0,0,0.5); z-index: 1070;" : "")">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau Type de Produit</h5>
+                <button type="button" class="btn-close" @onclick="FermerModalNouveauTypeProduit"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nom du type de produit *</label>
+                    <input type="text" class="form-control" @bind="nouveauTypeProduitNom" placeholder="Saisir le nom du type" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" @bind="nouveauTypeProduitDescription" placeholder="Description optionnelle"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauTypeProduit">Annuler</button>
+                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduitNom) || creationTypeProduitEnCours)">
+                    @if (creationTypeProduitEnCours)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Créer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
     [Parameter] public FTConteneur? FTConteneur { get; set; }
     [Parameter] public EventCallback<FTConteneur> OnConteneurChanged { get; set; }
@@ -293,6 +526,30 @@
     private string nouveauCommentaire = string.Empty;
     private int draggedElementId = 0;
 
+    // Variables pour la création de fiche technique
+    private bool afficherModalCreationFiche = false;
+    private bool sauvegardeNouvelleFiche = false;
+    private FicheTechnique nouvelleFiche = new();
+    private FicheTechnique? ficheEnCoursCreation = null;
+    private List<string> fabricantsDisponibles = new();
+    private List<TypeProduit> typesProduits = new();
+
+    // Variables pour la modal PDF de nouvelle fiche
+    private bool afficherModalPDFNouvelleFiche = false;
+    private bool uploadEnCoursNouvelleFiche = false;
+    private List<ImportPDF> pdfsFicheNouvelle = new();
+    private List<TypeDocumentImport> typesDocuments = new();
+    private string tailleMaxFichierLabel = "10MB";
+    private long tailleMaxFichierBytes = 10 * 1024 * 1024;
+
+    // Variables pour les modals de création fabricant/type produit
+    private bool afficherModalNouveauFabricant = false;
+    private bool afficherModalNouveauTypeProduit = false;
+    private string nouveauFabricantNom = string.Empty;
+    private string nouveauTypeProduitNom = string.Empty;
+    private string nouveauTypeProduitDescription = string.Empty;
+    private bool creationTypeProduitEnCours = false;
+
     // Classe helper pour la sélection multiple
     public class ImportPDFWithSelection
     {
@@ -305,6 +562,7 @@
     protected override async Task OnInitializedAsync()
     {
         await ChargerDonnees();
+        await ChargerDonneesCreationFiche();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -338,6 +596,35 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task ChargerDonneesCreationFiche()
+    {
+        try
+        {
+            // Charger les types de produits
+            typesProduits = (await typeProduitService.GetAllAsync().ConfigureAwait(false)).ToList();
+
+            // Charger les fabricants existants
+            var toutesLesFiches = await ficheTechniqueService.GetAllAsync().ConfigureAwait(false);
+            fabricantsDisponibles = toutesLesFiches
+                .Select(f => f.NomFabricant)
+                .Distinct()
+                .OrderBy(f => f)
+                .ToList();
+
+            // Charger les types de documents
+            typesDocuments = (await typeDocumentImportService.GetAllAsync().ConfigureAwait(false)).ToList();
+
+            // Charger la config pour taille max fichier
+            var config = await configurationService.GetAppSettingsAsync().ConfigureAwait(false);
+            tailleMaxFichierLabel = config.TailleMaxFichierPDF ?? "10MB";
+            tailleMaxFichierBytes = configurationService.ParseTailleMaxFichierToBytes(tailleMaxFichierLabel);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DEBUG] ChargerDonneesCreationFiche error: {ex.Message}");
         }
     }
 
@@ -424,20 +711,15 @@
 
             if (pdfsSelectionnes.Any())
             {
-                // Créer un élément pour chaque PDF sélectionné
+                // Créer un élément pour chaque PDF sélectionné avec la même position marché
                 var elementsAjoutes = new List<FTElement>();
 
-                for (int i = 0; i < pdfsSelectionnes.Count; i++)
+                foreach (var pdfId in pdfsSelectionnes)
                 {
-                    var pdfId = pdfsSelectionnes[i];
-                    var positionMarche = pdfsSelectionnes.Count == 1
-                        ? nouvellePositionMarche
-                        : $"{nouvellePositionMarche}.{i + 1}";
-
                     var element = await ftConteneurService.AddFTElementAsync(
                         FTConteneur.Id,
                         selectedFicheTechniqueId,
-                        positionMarche,
+                        nouvellePositionMarche, // Même position marché pour tous les PDFs du produit
                         pdfId,
                         nouveauCommentaire);
 
@@ -715,6 +997,232 @@
         finally
         {
             draggedElementId = 0;
+        }
+    }
+
+    // ========== Méthodes pour la création de fiche technique ==========
+
+    private async Task OuvrirModalCreationFiche()
+    {
+        nouvelleFiche = new FicheTechnique();
+        afficherModalCreationFiche = true;
+        await ChargerDonneesCreationFiche(); // Rafraîchir les listes
+    }
+
+    private void FermerModalCreationFiche()
+    {
+        afficherModalCreationFiche = false;
+        nouvelleFiche = new FicheTechnique();
+    }
+
+    private async Task SauvegarderNouvelleFiche()
+    {
+        try
+        {
+            sauvegardeNouvelleFiche = true;
+
+            // Créer la fiche technique
+            var ficheCreee = await ficheTechniqueService.CreateAsync(nouvelleFiche).ConfigureAwait(false);
+            ficheEnCoursCreation = ficheCreee;
+
+            // Recharger la liste des fiches disponibles
+            await ChargerDonnees();
+
+            // Fermer la modal de création
+            FermerModalCreationFiche();
+
+            // Ouvrir la modal PDF après un court délai
+            await Task.Delay(150);
+            afficherModalPDFNouvelleFiche = true;
+
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                $"Fiche technique '{ficheCreee.NomProduit}' créée avec succès");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la création: {ex.Message}");
+        }
+        finally
+        {
+            sauvegardeNouvelleFiche = false;
+        }
+    }
+
+    private async Task FermerModalPDFNouvelleFiche()
+    {
+        afficherModalPDFNouvelleFiche = false;
+
+        // Si des PDFs ont été ajoutés, sélectionner automatiquement la fiche créée
+        if (ficheEnCoursCreation != null)
+        {
+            var ficheComplete = fichesDisponibles.FirstOrDefault(f => f.Id == ficheEnCoursCreation.Id);
+            if (ficheComplete != null)
+            {
+                await OnFicheTechniqueSelected(ficheComplete);
+            }
+        }
+
+        // Reset
+        pdfsFicheNouvelle.Clear();
+        ficheEnCoursCreation = null;
+    }
+
+    private async Task OnFileSelectedNouvelleFiche(InputFileChangeEventArgs e)
+    {
+        if (ficheEnCoursCreation == null) return;
+
+        uploadEnCoursNouvelleFiche = true;
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles())
+            {
+                // Vérifier la taille du fichier
+                if (file.Size > tailleMaxFichierBytes)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Fichier trop volumineux",
+                        $"{file.Name} dépasse la taille maximale autorisée ({tailleMaxFichierLabel})");
+                    continue;
+                }
+
+                // Vérifier le type de fichier
+                if (!file.ContentType.Contains("pdf") && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Type de fichier non supporté",
+                        $"{file.Name} n'est pas un fichier PDF");
+                    continue;
+                }
+
+                // Upload du fichier
+                using var stream = file.OpenReadStream(tailleMaxFichierBytes);
+                var cheminFichier = await ficheTechniqueService.SavePDFFileAsync(stream, file.Name).ConfigureAwait(false);
+
+                var nouveauPDF = new ImportPDF
+                {
+                    CheminFichier = cheminFichier,
+                    NomFichierOriginal = file.Name,
+                    TypeDocumentImportId = typesDocuments.FirstOrDefault()?.Id ?? 1,
+                    TailleFichier = file.Size
+                };
+
+                var pdfCree = await ficheTechniqueService.AddPDFAsync(ficheEnCoursCreation.Id, nouveauPDF).ConfigureAwait(false);
+                pdfsFicheNouvelle.Add(pdfCree);
+            }
+
+            if (pdfsFicheNouvelle.Any())
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"{pdfsFicheNouvelle.Count} fichier(s) PDF ajouté(s)");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de l'upload: {ex.Message}");
+        }
+        finally
+        {
+            uploadEnCoursNouvelleFiche = false;
+        }
+    }
+
+    private void SupprimerPDFNouvelleFiche(ImportPDF pdf)
+    {
+        pdfsFicheNouvelle.Remove(pdf);
+        NotificationService.Notify(Radzen.NotificationSeverity.Info, "Supprimé",
+            $"{pdf.NomFichierOriginal} a été retiré de la liste");
+    }
+
+    private string FormatTailleFichier(long taille)
+    {
+        if (taille < 1024)
+            return $"{taille} B";
+        else if (taille < 1024 * 1024)
+            return $"{taille / 1024.0:F2} KB";
+        else
+            return $"{taille / (1024.0 * 1024.0):F2} MB";
+    }
+
+    // ========== Méthodes pour les modals fabricant/type produit ==========
+
+    private void OuvrirModalNouveauFabricant()
+    {
+        nouveauFabricantNom = string.Empty;
+        afficherModalNouveauFabricant = true;
+    }
+
+    private void FermerModalNouveauFabricant()
+    {
+        afficherModalNouveauFabricant = false;
+        nouveauFabricantNom = string.Empty;
+    }
+
+    private void AjouterNouveauFabricant()
+    {
+        if (string.IsNullOrWhiteSpace(nouveauFabricantNom))
+            return;
+
+        if (!fabricantsDisponibles.Contains(nouveauFabricantNom))
+        {
+            fabricantsDisponibles.Add(nouveauFabricantNom);
+            fabricantsDisponibles = fabricantsDisponibles.OrderBy(f => f).ToList();
+        }
+
+        nouvelleFiche.NomFabricant = nouveauFabricantNom;
+        FermerModalNouveauFabricant();
+
+        NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+            $"Fabricant '{nouveauFabricantNom}' ajouté");
+    }
+
+    private void OuvrirModalNouveauTypeProduit()
+    {
+        nouveauTypeProduitNom = string.Empty;
+        nouveauTypeProduitDescription = string.Empty;
+        afficherModalNouveauTypeProduit = true;
+    }
+
+    private void FermerModalNouveauTypeProduit()
+    {
+        afficherModalNouveauTypeProduit = false;
+        nouveauTypeProduitNom = string.Empty;
+        nouveauTypeProduitDescription = string.Empty;
+    }
+
+    private async Task AjouterNouveauTypeProduit()
+    {
+        if (string.IsNullOrWhiteSpace(nouveauTypeProduitNom))
+            return;
+
+        try
+        {
+            creationTypeProduitEnCours = true;
+
+            var nouveauType = new TypeProduit
+            {
+                Nom = nouveauTypeProduitNom,
+                Description = nouveauTypeProduitDescription
+            };
+
+            var typeCreee = await typeProduitService.CreateAsync(nouveauType).ConfigureAwait(false);
+            typesProduits.Add(typeCreee);
+            typesProduits = typesProduits.OrderBy(t => t.Nom).ToList();
+
+            nouvelleFiche.TypeProduit = typeCreee.Nom;
+            FermerModalNouveauTypeProduit();
+
+            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                $"Type de produit '{typeCreee.Nom}' créé");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Erreur lors de la création: {ex.Message}");
+        }
+        finally
+        {
+            creationTypeProduitEnCours = false;
         }
     }
 }
