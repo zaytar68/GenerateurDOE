@@ -5,6 +5,8 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.WebUtilities
 @using Components
+@using Radzen
+@using Radzen.Blazor
 @inject IFicheTechniqueService FicheTechniqueService
 @inject ITypeProduitService TypeProduitService
 @inject ITypeDocumentImportService TypeDocumentImportService
@@ -12,6 +14,7 @@
 @inject IConfigurationService ConfigurationService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Fiches Techniques</PageTitle>
 
@@ -65,70 +68,150 @@
                 </div>
             </div>
 
-            <!-- Tableau des fiches -->
+            <!-- Bouton Expand/Collapse All -->
+            <div class="d-flex justify-content-end mb-2">
+                <RadzenButton Text="@((allGroupsExpanded ?? false) ? "Tout replier" : "Tout déplier")"
+                              Icon="@((allGroupsExpanded ?? false) ? "unfold_less" : "unfold_more")"
+                              ButtonStyle="ButtonStyle.Light"
+                              Size="ButtonSize.Small"
+                              Click="ToggleTousLesGroupes" />
+            </div>
+
+            <!-- RadzenDataGrid avec grouping -->
             <div class="card">
-                <div class="card-body">
+                <div class="card-body p-0">
                     @if (chargement)
                     {
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Chargement...</span>
-                            </div>
+                        <div class="text-center p-5">
+                            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large">
+                                <Template>Chargement...</Template>
+                            </RadzenProgressBarCircular>
                         </div>
                     }
                     else if (!fichesFiltrees.Any())
                     {
-                        <div class="text-center text-muted">
-                            <p>Aucune fiche technique trouvée.</p>
+                        <div class="text-center text-muted p-5">
+                            <RadzenIcon Icon="description" Style="font-size: 3rem; opacity: 0.3;" />
+                            <p class="mt-3">Aucune fiche technique trouvée.</p>
                         </div>
                     }
                     else
                     {
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>Marque - Produit</th>
-                                        <th>Type</th>
-                                        <th>PDF</th>
-                                        <th>Date Création</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var fiche in fichesFiltrees)
-                                    {
-                                        <tr class="@(fiche == ficheSelectionnee ? "table-warning" : "")">
-                                            <td>
-                                                <strong>@fiche.NomFabricant</strong> - @fiche.NomProduit
-                                                @if (fiche == ficheSelectionnee)
-                                                {
-                                                    <span class="badge bg-primary ms-2">Sélectionnée</span>
-                                                }
-                                            </td>
-                                            <td>@fiche.TypeProduit</td>
-                                            <td>
-                                                <span class="badge bg-info">@fiche.ImportsPDF.Count</span>
-                                            </td>
-                                            <td>@fiche.DateCreation.ToString("dd/MM/yyyy")</td>
-                                            <td class="text-center">
-                                                <div class="btn-group btn-group-sm" role="group">
-                                                    <button class="btn btn-outline-info" @onclick="() => OuvrirModalPDF(fiche)" title="Gérer les PDF">
-                                                        <i class="oi oi-document"></i>
-                                                    </button>
-                                                    <button class="btn btn-outline-primary" @onclick="() => OuvrirModalEdition(fiche)" title="Modifier">
-                                                        <i class="oi oi-pencil"></i>
-                                                    </button>
-                                                    <button class="btn btn-outline-danger" @onclick="() => OuvrirModalSuppression(fiche)" title="Supprimer">
-                                                        <i class="oi oi-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <RadzenDataGrid @ref="grid"
+                                        Data="@fichesPourGrid"
+                                        TItem="FicheTechnique"
+                                        AllowFiltering="true"
+                                        AllowSorting="true"
+                                        AllowGrouping="true"
+                                        FilterMode="FilterMode.Advanced"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        Render="@OnRender"
+                                        GroupRowRender="OnGroupRowRender"
+                                        GroupRowExpand="OnGroupRowExpand"
+                                        GroupRowCollapse="OnGroupRowCollapse"
+                                        @bind-AllGroupsExpanded="@allGroupsExpanded"
+                                        Density="Density.Compact"
+                                        class="rz-datatable-fiches">
+
+                            <GroupHeaderTemplate Context="groupContext">
+                                @{
+                                    var fabricant = groupContext.Data.Key?.ToString() ?? "Non spécifié";
+                                }
+                                <div style="font-weight: bold; padding: 8px; background-color: var(--secondary); color: white; border-radius: 4px;">
+                                    <RadzenIcon Icon="business" Style="vertical-align: middle; margin-right: 8px;" />
+                                    @fabricant
+                                </div>
+                            </GroupHeaderTemplate>
+
+                            <Columns>
+                                <!-- Colonne Fabricant (utilisée pour grouping) -->
+                                <RadzenDataGridColumn TItem="FicheTechnique"
+                                                      Property="NomFabricant"
+                                                      Title="Marque"
+                                                      Groupable="true"
+                                                      Sortable="true"
+                                                      Filterable="true" />
+
+                                <!-- Colonne Produit -->
+                                <RadzenDataGridColumn TItem="FicheTechnique"
+                                                      Property="NomProduit"
+                                                      Title="Produit"
+                                                      Sortable="true"
+                                                      Filterable="true">
+                                    <Template Context="fiche">
+                                        <div>
+                                            @fiche.NomProduit
+                                            @if (fiche == ficheSelectionnee)
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Primary"
+                                                             Text="Sélectionnée"
+                                                             Style="margin-left: 8px;" />
+                                            }
+                                        </div>
+                                    </Template>
+                                </RadzenDataGridColumn>
+
+                                <!-- Colonne Type -->
+                                <RadzenDataGridColumn TItem="FicheTechnique"
+                                                      Property="TypeProduit"
+                                                      Title="Type"
+                                                      Sortable="true"
+                                                      Filterable="true" />
+
+                                <!-- Colonne PDF Count -->
+                                <RadzenDataGridColumn TItem="FicheTechnique"
+                                                      Title="PDF"
+                                                      Sortable="false"
+                                                      Filterable="false"
+                                                      Width="80px"
+                                                      TextAlign="TextAlign.Center">
+                                    <Template Context="fiche">
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info"
+                                                     Text="@fiche.ImportsPDF.Count.ToString()" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+
+                                <!-- Colonne Date -->
+                                <RadzenDataGridColumn TItem="FicheTechnique"
+                                                      Property="DateCreation"
+                                                      Title="Date Création"
+                                                      FormatString="{0:dd/MM/yyyy}"
+                                                      Sortable="true"
+                                                      Filterable="true"
+                                                      Width="130px" />
+
+                                <!-- Colonne Actions -->
+                                <RadzenDataGridColumn TItem="FicheTechnique"
+                                                      Title="Actions"
+                                                      Sortable="false"
+                                                      Filterable="false"
+                                                      Width="200px"
+                                                      TextAlign="TextAlign.Center">
+                                    <Template Context="fiche">
+                                        <RadzenButton Icon="description"
+                                                      ButtonStyle="ButtonStyle.Info"
+                                                      Size="ButtonSize.Small"
+                                                      Click="@(() => OuvrirModalPDF(fiche))"
+                                                      title="Gérer les PDFs"
+                                                      Style="margin: 0 4px;" />
+
+                                        <RadzenButton Icon="edit"
+                                                      ButtonStyle="ButtonStyle.Primary"
+                                                      Size="ButtonSize.Small"
+                                                      Click="@(() => OuvrirModalEdition(fiche))"
+                                                      title="Modifier"
+                                                      Style="margin: 0 4px;" />
+
+                                        <RadzenButton Icon="delete"
+                                                      ButtonStyle="ButtonStyle.Danger"
+                                                      Size="ButtonSize.Small"
+                                                      Click="@(() => OuvrirModalSuppression(fiche))"
+                                                      title="Supprimer"
+                                                      Style="margin: 0 4px;" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
                     }
                 </div>
             </div>
@@ -265,8 +348,14 @@
                         <h6 class="mb-0"><i class="oi oi-cloud-upload"></i> Ajouter des fichiers PDF</h6>
                     </div>
                     <div class="card-body">
-                        <div class="upload-zone border border-2 border-dashed p-4 text-center" 
-                             style="min-height: 150px; border-color: #dee2e6 !important;">
+                        <div @ref="dropZoneElement"
+                             class="upload-zone border border-2 border-dashed p-4 text-center @dropZoneClass"
+                             style="min-height: 150px; transition: all 0.3s ease;"
+                             @ondragenter="OnDragEnter"
+                             @ondragleave="OnDragLeave"
+                             @ondragover:preventDefault="true"
+                             @ondrop="OnDrop"
+                             @ondrop:preventDefault="true">
                             <InputFile OnChange="OnFileSelected" multiple accept=".pdf" class="d-none" id="fileInput" />
                             <label for="fileInput" class="d-block" style="cursor: pointer;">
                                 @if (uploadEnCours)
@@ -462,6 +551,15 @@
     private long tailleMaxFichierBytes = 10 * 1024 * 1024; // 10MB par défaut
     private string tailleMaxFichierLabel = "10MB"; // Pour l'affichage dans l'UI
 
+    // Drag & Drop file upload
+    private ElementReference dropZoneElement;
+    private string dropZoneClass = "";
+
+    // Variables pour RadzenDataGrid
+    private RadzenDataGrid<FicheTechnique> grid;
+    private IEnumerable<FicheTechnique> fichesPourGrid => fichesFiltrees;
+    private bool? allGroupsExpanded = false; // false = collapsed par défaut
+
     protected override async Task OnInitializedAsync()
     {
         await ChargerConfiguration();
@@ -492,6 +590,43 @@
             tailleMaxFichierBytes = 10 * 1024 * 1024;
             tailleMaxFichierLabel = "10MB";
         }
+    }
+
+    // ===== DRAG & DROP METHODS =====
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialiser le drag & drop JavaScript après le premier rendu
+                await JSRuntime.InvokeVoidAsync("fileDropHandler.initialize", dropZoneElement, "fileInput");
+            }
+            catch (Exception ex)
+            {
+                // Logs en console JavaScript pour debug
+                await JSRuntime.InvokeVoidAsync("console.error", $"[FichesTechniques] Erreur initialisation drag & drop: {ex.Message}");
+            }
+        }
+    }
+
+    private void OnDragEnter(DragEventArgs e)
+    {
+        // Ajouter la classe CSS pour feedback visuel hover
+        dropZoneClass = "drag-hover";
+    }
+
+    private void OnDragLeave(DragEventArgs e)
+    {
+        // Retirer la classe CSS hover
+        dropZoneClass = "";
+    }
+
+    private void OnDrop(DragEventArgs e)
+    {
+        // Le JavaScript gère le transfert des fichiers vers InputFile
+        // OnFileSelected sera appelé automatiquement via l'événement 'change'
+        dropZoneClass = "";
     }
 
     private async Task ChargerDonnees()
@@ -529,12 +664,19 @@
         ).ToList();
     }
 
-    private void ReinitialiserFiltres()
+    private async Task ReinitialiserFiltres()
     {
         filtreRecherche = string.Empty;
         rechercheText = string.Empty; // Vide le champ AutoComplete
         ficheSelectionnee = null; // Désélectionner la fiche
-        fichesFiltrees = fiches.ToList();
+        fichesFiltrees = fiches.OrderBy(f => f.NomFabricant).ThenBy(f => f.NomProduit).ToList();
+
+        // Recharger le grid
+        if (grid != null)
+        {
+            await grid.Reload();
+        }
+
         StateHasChanged(); // Force le rafraîchissement du composant AutoComplete
     }
 
@@ -875,11 +1017,11 @@
         // Le filtrage est maintenu par le texte de recherche existant
     }
 
-    private void OnFicheTechniqueSearchChanged(string searchText)
+    private async Task OnFicheTechniqueSearchChanged(string searchText)
     {
         filtreRecherche = searchText;
         rechercheText = searchText; // Synchroniser la variable de contrôle
-        
+
         if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < 2)
         {
             // Si le texte est vide ou trop court, afficher toutes les fiches (ou appliquer les autres filtres)
@@ -894,11 +1036,114 @@
                 f.NomFabricant.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                 f.TypeProduit.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                 (!string.IsNullOrEmpty(f.Description) && f.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase))
-            ).ToList();
+            ).OrderBy(f => f.NomFabricant).ThenBy(f => f.NomProduit).ToList();
         }
-        
+
+        // Recharger le grid après filtrage
+        if (grid != null)
+        {
+            await grid.Reload();
+        }
+
         // Force le rafraîchissement de l'affichage
         StateHasChanged();
     }
 
+    // ===== MÉTHODES RAZDENDATAGRID GROUPING =====
+
+    void OnRender(DataGridRenderEventArgs<FicheTechnique> args)
+    {
+        if (args.FirstRender)
+        {
+            // Définir le grouping par défaut au premier rendu
+            args.Grid.Groups.Add(new GroupDescriptor() { Property = "NomFabricant", SortOrder = SortOrder.Ascending });
+            StateHasChanged();
+        }
+    }
+
+    void OnGroupRowRender(GroupRowRenderEventArgs args)
+    {
+        // Gérer l'état collapsed/expanded des groupes
+        if (args.FirstRender && allGroupsExpanded != null)
+        {
+            args.Expanded = allGroupsExpanded.Value;
+        }
+    }
+
+    void OnGroupRowExpand(Group group)
+    {
+        // Event appelé quand un groupe est expanded
+        // Pour le moment, pas d'action spécifique
+    }
+
+    void OnGroupRowCollapse(Group group)
+    {
+        // Event appelé quand un groupe est collapsed
+        // Pour le moment, pas d'action spécifique
+    }
+
+    void ToggleTousLesGroupes()
+    {
+        // Toggle entre expanded/collapsed
+        allGroupsExpanded = !(allGroupsExpanded ?? false);
+    }
 }
+
+<style>
+    /* ===== DRAG & DROP STYLES ===== */
+    .upload-zone {
+        border-color: #dee2e6 !important;
+        background-color: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+
+    .upload-zone:hover {
+        border-color: #adb5bd !important;
+    }
+
+    .upload-zone.drag-hover {
+        border-color: #0d6efd !important;
+        background-color: #e7f1ff;
+        transform: scale(1.02);
+        box-shadow: 0 0 15px rgba(13, 110, 253, 0.3);
+    }
+
+    /* ===== RAZDENDATAGRID CUSTOM STYLES ===== */
+    .rz-datatable-fiches {
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .rz-datatable-fiches .rz-grid-table {
+        font-size: 0.95rem;
+    }
+
+    .rz-datatable-fiches .rz-data-grid-group-row {
+        background-color: var(--secondary);
+        color: white;
+        font-weight: 600;
+        padding: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .rz-datatable-fiches .rz-data-grid-group-row:hover {
+        background-color: var(--secondary-hover);
+    }
+
+    /* Actions buttons spacing */
+    .rz-datatable-fiches .rz-button {
+        margin: 0 4px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .rz-datatable-fiches {
+            font-size: 0.85rem;
+        }
+
+        .rz-datatable-fiches .rz-button {
+            margin: 2px;
+        }
+    }
+</style>
