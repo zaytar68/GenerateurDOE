@@ -452,61 +452,15 @@
     </div>
 </div>
 
-<!-- Modal Nouveau Fabricant -->
-<div class="modal fade @(afficherModalNouveauFabricant ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauFabricant ? "background: rgba(0,0,0,0.5); z-index: 1070;" : "")">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nouveau Fabricant</h5>
-                <button type="button" class="btn-close" @onclick="FermerModalNouveauFabricant"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Nom du fabricant *</label>
-                    <input type="text" class="form-control" @bind="nouveauFabricantNom" placeholder="Saisir le nom du fabricant" />
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauFabricant">Annuler</button>
-                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauFabricant" disabled="@(string.IsNullOrWhiteSpace(nouveauFabricantNom))">
-                    Ajouter
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Composants Modal Réutilisables -->
+<FabricantModal IsVisible="@afficherModalNouveauFabricant"
+                OnFabricantCreated="@AjouterNouveauFabricantFTC"
+                OnClosed="@FermerModalNouveauFabricant" />
 
-<!-- Modal Nouveau Type Produit -->
-<div class="modal fade @(afficherModalNouveauTypeProduit ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauTypeProduit ? "background: rgba(0,0,0,0.5); z-index: 1070;" : "")">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nouveau Type de Produit</h5>
-                <button type="button" class="btn-close" @onclick="FermerModalNouveauTypeProduit"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Nom du type de produit *</label>
-                    <input type="text" class="form-control" @bind="nouveauTypeProduitNom" placeholder="Saisir le nom du type" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <textarea class="form-control" rows="2" @bind="nouveauTypeProduitDescription" placeholder="Description optionnelle"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauTypeProduit">Annuler</button>
-                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduitNom) || creationTypeProduitEnCours)">
-                    @if (creationTypeProduitEnCours)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    Créer
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<TypeProduitModal IsVisible="@afficherModalNouveauTypeProduit"
+                  TypesProduitsExistants="@typesProduits"
+                  OnTypeProduitCreated="@AjouterNouveauTypeProduitFTC"
+                  OnClosed="@FermerModalNouveauTypeProduit" />
 
 @code {
     [Parameter] public FTConteneur? FTConteneur { get; set; }
@@ -545,10 +499,6 @@
     // Variables pour les modals de création fabricant/type produit
     private bool afficherModalNouveauFabricant = false;
     private bool afficherModalNouveauTypeProduit = false;
-    private string nouveauFabricantNom = string.Empty;
-    private string nouveauTypeProduitNom = string.Empty;
-    private string nouveauTypeProduitDescription = string.Empty;
-    private bool creationTypeProduitEnCours = false;
 
     // Classe helper pour la sélection multiple
     public class ImportPDFWithSelection
@@ -1148,82 +1098,61 @@
 
     private void OuvrirModalNouveauFabricant()
     {
-        nouveauFabricantNom = string.Empty;
         afficherModalNouveauFabricant = true;
     }
 
     private void FermerModalNouveauFabricant()
     {
         afficherModalNouveauFabricant = false;
-        nouveauFabricantNom = string.Empty;
     }
 
-    private void AjouterNouveauFabricant()
+    private void AjouterNouveauFabricantFTC(string nomFabricant)
     {
-        if (string.IsNullOrWhiteSpace(nouveauFabricantNom))
+        if (string.IsNullOrWhiteSpace(nomFabricant))
             return;
 
-        if (!fabricantsDisponibles.Contains(nouveauFabricantNom))
+        if (!fabricantsDisponibles.Contains(nomFabricant))
         {
-            fabricantsDisponibles.Add(nouveauFabricantNom);
+            fabricantsDisponibles.Add(nomFabricant);
             fabricantsDisponibles = fabricantsDisponibles.OrderBy(f => f).ToList();
         }
 
-        nouvelleFiche.NomFabricant = nouveauFabricantNom;
+        nouvelleFiche.NomFabricant = nomFabricant;
         FermerModalNouveauFabricant();
 
         NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
-            $"Fabricant '{nouveauFabricantNom}' ajouté");
+            $"Fabricant '{nomFabricant}' ajouté");
     }
 
     private void OuvrirModalNouveauTypeProduit()
     {
-        nouveauTypeProduitNom = string.Empty;
-        nouveauTypeProduitDescription = string.Empty;
         afficherModalNouveauTypeProduit = true;
     }
 
     private void FermerModalNouveauTypeProduit()
     {
         afficherModalNouveauTypeProduit = false;
-        nouveauTypeProduitNom = string.Empty;
-        nouveauTypeProduitDescription = string.Empty;
     }
 
-    private async Task AjouterNouveauTypeProduit()
+    private void AjouterNouveauTypeProduitFTC(TypeProduit typeProduit)
     {
-        if (string.IsNullOrWhiteSpace(nouveauTypeProduitNom))
+        if (typeProduit == null)
             return;
 
-        try
+        // Vérifier si le type existe déjà dans la liste locale
+        var typeExistant = typesProduits.FirstOrDefault(t => t.Id == typeProduit.Id);
+        if (typeExistant == null)
         {
-            creationTypeProduitEnCours = true;
-
-            var nouveauType = new TypeProduit
-            {
-                Nom = nouveauTypeProduitNom,
-                Description = nouveauTypeProduitDescription
-            };
-
-            var typeCreee = await typeProduitService.CreateAsync(nouveauType).ConfigureAwait(false);
-            typesProduits.Add(typeCreee);
+            // Ajouter à la liste locale
+            typesProduits.Add(typeProduit);
             typesProduits = typesProduits.OrderBy(t => t.Nom).ToList();
+        }
 
-            nouvelleFiche.TypeProduit = typeCreee.Nom;
-            FermerModalNouveauTypeProduit();
+        nouvelleFiche.TypeProduit = typeProduit.Nom;
+        FermerModalNouveauTypeProduit();
 
-            NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
-                $"Type de produit '{typeCreee.Nom}' créé");
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                $"Erreur lors de la création: {ex.Message}");
-        }
-        finally
-        {
-            creationTypeProduitEnCours = false;
-        }
+        NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+            $"Type de produit '{typeProduit.Nom}' créé");
     }
 }
 

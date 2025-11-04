@@ -369,5 +369,57 @@ html, body {
   z-index: 1062 !important;
 }
 
+/* ================================
+   📋 Cartes PDF - Gestion noms longs
+   ================================ */
 
+/* Conteneur flex du contenu de la carte PDF */
+.card-body .flex-grow-1 {
+  min-width: 0;                  /* CRITIQUE : Permet au flex de se réduire */
+  max-width: 100%;               /* Ne jamais dépasser le parent */
+  overflow: hidden;              /* Masquer tout débordement */
+}
+
+/* Titre du fichier PDF avec ellipsis */
+.card-body .card-title {
+  white-space: nowrap;           /* Pas de retour à la ligne */
+  text-overflow: ellipsis;       /* Afficher "..." à la fin */
+  overflow: hidden;              /* Masquer le texte qui déborde */
+  max-width: 100%;               /* Respecter le conteneur parent */
+  display: block;                /* Nécessaire pour text-overflow */
+  word-break: break-all;         /* En backup si nowrap échoue */
+}
+
+/* Dropdown de type document - Contraindre la largeur */
+.card-body .form-select,
+.card-body .form-select-sm {
+  width: 100% !important;        /* Prendre toute la largeur disponible */
+  max-width: 100% !important;    /* Jamais dépasser le parent */
+  overflow: hidden;              /* Masquer le texte long dans les options */
+  text-overflow: ellipsis;       /* Ellipsis dans le dropdown */
+}
+
+/* Footer de carte - Gérer les boutons */
+.card-footer .d-flex {
+  flex-wrap: wrap;               /* Wrapper les boutons si nécessaire */
+  gap: 0.25rem;                  /* Espacement entre boutons wrappés */
+}
+
+.card-footer .btn {
+  flex: 1 1 auto;                /* Boutons flexibles */
+  min-width: 0;                  /* Permettre réduction */
+  white-space: nowrap;           /* Pas de wrap du texte */
+  overflow: hidden;              /* Masquer débordement */
+  text-overflow: ellipsis;       /* Ellipsis si texte trop long */
+  max-width: 100%;               /* Respecter le parent */
+}
+
+/* Infos supplémentaires (taille, date) */
+.card-body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  max-width: 100%;
+}
 

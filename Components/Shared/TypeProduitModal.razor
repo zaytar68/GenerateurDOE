@@ -1,0 +1,144 @@
+@* Composant modal réutilisable pour l'ajout d'un nouveau type de produit *@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject ITypeProduitService TypeProduitService
+@inject IJSRuntime JSRuntime
+
+<!-- Modal Nouveau Type de Produit -->
+<div class="modal fade @(IsVisible ? "show d-block" : "")" tabindex="-1" style="@(IsVisible ? "background: rgba(0,0,0,0.5);" : "")">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau Type de Produit</h5>
+                <button type="button" class="btn-close" @onclick="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nom du type de produit *</label>
+                    <input type="text" class="form-control" @bind="typeProduitNom" placeholder="Saisir le nom du type" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" @bind="typeProduitDescription" placeholder="Description optionnelle"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Fermer">Annuler</button>
+                <button type="button" class="btn btn-primary" @onclick="Creer" disabled="@(string.IsNullOrWhiteSpace(typeProduitNom) || creationEnCours)">
+                    @if (creationEnCours)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Créer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Indique si la modal est visible
+    /// </summary>
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    /// <summary>
+    /// Liste des types de produits existants pour vérification des doublons
+    /// </summary>
+    [Parameter]
+    public List<TypeProduit> TypesProduitsExistants { get; set; } = new();
+
+    /// <summary>
+    /// Callback appelé lorsqu'un nouveau type de produit est créé
+    /// Retourne le TypeProduit créé ou existant
+    /// </summary>
+    [Parameter]
+    public EventCallback<TypeProduit> OnTypeProduitCreated { get; set; }
+
+    /// <summary>
+    /// Callback appelé lorsque la modal est fermée
+    /// </summary>
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    private string typeProduitNom = string.Empty;
+    private string typeProduitDescription = string.Empty;
+    private bool creationEnCours = false;
+
+    /// <summary>
+    /// Crée le nouveau type de produit et notifie le parent
+    /// </summary>
+    private async Task Creer()
+    {
+        if (string.IsNullOrWhiteSpace(typeProduitNom))
+            return;
+
+        creationEnCours = true;
+        try
+        {
+            // Vérifier si le type existe déjà
+            var typeExistant = TypesProduitsExistants.FirstOrDefault(t =>
+                t.Nom.Equals(typeProduitNom, StringComparison.OrdinalIgnoreCase));
+
+            if (typeExistant != null)
+            {
+                // Type déjà existant, retourner celui-ci
+                await OnTypeProduitCreated.InvokeAsync(typeExistant);
+                ResetForm();
+                return;
+            }
+
+            // Créer un nouveau type de produit
+            var nouveauTypeProduit = new TypeProduit
+            {
+                Nom = typeProduitNom,
+                Description = string.IsNullOrWhiteSpace(typeProduitDescription) ?
+                    $"Type créé automatiquement" : typeProduitDescription,
+                IsActive = true
+            };
+
+            var typeCree = await TypeProduitService.CreateAsync(nouveauTypeProduit).ConfigureAwait(false);
+
+            // Notifier le parent avec le type créé
+            await OnTypeProduitCreated.InvokeAsync(typeCree);
+            ResetForm();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Erreur lors de la création du type de produit: {ex.Message}");
+            // En cas d'erreur, créer un objet temporaire avec le nom saisi
+            var typeTemporaire = new TypeProduit
+            {
+                Nom = typeProduitNom,
+                Description = typeProduitDescription,
+                IsActive = true
+            };
+            await OnTypeProduitCreated.InvokeAsync(typeTemporaire);
+            ResetForm();
+        }
+        finally
+        {
+            creationEnCours = false;
+        }
+    }
+
+    /// <summary>
+    /// Ferme la modal et réinitialise le formulaire
+    /// </summary>
+    private async Task Fermer()
+    {
+        ResetForm();
+        await OnClosed.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Réinitialise les champs du formulaire
+    /// </summary>
+    private void ResetForm()
+    {
+        typeProduitNom = string.Empty;
+        typeProduitDescription = string.Empty;
+        creationEnCours = false;
+    }
+}

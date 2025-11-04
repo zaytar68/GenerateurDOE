@@ -461,61 +461,15 @@
     </div>
 </div>
 
-<!-- Modal Nouveau Fabricant -->
-<div class="modal fade @(afficherModalNouveauFabricant ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauFabricant ? "background: rgba(0,0,0,0.5);" : "")">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nouveau Fabricant</h5>
-                <button type="button" class="btn-close" @onclick="FermerModalNouveauFabricant"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Nom du fabricant *</label>
-                    <input type="text" class="form-control" @bind="nouveauFabricantNom" placeholder="Saisir le nom du fabricant" />
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauFabricant">Annuler</button>
-                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauFabricant" disabled="@(string.IsNullOrWhiteSpace(nouveauFabricantNom))">
-                    Ajouter
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Composants Modal Réutilisables -->
+<FabricantModal IsVisible="@afficherModalNouveauFabricant"
+                OnFabricantCreated="@AjouterNouveauFabricant"
+                OnClosed="@FermerModalNouveauFabricant" />
 
-<!-- Modal Nouveau Type de Produit -->
-<div class="modal fade @(afficherModalNouveauTypeProduit ? "show d-block" : "")" tabindex="-1" style="@(afficherModalNouveauTypeProduit ? "background: rgba(0,0,0,0.5);" : "")">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nouveau Type de Produit</h5>
-                <button type="button" class="btn-close" @onclick="FermerModalNouveauTypeProduit"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Nom du type de produit *</label>
-                    <input type="text" class="form-control" @bind="nouveauTypeProduitNom" placeholder="Saisir le nom du type" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <textarea class="form-control" rows="2" @bind="nouveauTypeProduitDescription" placeholder="Description optionnelle"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="FermerModalNouveauTypeProduit">Annuler</button>
-                <button type="button" class="btn btn-primary" @onclick="AjouterNouveauTypeProduit" disabled="@(string.IsNullOrWhiteSpace(nouveauTypeProduitNom) || creationTypeProduitEnCours)">
-                    @if (creationTypeProduitEnCours)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    Créer
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<TypeProduitModal IsVisible="@afficherModalNouveauTypeProduit"
+                  TypesProduitsExistants="@typesProduits"
+                  OnTypeProduitCreated="@AjouterNouveauTypeProduit"
+                  OnClosed="@FermerModalNouveauTypeProduit" />
 
 @code {
     private List<FicheTechnique> fiches = new();
@@ -540,12 +494,6 @@
     private string filtreRecherche = string.Empty;
     private string rechercheText = string.Empty;
     private FicheTechnique? ficheSelectionnee;
-    
-    // Variables pour les nouvelles modales
-    private string nouveauFabricantNom = string.Empty;
-    private string nouveauTypeProduitNom = string.Empty;
-    private string nouveauTypeProduitDescription = string.Empty;
-    private bool creationTypeProduitEnCours = false;
 
     // Configuration taille fichiers
     private long tailleMaxFichierBytes = 10 * 1024 * 1024; // 10MB par défaut
@@ -928,95 +876,59 @@
 
     private void OuvrirModalNouveauFabricant()
     {
-        nouveauFabricantNom = string.Empty;
         afficherModalNouveauFabricant = true;
     }
 
     private void FermerModalNouveauFabricant()
     {
         afficherModalNouveauFabricant = false;
-        nouveauFabricantNom = string.Empty;
     }
 
-    private void AjouterNouveauFabricant()
+    private void AjouterNouveauFabricant(string nomFabricant)
     {
-        if (string.IsNullOrWhiteSpace(nouveauFabricantNom))
+        if (string.IsNullOrWhiteSpace(nomFabricant))
             return;
 
-        if (!fabricantsDisponibles.Contains(nouveauFabricantNom))
+        if (!fabricantsDisponibles.Contains(nomFabricant))
         {
-            fabricantsDisponibles.Add(nouveauFabricantNom);
+            fabricantsDisponibles.Add(nomFabricant);
             fabricantsDisponibles.Sort();
         }
 
-        ficheEnCours.NomFabricant = nouveauFabricantNom;
+        ficheEnCours.NomFabricant = nomFabricant;
         FermerModalNouveauFabricant();
         StateHasChanged();
     }
 
     private void OuvrirModalNouveauTypeProduit()
     {
-        nouveauTypeProduitNom = string.Empty;
-        nouveauTypeProduitDescription = string.Empty;
         afficherModalNouveauTypeProduit = true;
     }
 
     private void FermerModalNouveauTypeProduit()
     {
         afficherModalNouveauTypeProduit = false;
-        nouveauTypeProduitNom = string.Empty;
-        nouveauTypeProduitDescription = string.Empty;
-        creationTypeProduitEnCours = false;
     }
 
-    private async Task AjouterNouveauTypeProduit()
+    private void AjouterNouveauTypeProduit(TypeProduit typeProduit)
     {
-        if (string.IsNullOrWhiteSpace(nouveauTypeProduitNom))
+        if (typeProduit == null)
             return;
 
-        creationTypeProduitEnCours = true;
-        try
+        // Vérifier si le type existe déjà dans la liste locale
+        var typeExistant = typesProduits.FirstOrDefault(t => t.Id == typeProduit.Id);
+        if (typeExistant == null)
         {
-            // Vérifier si le type existe déjà
-            if (typesProduits.Any(t => t.Nom.Equals(nouveauTypeProduitNom, StringComparison.OrdinalIgnoreCase)))
-            {
-                ficheEnCours.TypeProduit = nouveauTypeProduitNom;
-                FermerModalNouveauTypeProduit();
-                return;
-            }
-
-            // Créer un nouveau type de produit
-            var nouveauTypeProduit = new TypeProduit
-            {
-                Nom = nouveauTypeProduitNom,
-                Description = string.IsNullOrWhiteSpace(nouveauTypeProduitDescription) ? 
-                    $"Type créé automatiquement" : nouveauTypeProduitDescription,
-                IsActive = true
-            };
-
-            var typeCree = await TypeProduitService.CreateAsync(nouveauTypeProduit);
-            
             // Ajouter à la liste locale
-            typesProduits.Add(typeCree);
+            typesProduits.Add(typeProduit);
             typesProduits.Sort((a, b) => a.Nom.CompareTo(b.Nom));
-            
-            // Assigner à la fiche en cours
-            ficheEnCours.TypeProduit = typeCree.Nom;
-            
-            FermerModalNouveauTypeProduit();
-            StateHasChanged();
         }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Erreur lors de la création du type de produit: {ex.Message}");
-            // En cas d'erreur, utiliser quand même le texte saisi
-            ficheEnCours.TypeProduit = nouveauTypeProduitNom;
-            FermerModalNouveauTypeProduit();
-        }
-        finally
-        {
-            creationTypeProduitEnCours = false;
-        }
+
+        // Assigner à la fiche en cours
+        ficheEnCours.TypeProduit = typeProduit.Nom;
+
+        FermerModalNouveauTypeProduit();
+        StateHasChanged();
     }
 
     private string? GetValidationMessage(System.Linq.Expressions.Expression<Func<string>> accessor)

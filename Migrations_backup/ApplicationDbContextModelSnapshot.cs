@@ -354,11 +354,16 @@ namespace GenerateurDOE.Migrations
                     b.Property<int>("TypeDocumentImportId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("TypeDocumentImportId1")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FicheTechniqueId");
 
                     b.HasIndex("TypeDocumentImportId");
+
+                    b.HasIndex("TypeDocumentImportId1");
 
                     b.ToTable("ImportsPDF");
                 });
@@ -785,6 +790,10 @@ namespace GenerateurDOE.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("GenerateurDOE.Models.TypeDocumentImport", null)
+                        .WithMany("ImportsPDF")
+                        .HasForeignKey("TypeDocumentImportId1");
+
                     b.Navigation("FicheTechnique");
 
                     b.Navigation("TypeDocumentImport");
@@ -871,6 +880,11 @@ namespace GenerateurDOE.Migrations
             modelBuilder.Entity("GenerateurDOE.Models.SectionConteneur", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("GenerateurDOE.Models.TypeDocumentImport", b =>
+                {
+                    b.Navigation("ImportsPDF");
                 });
 
             modelBuilder.Entity("GenerateurDOE.Models.TypeProduit", b =>
