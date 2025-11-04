@@ -708,11 +708,15 @@
     private async Task SauvegarderFiche()
     {
         sauvegarde = true;
+        bool estNouvelleCreation = ficheEnCours.Id == 0;
+        int? ficheCreeId = null;
+
         try
         {
-            if (ficheEnCours.Id == 0)
+            if (estNouvelleCreation)
             {
-                await FicheTechniqueService.CreateAsync(ficheEnCours);
+                var ficheCreee = await FicheTechniqueService.CreateAsync(ficheEnCours);
+                ficheCreeId = ficheCreee.Id;
             }
             else
             {
@@ -722,6 +726,12 @@
             await ChargerDonnees();
             FermerModalEdition();
             FiltrerFiches();
+
+            // Ouvrir automatiquement la modal PDF pour une nouvelle création
+            if (estNouvelleCreation && ficheCreeId.HasValue)
+            {
+                await OuvrirModalPDFApresCreation(ficheCreeId.Value);
+            }
         }
         finally
         {
@@ -770,6 +780,19 @@
         // ✅ CORRECTION DOUBLONS FINALE: Éliminer les doublons par ID dès l'ouverture
         pdfsFiche = fiche.ImportsPDF?.GroupBy(p => p.Id).Select(g => g.First()).ToList() ?? new List<ImportPDF>();
         afficherModalPDF = true;
+    }
+
+    private async Task OuvrirModalPDFApresCreation(int ficheTechniqueId)
+    {
+        // Récupérer la fiche complète avec ses relations depuis la liste rechargée
+        var ficheComplete = fiches.FirstOrDefault(f => f.Id == ficheTechniqueId);
+
+        if (ficheComplete != null)
+        {
+            // Délai pour éviter conflit entre fermeture modal édition et ouverture modal PDF
+            await Task.Delay(150);
+            OuvrirModalPDF(ficheComplete);
+        }
     }
 
     private void FermerModalPDF()
