@@ -18,6 +18,13 @@
                 <button type="button" class="btn-close" @onclick="FermerModal"></button>
             </div>
             <div class="modal-body">
+                @if (!string.IsNullOrEmpty(MessageInfo))
+                {
+                    <div class="alert alert-info mb-4">
+                        <i class="oi oi-info"></i>
+                        @MessageInfo
+                    </div>
+                }
 
                 <!-- Zone d'upload -->
                 <div class="card mb-4">
@@ -209,6 +216,12 @@
     /// </summary>
     [Parameter]
     public string? Titre { get; set; }
+
+    /// <summary>
+    /// Message d'information optionnel affiché en haut de la modal
+    /// </summary>
+    [Parameter]
+    public string? MessageInfo { get; set; }
 
     /// <summary>
     /// Z-index pour modal imbriquée (par défaut 1050)

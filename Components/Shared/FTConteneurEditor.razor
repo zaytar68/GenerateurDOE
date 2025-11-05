@@ -305,6 +305,7 @@
                  PDFsChanged="@((pdfs) => { pdfsFicheNouvelle = pdfs; StateHasChanged(); })"
                  OnClosed="@FermerModalPDFNouvelleFiche"
                  Titre="@($"Ajouter des PDF - {ficheEnCoursCreation?.NomProduit}")"
+                 MessageInfo="Ajoutez des fichiers PDF pour cette nouvelle fiche technique. Vous pourrez également les ajouter plus tard."
                  ZIndex="1060"
                  EnableDragDrop="false" />
 
