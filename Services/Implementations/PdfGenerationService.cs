@@ -1093,7 +1093,7 @@ namespace GenerateurDOE.Services.Implementations
 
                 foreach (var element in document.FTConteneur.Elements.OrderBy(e => e.Ordre))
                 {
-                    var title = element.FicheTechnique?.NomProduit ?? element.ImportPDF?.NomFichierOriginal ?? "Document";
+                    var title = FormatFicheTechniqueTitle(element);
                     ftEntry.Children.Add(new TocEntry
                     {
                         Title = title,
@@ -1669,6 +1669,45 @@ namespace GenerateurDOE.Services.Implementations
                 _loggingService.LogError($"Erreur lors de l'ajout du pied de page à la page {pageNumber}: {ex.Message}");
                 throw new Exception($"Erreur graphique pied de page: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Formate le titre d'une fiche technique pour la table des matières
+        /// Format: <strong>Marque</strong> Nom du produit - <em>type de document</em>
+        /// </summary>
+        private string FormatFicheTechniqueTitle(FTElement element)
+        {
+            if (element.FicheTechnique == null)
+            {
+                return element.ImportPDF?.NomFichierOriginal ?? "Document";
+            }
+
+            var marque = element.FicheTechnique.NomFabricant;
+            var produit = element.FicheTechnique.NomProduit;
+            var typeDocument = element.ImportPDF?.TypeDocumentImport?.Nom;
+
+            // Construction du titre selon les données disponibles
+            var titleParts = new List<string>();
+
+            // Ajouter la marque en gras si disponible
+            if (!string.IsNullOrWhiteSpace(marque))
+            {
+                titleParts.Add($"<strong>{marque}</strong>");
+            }
+
+            // Ajouter le nom du produit
+            titleParts.Add(produit);
+
+            // Construire la première partie (marque + produit)
+            var mainPart = string.Join(" ", titleParts);
+
+            // Ajouter le type de document en italique si disponible
+            if (!string.IsNullOrWhiteSpace(typeDocument))
+            {
+                return $"{mainPart} - <em>{typeDocument}</em>";
+            }
+
+            return mainPart;
         }
 
         /// <summary>

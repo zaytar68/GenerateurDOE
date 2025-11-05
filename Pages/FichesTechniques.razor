@@ -117,7 +117,7 @@
                                 @{
                                     var fabricant = groupContext.Data.Key?.ToString() ?? "Non spécifié";
                                 }
-                                <div style="font-weight: bold; padding: 8px; background-color: var(--secondary); color: white; border-radius: 4px;">
+                                <div style="font-weight: bold; padding: 8px; background-color: var(--info); color: white; border-radius: 4px;">
                                     <RadzenIcon Icon="business" Style="vertical-align: middle; margin-right: 8px;" />
                                     @fabricant
                                 </div>
@@ -745,7 +745,7 @@
     }
 
     .rz-datatable-fiches .rz-data-grid-group-row {
-        background-color: var(--secondary);
+        background-color: var(--info);
         color: white;
         font-weight: 600;
         padding: 12px;
@@ -754,7 +754,7 @@
     }
 
     .rz-datatable-fiches .rz-data-grid-group-row:hover {
-        background-color: var(--secondary-hover);
+        background-color: #0a9ec9; /* var(--info) légèrement plus clair au survol */
     }
 
     /* Actions buttons spacing */

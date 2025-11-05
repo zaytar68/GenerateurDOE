@@ -5,6 +5,30 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2025-11-05
+
+### ✨ **Amélioration Affichage Table des Matières**
+- **Format enrichi pour fiches techniques** : Les entrées de la table des matières affichent maintenant **Marque** Nom du produit - *type de document*
+- **Formatage HTML** : Utilisation de balises `<strong>` pour la marque en gras et `<em>` pour le type de document en italique
+- **Gestion intelligente des valeurs manquantes** : Affichage adaptatif selon les données disponibles (avec/sans marque, avec/sans type)
+
+### 🔧 **Technique**
+- **TableOfContentsService** : Nouvelle méthode `FormatFicheTechniqueTitle()` pour formatage enrichi des titres
+- **PdfGenerationService** : Implémentation identique pour cohérence entre structure TOC et rendu PDF
+- **DocumentRepositoryService** : Ajout `ThenInclude(pdf => pdf!.TypeDocumentImport)` pour chargement complet de la relation EF Core
+- **Eager Loading optimisé** : Correction de la chaîne Include pour éviter les données null dans TypeDocumentImport
+
+### ✅ **Avantages**
+- **Lisibilité améliorée** : Identification rapide de la marque et du type de document dans la TOC
+- **Cohérence visuelle** : Format uniforme pour toutes les fiches techniques du document
+- **Architecture DRY** : Méthode de formatage partagée entre les deux services de génération
+- **Robustesse EF Core** : Relations correctement chargées pour éviter les null references
+
+### 📝 **Exemples de rendu**
+- Complet : **Knauf** Panneau isolant XPS - *Fiche technique*
+- Sans marque : Panneau isolant XPS - *Fiche technique*
+- Sans type : **Knauf** Panneau isolant XPS
+
 ## [2.2.0] - 2025-10-28
 
 ### ✨ **Configuration Dynamique Taille Fichiers**

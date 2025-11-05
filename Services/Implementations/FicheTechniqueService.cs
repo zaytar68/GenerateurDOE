@@ -176,6 +176,33 @@ public class FicheTechniqueService : IFicheTechniqueService
         return true;
     }
 
+    /// <summary>
+    /// Met à jour le type de document d'un ImportPDF
+    /// </summary>
+    /// <param name="importPDFId">Identifiant de l'ImportPDF à modifier</param>
+    /// <param name="typeDocumentImportId">Nouveau type de document</param>
+    /// <returns>ImportPDF mis à jour</returns>
+    /// <exception cref="InvalidOperationException">Si l'ImportPDF n'existe pas</exception>
+    public async Task<ImportPDF> UpdatePDFTypeAsync(int importPDFId, int typeDocumentImportId)
+    {
+        using var context = _contextFactory.CreateDbContext();
+        var importPDF = await context.ImportsPDF
+            .Include(i => i.TypeDocumentImport)
+            .FirstOrDefaultAsync(i => i.Id == importPDFId);
+
+        if (importPDF == null)
+        {
+            throw new InvalidOperationException($"ImportPDF avec l'ID {importPDFId} n'existe pas.");
+        }
+
+        importPDF.TypeDocumentImportId = typeDocumentImportId;
+        await context.SaveChangesAsync();
+
+        _loggingService.LogInformation($"Type de document mis à jour pour ImportPDF {importPDFId}: TypeDocumentImportId = {typeDocumentImportId}");
+
+        return importPDF;
+    }
+
     public async Task<string> SavePDFFileAsync(Stream fileStream, string originalFileName)
     {
         var repertoireStockage = _appSettings.RepertoireStockagePDF;

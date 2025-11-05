@@ -123,7 +123,9 @@
                                                             @pdf.NomFichierOriginal
                                                         </h6>
                                                         <div class="mb-2">
-                                                            <select class="form-select form-select-sm" @bind="pdf.TypeDocumentImportId">
+                                                            <select class="form-select form-select-sm"
+                                                                    value="@pdf.TypeDocumentImportId"
+                                                                    @onchange="@((ChangeEventArgs e) => OnTypeDocumentChanged(pdf, e))">
                                                                 @foreach (var typeDocument in typesDocuments)
                                                                 {
                                                                     <option value="@typeDocument.Id">@typeDocument.Nom</option>
@@ -429,6 +431,39 @@
                 Radzen.NotificationSeverity.Error,
                 "Erreur",
                 $"Impossible de supprimer: {ex.Message}"
+            );
+        }
+    }
+
+    private async Task OnTypeDocumentChanged(ImportPDF pdf, ChangeEventArgs e)
+    {
+        try
+        {
+            // Récupérer le nouveau TypeDocumentImportId depuis l'événement
+            if (int.TryParse(e.Value?.ToString(), out int newTypeId))
+            {
+                // Sauvegarder en base de données
+                await FicheTechniqueService.UpdatePDFTypeAsync(pdf.Id, newTypeId);
+
+                // Mettre à jour l'objet local
+                pdf.TypeDocumentImportId = newTypeId;
+
+                NotificationService.Notify(
+                    Radzen.NotificationSeverity.Success,
+                    "Succès",
+                    "Type de document mis à jour"
+                );
+
+                // Notifier le parent du changement
+                await PDFsChanged.InvokeAsync(PDFs);
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(
+                Radzen.NotificationSeverity.Error,
+                "Erreur",
+                $"Impossible de mettre à jour le type: {ex.Message}"
             );
         }
     }

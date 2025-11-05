@@ -75,6 +75,7 @@ public class DocumentRepositoryService : IDocumentRepositoryService
                     .ThenInclude(e => e.FicheTechnique)
             .Include(d => d.FTConteneur!.Elements)
                 .ThenInclude(e => e.ImportPDF)
+                    .ThenInclude(pdf => pdf!.TypeDocumentImport)
             .AsSplitQuery()  // ✅ OBLIGATOIRE pour éviter erreurs concurrence
             .FirstOrDefaultAsync(d => d.Id == documentId).ConfigureAwait(false);
 
