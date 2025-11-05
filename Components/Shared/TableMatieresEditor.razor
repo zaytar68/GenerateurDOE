@@ -1,7 +1,9 @@
 @using System.Text.Json
 @using GenerateurDOE.Models
 @using GenerateurDOE.Services.Interfaces
+@using GenerateurDOE.Controllers
 @inject Radzen.NotificationService NotificationService
+@inject ITableOfContentsService TableOfContentsService
 
 <div class="table-matieres-editor">
     <div class="card">
@@ -85,7 +87,16 @@
                         <button type="button" class="btn btn-outline-info btn-sm"
                                 @onclick="LoadDefaultStructure"
                                 disabled="@IsLoadingStructure">
-                            <i class="oi oi-cloud-download"></i> Charger la structure par défaut
+                            @if (IsLoadingStructure)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                <span>Chargement en cours...</span>
+                            }
+                            else
+                            {
+                                <i class="oi oi-cloud-download"></i>
+                                <span> Charger la structure par défaut</span>
+                            }
                         </button>
                     </div>
                     <div class="col-md-6">
@@ -397,45 +408,39 @@
 
         try
         {
-            // Appeler l'API pour récupérer la structure par défaut
-            using var httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri("http://localhost:5282/"); // TODO: configurer l'URL de base
+            // Appeler directement le service pour récupérer la structure par défaut
+            var tocStructure = await TableOfContentsService.GenerateStructureAsync(DocumentGenere.Id);
 
-            var response = await httpClient.GetAsync($"api/toc/structure/{DocumentGenere.Id}");
-            if (response.IsSuccessStatusCode)
+            if (tocStructure != null)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                var tocStructure = JsonSerializer.Deserialize<TocStructureResponse>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                EntriesCustom.Clear();
+                var order = 0;
 
-                if (tocStructure != null)
+                foreach (var entry in tocStructure.Entries)
                 {
-                    EntriesCustom.Clear();
-                    var order = 0;
+                    AddTocEntryRecursive(entry, order++, entry.Level);
 
-                    foreach (var entry in tocStructure.Entries)
+                    // Ajouter les entrées enfants
+                    foreach (var child in entry.Children)
                     {
-                        AddTocEntryRecursive(entry, order++, entry.Level);
-
-                        // Ajouter les entrées enfants
-                        foreach (var child in entry.Children)
-                        {
-                            AddTocEntryRecursive(child, order++, child.Level);
-                        }
+                        AddTocEntryRecursive(child, order++, child.Level);
                     }
-
-                    await OnTableMatieresChanged();
-                    NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
-                        $"Structure chargée avec {EntriesCustom.Count} entrées");
                 }
+
+                await OnTableMatieresChanged();
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
+                    $"Structure chargée avec {EntriesCustom.Count} entrées");
             }
             else
             {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                    "Impossible de charger la structure par défaut");
+                NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Attention",
+                    "Aucune structure n'a pu être générée pour ce document");
             }
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("introuvable"))
+        {
+            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
+                $"Document introuvable : {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -541,24 +546,6 @@
             entry.IsModified = true;
         }
         await OnTableMatieresChanged();
-    }
-
-    // Classes DTO pour l'API
-    public class TocStructureResponse
-    {
-        public int DocumentId { get; set; }
-        public string DocumentTitle { get; set; } = "";
-        public bool IncludePageGuard { get; set; }
-        public bool IncludeTableOfContents { get; set; }
-        public List<TocEntryDto> Entries { get; set; } = new();
-    }
-
-    public class TocEntryDto
-    {
-        public string Title { get; set; } = "";
-        public int Level { get; set; }
-        public int PageNumber { get; set; }
-        public List<TocEntryDto> Children { get; set; } = new();
     }
 
     // Classes pour la sérialisation JSON

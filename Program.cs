@@ -151,6 +151,9 @@ builder.Services.AddScoped<IPdfProgressService, PdfProgressService>();
 builder.Services.AddScoped<IPdfProgressDialogService, PdfProgressDialogService>();
 builder.Services.AddScoped<IPdfPageCountService, PdfPageCountService>();
 
+// Table of contents service
+builder.Services.AddScoped<ITableOfContentsService, TableOfContentsService>();
+
 // Template management services
 builder.Services.AddScoped<IPageGardeTemplateService, PageGardeTemplateService>();
 
