@@ -26,15 +26,15 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Nom du Fabricant *</label>
-                                    <div class="input-group">
-                                        <select class="form-select" @bind="Fiche.NomFabricant">
+                                    <div class="d-flex gap-2">
+                                        <select class="form-select flex-grow-1" @bind="Fiche.NomFabricant">
                                             <option value="">-- Sélectionner un fabricant --</option>
                                             @foreach (var fabricant in FabricantsDisponibles)
                                             {
                                                 <option value="@fabricant">@fabricant</option>
                                             }
                                         </select>
-                                        <button type="button" class="btn btn-outline-primary" @onclick="HandleOpenFabricantModal">
+                                        <button type="button" class="btn btn-outline-primary flex-shrink-0" @onclick="HandleOpenFabricantModal" style="width: 44px; height: 38px;">
                                             <i class="oi oi-plus"></i>
                                         </button>
                                     </div>
@@ -44,15 +44,15 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Type de Produit *</label>
-                            <div class="input-group">
-                                <select class="form-select" @bind="Fiche.TypeProduit">
+                            <div class="d-flex gap-2">
+                                <select class="form-select flex-grow-1" @bind="Fiche.TypeProduit">
                                     <option value="">-- Sélectionner un type de produit --</option>
                                     @foreach (var typeProduit in TypesProduits)
                                     {
                                         <option value="@typeProduit.Nom">@typeProduit.Nom</option>
                                     }
                                 </select>
-                                <button type="button" class="btn btn-outline-primary" @onclick="HandleOpenTypeProduitModal">
+                                <button type="button" class="btn btn-outline-primary flex-shrink-0" @onclick="HandleOpenTypeProduitModal" style="width: 44px; height: 38px;">
                                     <i class="oi oi-plus"></i>
                                 </button>
                             </div>
