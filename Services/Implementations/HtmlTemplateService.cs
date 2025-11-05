@@ -722,18 +722,19 @@ namespace GenerateurDOE.Services.Implementations
                         <thead>
                             <tr>
                                 <th style='width: 12%;'>Position Marché</th>
-                                <th style='width: 20%;'>Fabricant</th>
-                                <th style='width: 28%;'>Produit</th>
                                 <th style='width: 18%;'>Type</th>
+                                <th style='width: 20%;'>Marque</th>
+                                <th style='width: 28%;'>Produit</th>
                                 <th style='width: 22%;'>Spécification</th>
                             </tr>
                         </thead>
                         <tbody>");
 
-                // Trier les éléments par position marché puis par ordre
+                // Trier les éléments par ordre et éliminer les doublons (première occurrence de chaque produit)
                 var elementsTriees = ftConteneur.Elements
-                    .OrderBy(e => e.PositionMarche ?? "zzz") // Les positions vides à la fin
-                    .ThenBy(e => e.Ordre)
+                    .OrderBy(e => e.Ordre)
+                    .GroupBy(e => e.FicheTechniqueId)
+                    .Select(g => g.First())
                     .ToList();
 
                 foreach (var element in elementsTriees)
@@ -751,9 +752,9 @@ namespace GenerateurDOE.Services.Implementations
                         html.AppendLine($@"
                             <tr>
                                 <td class='position-cell'>{positionMarche}</td>
+                                <td class='type-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.TypeProduit)}</td>
                                 <td class='fabricant-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.NomFabricant)}</td>
                                 <td class='produit-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.NomProduit)}</td>
-                                <td class='type-cell'>{System.Web.HttpUtility.HtmlEncode(fiche.TypeProduit)}</td>
                                 <td class='specification-cell'>{specification}</td>
                             </tr>");
                     }
