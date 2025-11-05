@@ -257,11 +257,12 @@
                                         </td>
                                         <td>
                                             <div class="btn-group">
-                                                <button class="btn btn-outline-secondary btn-sm" 
-                                                        @onclick="() => EditerElement(element)">
-                                                    <span class="oi oi-pencil"></span>
+                                                <button class="btn btn-outline-info btn-sm"
+                                                        @onclick="() => OuvrirPDFElement(element)"
+                                                        title="Gérer les PDFs">
+                                                    <span class="oi oi-document"></span>
                                                 </button>
-                                                <button class="btn btn-outline-danger btn-sm" 
+                                                <button class="btn btn-outline-danger btn-sm"
                                                         @onclick="() => SupprimerElement(element)">
                                                     <span class="oi oi-trash"></span>
                                                 </button>
@@ -309,6 +310,17 @@
                  ZIndex="1060"
                  EnableDragDrop="false" />
 
+<!-- Modal Gestion PDF pour élément existant -->
+<GestionPDFModal IsVisible="@afficherModalPDFElement"
+                 FicheTechnique="@fichePDFEnCours"
+                 PDFs="@pdfsFicheElement"
+                 PDFsChanged="@OnPDFsElementChanged"
+                 OnPDFAdded="@OnPDFElementAjoute"
+                 OnPDFRemoved="@OnPDFElementSupprime"
+                 OnClosed="@FermerModalPDFElement"
+                 ZIndex="1060"
+                 EnableDragDrop="false" />
+
 <!-- Composants Modal Réutilisables -->
 <FabricantModal IsVisible="@afficherModalNouveauFabricant"
                 OnFabricantCreated="@AjouterNouveauFabricantFTC"
@@ -348,6 +360,11 @@
     // Variables pour la modal PDF de nouvelle fiche
     private bool afficherModalPDFNouvelleFiche = false;
     private List<ImportPDF> pdfsFicheNouvelle = new();
+
+    // Variables pour la modal PDF des éléments existants
+    private bool afficherModalPDFElement = false;
+    private FicheTechnique? fichePDFEnCours = null;
+    private List<ImportPDF> pdfsFicheElement = new();
 
     // Variables pour les modals de création fabricant/type produit
     private bool afficherModalNouveauFabricant = false;
@@ -638,11 +655,45 @@
         }
     }
 
-    private void EditerElement(FTElement element)
+    private void OuvrirPDFElement(FTElement element)
     {
-        // TODO: Implémenter l'édition avancée des éléments
-        NotificationService.Notify(Radzen.NotificationSeverity.Info, "À venir", 
-            "Édition avancée des éléments en cours de développement");
+        // Récupérer la fiche technique associée à l'élément
+        fichePDFEnCours = element.FicheTechnique;
+
+        // Éliminer les doublons par ID dès l'ouverture (pattern similaire à FichesTechniques.razor)
+        pdfsFicheElement = element.FicheTechnique?.ImportsPDF?.GroupBy(p => p.Id)
+            .Select(g => g.First()).ToList() ?? new List<ImportPDF>();
+
+        afficherModalPDFElement = true;
+    }
+
+    private void FermerModalPDFElement()
+    {
+        afficherModalPDFElement = false;
+        fichePDFEnCours = null;
+        pdfsFicheElement.Clear();
+    }
+
+    private async Task OnPDFsElementChanged(List<ImportPDF> pdfs)
+    {
+        pdfsFicheElement = pdfs;
+        // Rafraîchir les données du conteneur pour mettre à jour l'affichage
+        await ChargerDonnees();
+        StateHasChanged();
+    }
+
+    private async Task OnPDFElementAjoute(ImportPDF pdf)
+    {
+        // Rafraîchir les données pour refléter le changement
+        await ChargerDonnees();
+        StateHasChanged();
+    }
+
+    private async Task OnPDFElementSupprime(ImportPDF pdf)
+    {
+        // Rafraîchir les données pour refléter le changement
+        await ChargerDonnees();
+        StateHasChanged();
     }
 
     private async Task CalculerNumeroPages()
