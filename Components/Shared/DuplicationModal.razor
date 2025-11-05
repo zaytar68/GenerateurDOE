@@ -70,6 +70,8 @@
                          Items="@chantiers"
                          OnItemSelected="@OnChantierSelected"
                          DisplaySelector="@GetChantierNom"
+                         Value="@chantierSearchText"
+                         OnTextChanged="@OnChantierTextChanged"
                          Placeholder="Rechercher un chantier..."
                          CssClass="@(string.IsNullOrEmpty(ErrorChantier) ? "" : "is-invalid")" />
         </div>
@@ -118,6 +120,7 @@
 
     private List<Chantier> chantiers = new();
     private bool isProcessing = false;
+    private string chantierSearchText = string.Empty;
 
     private string GetChantierNom(Chantier chantier) => chantier?.NomProjet ?? "";
 
@@ -278,6 +281,20 @@
     private void OnChantierSelected(Chantier chantier)
     {
         ChantierSelectionne = chantier;
+        chantierSearchText = GetChantierNom(chantier);
+        StateHasChanged();
+    }
+
+    private void OnChantierTextChanged(string text)
+    {
+        chantierSearchText = text;
+
+        // Si le texte est vidé, réinitialiser la sélection
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            ChantierSelectionne = null;
+        }
+
         StateHasChanged();
     }
 
