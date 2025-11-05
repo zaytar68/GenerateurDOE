@@ -286,80 +286,17 @@
     }
 </div>
 
-<!-- Modal Création Fiche Technique -->
-<div class="modal fade @(afficherModalCreationFiche ? "show d-block" : "")" tabindex="-1" style="@(afficherModalCreationFiche ? "background: rgba(0,0,0,0.5); z-index: 1060;" : "")">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <EditForm Model="nouvelleFiche" OnValidSubmit="SauvegarderNouvelleFiche">
-                <DataAnnotationsValidator />
-                <div class="modal-header">
-                    <h5 class="modal-title">Nouvelle Fiche Technique</h5>
-                    <button type="button" class="btn-close" @onclick="FermerModalCreationFiche"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Nom du Produit *</label>
-                                <InputText class="form-control" @bind-Value="nouvelleFiche.NomProduit" />
-                                <ValidationMessage For="@(() => nouvelleFiche.NomProduit)" />
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Nom du Fabricant *</label>
-                                <div class="input-group">
-                                    <select class="form-select" @bind="nouvelleFiche.NomFabricant">
-                                        <option value="">-- Sélectionner un fabricant --</option>
-                                        @foreach (var fabricant in fabricantsDisponibles)
-                                        {
-                                            <option value="@fabricant">@fabricant</option>
-                                        }
-                                    </select>
-                                    <button type="button" class="btn btn-outline-primary" @onclick="OuvrirModalNouveauFabricant">
-                                        <i class="oi oi-plus"></i>
-                                    </button>
-                                </div>
-                                <ValidationMessage For="@(() => nouvelleFiche.NomFabricant)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Type de Produit *</label>
-                        <div class="input-group">
-                            <select class="form-select" @bind="nouvelleFiche.TypeProduit">
-                                <option value="">-- Sélectionner un type de produit --</option>
-                                @foreach (var typeProduit in typesProduits)
-                                {
-                                    <option value="@typeProduit.Nom">@typeProduit.Nom</option>
-                                }
-                            </select>
-                            <button type="button" class="btn btn-outline-primary" @onclick="OuvrirModalNouveauTypeProduit">
-                                <i class="oi oi-plus"></i>
-                            </button>
-                        </div>
-                        <ValidationMessage For="@(() => nouvelleFiche.TypeProduit)" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <InputTextArea class="form-control" rows="3" @bind-Value="nouvelleFiche.Description" />
-                        <ValidationMessage For="@(() => nouvelleFiche.Description)" />
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="FermerModalCreationFiche">Annuler</button>
-                    <button type="submit" class="btn btn-primary" disabled="@sauvegardeNouvelleFiche">
-                        @if (sauvegardeNouvelleFiche)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                        }
-                        Sauvegarder
-                    </button>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-</div>
+<!-- Composant Modal Création Fiche Technique -->
+<FicheTechniqueEditionModal IsVisible="@afficherModalCreationFiche"
+                            Fiche="@nouvelleFiche"
+                            FabricantsDisponibles="@fabricantsDisponibles"
+                            TypesProduits="@typesProduits"
+                            IsSaving="@sauvegardeNouvelleFiche"
+                            ZIndex="1060"
+                            OnSubmit="@SauvegarderNouvelleFiche"
+                            OnClosed="@FermerModalCreationFiche"
+                            OnOpenFabricantModal="@OuvrirModalNouveauFabricant"
+                            OnOpenTypeProduitModal="@OuvrirModalNouveauTypeProduit" />
 
 <!-- Modal Gestion PDF pour nouvelle fiche -->
 <div class="modal fade @(afficherModalPDFNouvelleFiche ? "show d-block" : "")" tabindex="-1" style="@(afficherModalPDFNouvelleFiche ? "background: rgba(0,0,0,0.5); z-index: 1060;" : "")">

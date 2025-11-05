@@ -1,0 +1,164 @@
+@* Composant modal réutilisable pour la création/édition d'une fiche technique *@
+@using GenerateurDOE.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+<!-- Modal Création/Édition Fiche Technique -->
+<div class="modal fade @(IsVisible ? "show d-block" : "")" tabindex="-1" style="@(IsVisible ? $"background: rgba(0,0,0,0.5); z-index: {ZIndex};" : "")">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <EditForm Model="Fiche" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <div class="modal-header">
+                    <h5 class="modal-title">@(Fiche?.Id == 0 ? "Nouvelle" : "Modifier") Fiche Technique</h5>
+                    <button type="button" class="btn-close" @onclick="HandleClose"></button>
+                </div>
+                <div class="modal-body">
+                    @if (Fiche != null)
+                    {
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nom du Produit *</label>
+                                    <InputText class="form-control" @bind-Value="Fiche.NomProduit" />
+                                    <ValidationMessage For="@(() => Fiche.NomProduit)" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nom du Fabricant *</label>
+                                    <div class="input-group">
+                                        <select class="form-select" @bind="Fiche.NomFabricant">
+                                            <option value="">-- Sélectionner un fabricant --</option>
+                                            @foreach (var fabricant in FabricantsDisponibles)
+                                            {
+                                                <option value="@fabricant">@fabricant</option>
+                                            }
+                                        </select>
+                                        <button type="button" class="btn btn-outline-primary" @onclick="HandleOpenFabricantModal">
+                                            <i class="oi oi-plus"></i>
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="@(() => Fiche.NomFabricant)" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Type de Produit *</label>
+                            <div class="input-group">
+                                <select class="form-select" @bind="Fiche.TypeProduit">
+                                    <option value="">-- Sélectionner un type de produit --</option>
+                                    @foreach (var typeProduit in TypesProduits)
+                                    {
+                                        <option value="@typeProduit.Nom">@typeProduit.Nom</option>
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" @onclick="HandleOpenTypeProduitModal">
+                                    <i class="oi oi-plus"></i>
+                                </button>
+                            </div>
+                            <ValidationMessage For="@(() => Fiche.TypeProduit)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="Fiche.Description" />
+                            <ValidationMessage For="@(() => Fiche.Description)" />
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HandleClose">Annuler</button>
+                    <button type="submit" class="btn btn-primary" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Sauvegarder
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Indique si la modal est visible
+    /// </summary>
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    /// <summary>
+    /// La fiche technique à éditer
+    /// </summary>
+    [Parameter]
+    public FicheTechnique? Fiche { get; set; }
+
+    /// <summary>
+    /// Liste des fabricants disponibles pour la sélection
+    /// </summary>
+    [Parameter]
+    public List<string> FabricantsDisponibles { get; set; } = new();
+
+    /// <summary>
+    /// Liste des types de produits disponibles pour la sélection
+    /// </summary>
+    [Parameter]
+    public List<TypeProduit> TypesProduits { get; set; } = new();
+
+    /// <summary>
+    /// Indique si une opération de sauvegarde est en cours
+    /// </summary>
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    /// <summary>
+    /// Z-index pour la modal (permet de gérer les modals imbriquées)
+    /// Par défaut 1050, peut être augmenté pour les modals enfants
+    /// </summary>
+    [Parameter]
+    public int ZIndex { get; set; } = 1050;
+
+    /// <summary>
+    /// Callback appelé lors de la soumission du formulaire
+    /// </summary>
+    [Parameter]
+    public EventCallback OnSubmit { get; set; }
+
+    /// <summary>
+    /// Callback appelé lors de la fermeture de la modal
+    /// </summary>
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    /// <summary>
+    /// Callback appelé pour ouvrir la modal de création de fabricant
+    /// </summary>
+    [Parameter]
+    public EventCallback OnOpenFabricantModal { get; set; }
+
+    /// <summary>
+    /// Callback appelé pour ouvrir la modal de création de type produit
+    /// </summary>
+    [Parameter]
+    public EventCallback OnOpenTypeProduitModal { get; set; }
+
+    private async Task HandleSubmit()
+    {
+        await OnSubmit.InvokeAsync();
+    }
+
+    private async Task HandleClose()
+    {
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task HandleOpenFabricantModal()
+    {
+        await OnOpenFabricantModal.InvokeAsync();
+    }
+
+    private async Task HandleOpenTypeProduitModal()
+    {
+        await OnOpenTypeProduitModal.InvokeAsync();
+    }
+}
