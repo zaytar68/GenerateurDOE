@@ -8,7 +8,7 @@ public class FTConteneur : IDocumentSection
     public int Id { get; set; }
     
     [StringLength(200, ErrorMessage = "Le titre ne peut pas dépasser 200 caractères")]
-    public string Titre { get; set; } = "Fiches Techniques";
+    public string Titre { get; set; } = "Documentation technique";
     
     [Required(ErrorMessage = "L'ordre est requis")]
     [Range(1, int.MaxValue, ErrorMessage = "L'ordre doit être un nombre positif")]

@@ -61,10 +61,24 @@
         <!-- Section d'ajout de nouvelle fiche technique -->
         <div class="card mb-4">
             <div class="card-header">
-                <h6 class="mb-0">
-                    <span class="oi oi-plus" aria-hidden="true"></span>
-                    Ajouter une Fiche Technique
-                </h6>
+                <div class="row justify-content-between">
+                    <div class="col-4">
+                        <h6 class="mb-0">
+                            <span class="oi oi-plus" aria-hidden="true"></span>
+                            Ajouter une Fiche Technique
+                        </h6>
+                    </div>
+                    <div class="col-2 align-self-end">
+                        <button type="button" class="btn btn-outline-success"
+                                    @onclick="OuvrirModalCreationFiche"
+                                    title="Créer une nouvelle fiche technique">
+                                <i class="oi oi-plus"></i>
+                                <h6 class="mb-0 d-inline-block ms-1" color="success">
+                                    Créer une nouvelle Fiche
+                                </h6>
+                            </button>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -90,25 +104,20 @@
                                     </div>
                                 </ItemTemplate>
                             </AutoComplete>
-                            <button type="button" class="btn btn-outline-success"
-                                    @onclick="OuvrirModalCreationFiche"
-                                    title="Créer une nouvelle fiche technique">
-                                <i class="oi oi-plus"></i>
-                            </button>
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Position Marché (optionnel)</label>
+                        <label class="form-label">Position Marché (opt.)</label>
                         <input type="text" class="form-control" @bind="nouvellePositionMarche"
                                placeholder="ex: 1.1" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Commentaire (optionnel)</label>
+                        <label class="form-label">Commentaire (opt.)</label>
                         <input type="text" class="form-control" @bind="nouveauCommentaire"
                                placeholder="Commentaire..." maxlength="500" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Documents PDF (optionnel)</label>
+                        <label class="form-label">Documents PDF à insérer</label>
                         @if (pdfsByCategory.Any())
                         {
                             <div class="pdf-selection-container border rounded p-3" style="max-height: 200px; overflow-y: auto;">
@@ -153,6 +162,7 @@
                             </div>
                         }
                     </div>
+                    <!-- Bouton ajouter à la liste -->
                     <div class="col-md-2 d-flex align-items-end">
                         <button class="btn btn-primary w-100" @onclick="AjouterFicheTechnique"
                                 disabled="@(selectedFicheTechniqueId == 0 || isAdding)">
