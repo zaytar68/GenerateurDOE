@@ -1,0 +1,459 @@
+@* Composant modal réutilisable pour la gestion des fichiers PDF d'une fiche technique *@
+@using GenerateurDOE.Models
+@using GenerateurDOE.Services.Interfaces
+@inject IFicheTechniqueService FicheTechniqueService
+@inject ITypeDocumentImportService TypeDocumentImportService
+@inject IConfigurationService ConfigurationService
+@inject IJSRuntime JSRuntime
+@inject Radzen.NotificationService NotificationService
+
+<!-- Modal Gestion des PDF -->
+<div class="modal fade @(IsVisible ? "show d-block" : "")" tabindex="-1" style="@(IsVisible ? $"background: rgba(0,0,0,0.5); z-index: {ZIndex};" : "")">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    @(Titre ?? $"Gestion des PDF - {FicheTechnique?.NomProduit}")
+                </h5>
+                <button type="button" class="btn-close" @onclick="FermerModal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Zone d'upload -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="oi oi-cloud-upload"></i> Ajouter des fichiers PDF</h6>
+                    </div>
+                    <div class="card-body">
+                        @if (EnableDragDrop)
+                        {
+                            <div @ref="dropZoneElement"
+                                 class="upload-zone border border-2 border-dashed p-4 text-center @dropZoneClass"
+                                 style="min-height: 150px; transition: all 0.3s ease;"
+                                 @ondragenter="OnDragEnter"
+                                 @ondragleave="OnDragLeave"
+                                 @ondragover:preventDefault="true"
+                                 @ondrop="OnDrop"
+                                 @ondrop:preventDefault="true">
+                                <InputFile OnChange="OnFileSelected" multiple accept=".pdf" class="d-none" id="@fileInputId" />
+                                <label for="@fileInputId" class="d-block" style="cursor: pointer;">
+                                    @if (uploadEnCours)
+                                    {
+                                        <div class="spinner-border text-primary mb-3"></div>
+                                        <p class="mb-0 text-primary">Upload en cours...</p>
+                                    }
+                                    else
+                                    {
+                                        <i class="oi oi-cloud-upload display-4 text-muted mb-3"></i>
+                                        <p class="mb-2"><strong>Cliquez ici ou glissez-déposez vos fichiers PDF</strong></p>
+                                        <p class="text-muted mb-0">Taille maximum : @tailleMaxFichierLabel par fichier</p>
+                                    }
+                                </label>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="upload-zone border border-2 border-dashed p-4 text-center"
+                                 style="min-height: 150px;">
+                                <InputFile OnChange="OnFileSelected" multiple accept=".pdf" class="d-none" id="@fileInputId" />
+                                <label for="@fileInputId" class="d-block" style="cursor: pointer;">
+                                    @if (uploadEnCours)
+                                    {
+                                        <div class="spinner-border text-primary mb-3"></div>
+                                        <p class="mb-0 text-primary">Upload en cours...</p>
+                                    }
+                                    else
+                                    {
+                                        <i class="oi oi-cloud-upload display-4 text-muted mb-3"></i>
+                                        <p class="mb-2"><strong>Cliquez ici pour sélectionner vos fichiers PDF</strong></p>
+                                        <p class="text-muted mb-0">Taille maximum : @tailleMaxFichierLabel par fichier</p>
+                                    }
+                                </label>
+                            </div>
+                        }
+                        <small class="text-muted">
+                            Seuls les fichiers PDF sont acceptés. Vous pourrez définir le type de document après l'upload.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Liste des PDF existants -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="oi oi-document"></i>
+                            Documents PDF (@PDFs.Count)
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        @if (chargementPDF)
+                        {
+                            <div class="text-center">
+                                <div class="spinner-border"></div>
+                            </div>
+                        }
+                        else if (!PDFs.Any())
+                        {
+                            <div class="text-center text-muted py-4">
+                                <i class="oi oi-document display-4"></i>
+                                <p class="mt-3">Aucun document PDF associé à cette fiche.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                @foreach (var pdf in PDFs.OrderBy(p => p.TypeDocumentImport?.Nom ?? "").ThenBy(p => p.NomFichierOriginal))
+                                {
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="card h-100 border">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-start">
+                                                    <div class="flex-shrink-0 me-3">
+                                                        <i class="oi oi-file text-danger" style="font-size: 2em;"></i>
+                                                    </div>
+                                                    <div class="flex-grow-1 min-width-0">
+                                                        <h6 class="card-title text-truncate mb-1" title="@pdf.NomFichierOriginal">
+                                                            @pdf.NomFichierOriginal
+                                                        </h6>
+                                                        <div class="mb-2">
+                                                            <select class="form-select form-select-sm" @bind="pdf.TypeDocumentImportId">
+                                                                @foreach (var typeDocument in typesDocuments)
+                                                                {
+                                                                    <option value="@typeDocument.Id">@typeDocument.Nom</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <small class="text-muted d-block">
+                                                            @FormatTailleFichier(pdf.TailleFichier)
+                                                        </small>
+                                                        <small class="text-muted d-block">
+                                                            @pdf.DateImport.ToString("dd/MM/yyyy HH:mm")
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card-footer p-2">
+                                                <div class="d-flex justify-content-between">
+                                                    <button class="btn btn-outline-primary btn-sm"
+                                                            @onclick="() => TelechargerPDF(pdf)">
+                                                        <i class="oi oi-data-transfer-download"></i> Ouvrir
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm"
+                                                            @onclick="() => SupprimerPDF(pdf)">
+                                                        <i class="oi oi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="FermerModal">
+                    Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Indique si la modal est visible
+    /// </summary>
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    /// <summary>
+    /// La fiche technique associée (DOIT avoir un ID valide)
+    /// </summary>
+    [Parameter, EditorRequired]
+    public FicheTechnique? FicheTechnique { get; set; }
+
+    /// <summary>
+    /// Liste des PDFs actuels (two-way binding)
+    /// </summary>
+    [Parameter]
+    public List<ImportPDF> PDFs { get; set; } = new();
+
+    /// <summary>
+    /// Callback appelé lorsque la liste des PDFs change
+    /// </summary>
+    [Parameter]
+    public EventCallback<List<ImportPDF>> PDFsChanged { get; set; }
+
+    /// <summary>
+    /// Callback appelé quand un PDF est ajouté
+    /// </summary>
+    [Parameter]
+    public EventCallback<ImportPDF> OnPDFAdded { get; set; }
+
+    /// <summary>
+    /// Callback appelé quand un PDF est supprimé
+    /// </summary>
+    [Parameter]
+    public EventCallback<ImportPDF> OnPDFRemoved { get; set; }
+
+    /// <summary>
+    /// Callback appelé à la fermeture de la modal
+    /// </summary>
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    /// <summary>
+    /// Titre personnalisé de la modal
+    /// </summary>
+    [Parameter]
+    public string? Titre { get; set; }
+
+    /// <summary>
+    /// Z-index pour modal imbriquée (par défaut 1050)
+    /// </summary>
+    [Parameter]
+    public int ZIndex { get; set; } = 1050;
+
+    /// <summary>
+    /// Activer le drag & drop (false par défaut car complexe)
+    /// </summary>
+    [Parameter]
+    public bool EnableDragDrop { get; set; } = false;
+
+    /// <summary>
+    /// ID unique pour drag & drop si activé
+    /// </summary>
+    [Parameter]
+    public string? DropZoneId { get; set; }
+
+    // ===== ÉTAT INTERNE =====
+    private bool uploadEnCours = false;
+    private bool chargementPDF = false;
+    private ElementReference dropZoneElement;
+    private string dropZoneClass = "";
+    private long tailleMaxFichierBytes = 10 * 1024 * 1024;
+    private string tailleMaxFichierLabel = "10MB";
+    private List<TypeDocumentImport> typesDocuments = new();
+    private string dropZoneId = "";
+    private string fileInputId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Générer un ID unique si non fourni
+        dropZoneId = DropZoneId ?? Guid.NewGuid().ToString();
+        fileInputId = $"fileInput_{dropZoneId}";
+
+        await ChargerConfiguration();
+        await ChargerTypesDocuments();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && EnableDragDrop)
+        {
+            try
+            {
+                // Initialiser le drag & drop JavaScript après le premier rendu
+                await JSRuntime.InvokeVoidAsync("fileDropHandler.initialize", dropZoneElement, fileInputId);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(
+                    Radzen.NotificationSeverity.Warning,
+                    "Drag & Drop",
+                    "Le glisser-déposer n'est pas disponible. Utilisez le bouton d'upload."
+                );
+                await JSRuntime.InvokeVoidAsync("console.error", $"[GestionPDFModal] Erreur initialisation drag & drop: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task ChargerConfiguration()
+    {
+        try
+        {
+            var appSettings = await ConfigurationService.GetAppSettingsAsync();
+            tailleMaxFichierBytes = ConfigurationService.ParseTailleMaxFichierToBytes(appSettings.TailleMaxFichierPDF);
+            tailleMaxFichierLabel = appSettings.TailleMaxFichierPDF;
+        }
+        catch
+        {
+            // Garder les valeurs par défaut en cas d'erreur
+            tailleMaxFichierBytes = 10 * 1024 * 1024;
+            tailleMaxFichierLabel = "10MB";
+        }
+    }
+
+    private async Task ChargerTypesDocuments()
+    {
+        typesDocuments = (await TypeDocumentImportService.GetActiveAsync()).ToList();
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        if (FicheTechnique == null || FicheTechnique.Id == 0)
+        {
+            NotificationService.Notify(
+                Radzen.NotificationSeverity.Error,
+                "Erreur",
+                "Aucune fiche technique associée"
+            );
+            return;
+        }
+
+        uploadEnCours = true;
+        var filesUploaded = 0;
+        var filesIgnored = 0;
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles())
+            {
+                // Validation taille
+                if (file.Size > tailleMaxFichierBytes)
+                {
+                    NotificationService.Notify(
+                        Radzen.NotificationSeverity.Warning,
+                        "Fichier trop volumineux",
+                        $"{file.Name} dépasse {tailleMaxFichierLabel}"
+                    );
+                    filesIgnored++;
+                    continue;
+                }
+
+                // Validation type
+                if (file.ContentType != "application/pdf")
+                {
+                    NotificationService.Notify(
+                        Radzen.NotificationSeverity.Warning,
+                        "Type invalide",
+                        $"{file.Name} n'est pas un PDF"
+                    );
+                    filesIgnored++;
+                    continue;
+                }
+
+                try
+                {
+                    // Upload du fichier
+                    using var stream = file.OpenReadStream(tailleMaxFichierBytes);
+                    var cheminFichier = await FicheTechniqueService.SavePDFFileAsync(stream, file.Name);
+
+                    // Utiliser le premier type de document disponible par défaut
+                    var typeParDefaut = typesDocuments.FirstOrDefault();
+
+                    var nouveauPDF = new ImportPDF
+                    {
+                        CheminFichier = cheminFichier,
+                        NomFichierOriginal = file.Name,
+                        TypeDocumentImportId = typeParDefaut?.Id ?? 1,
+                        TailleFichier = file.Size
+                    };
+
+                    var pdfCree = await FicheTechniqueService.AddPDFAsync(FicheTechnique.Id, nouveauPDF);
+
+                    // Ajouter à la liste locale
+                    PDFs.Add(pdfCree);
+                    filesUploaded++;
+
+                    // Notifier le parent via callbacks
+                    await OnPDFAdded.InvokeAsync(pdfCree);
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(
+                        Radzen.NotificationSeverity.Error,
+                        "Erreur d'upload",
+                        $"Impossible d'uploader {file.Name}: {ex.Message}"
+                    );
+                    filesIgnored++;
+                }
+            }
+
+            // Notifier le changement de la liste
+            await PDFsChanged.InvokeAsync(PDFs);
+
+            // Message de succès si au moins un fichier uploadé
+            if (filesUploaded > 0)
+            {
+                NotificationService.Notify(
+                    Radzen.NotificationSeverity.Success,
+                    "Succès",
+                    $"{filesUploaded} fichier(s) ajouté(s) avec succès"
+                );
+            }
+        }
+        finally
+        {
+            uploadEnCours = false;
+        }
+    }
+
+    private async Task SupprimerPDF(ImportPDF pdf)
+    {
+        try
+        {
+            await FicheTechniqueService.RemovePDFAsync(pdf.Id);
+
+            // Retirer de la liste locale
+            PDFs.Remove(pdf);
+
+            // Notifier le parent via callbacks
+            await OnPDFRemoved.InvokeAsync(pdf);
+            await PDFsChanged.InvokeAsync(PDFs);
+
+            NotificationService.Notify(
+                Radzen.NotificationSeverity.Success,
+                "Supprimé",
+                "Document supprimé avec succès"
+            );
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(
+                Radzen.NotificationSeverity.Error,
+                "Erreur",
+                $"Impossible de supprimer: {ex.Message}"
+            );
+        }
+    }
+
+    private async Task TelechargerPDF(ImportPDF pdf)
+    {
+        // Ouvrir le PDF dans un nouvel onglet/fenêtre
+        await JSRuntime.InvokeVoidAsync("open", $"api/files/{pdf.Id}", "_blank");
+    }
+
+    private async Task FermerModal()
+    {
+        await OnClosed.InvokeAsync();
+    }
+
+    private string FormatTailleFichier(long taille)
+    {
+        if (taille < 1024) return $"{taille} B";
+        if (taille < 1024 * 1024) return $"{taille / 1024:F1} KB";
+        if (taille < 1024 * 1024 * 1024) return $"{taille / (1024 * 1024):F1} MB";
+        return $"{taille / (1024 * 1024 * 1024):F1} GB";
+    }
+
+    // ===== DRAG & DROP HANDLERS =====
+    private void OnDragEnter(DragEventArgs e)
+    {
+        dropZoneClass = "drag-hover";
+    }
+
+    private void OnDragLeave(DragEventArgs e)
+    {
+        dropZoneClass = "";
+    }
+
+    private void OnDrop(DragEventArgs e)
+    {
+        // Le JavaScript gère le transfert des fichiers vers InputFile
+        // OnFileSelected sera appelé automatiquement via l'événement 'change'
+        dropZoneClass = "";
+    }
+}

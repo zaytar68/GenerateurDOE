@@ -299,95 +299,14 @@
                             OnOpenTypeProduitModal="@OuvrirModalNouveauTypeProduit" />
 
 <!-- Modal Gestion PDF pour nouvelle fiche -->
-<div class="modal fade @(afficherModalPDFNouvelleFiche ? "show d-block" : "")" tabindex="-1" style="@(afficherModalPDFNouvelleFiche ? "background: rgba(0,0,0,0.5); z-index: 1060;" : "")">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    Ajouter des PDF - @(ficheEnCoursCreation?.NomProduit)
-                </h5>
-                <button type="button" class="btn-close" @onclick="FermerModalPDFNouvelleFiche"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="oi oi-info"></i>
-                    Ajoutez des fichiers PDF pour cette nouvelle fiche technique. Vous pourrez également les ajouter plus tard.
-                </div>
-
-                <!-- Zone d'upload -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h6 class="mb-0"><i class="oi oi-cloud-upload"></i> Ajouter des fichiers PDF</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="upload-zone border border-2 border-dashed p-4 text-center"
-                             style="min-height: 150px;">
-                            <InputFile OnChange="OnFileSelectedNouvelleFiche" multiple accept=".pdf" class="d-none" id="fileInputNouvelleFiche" />
-                            <label for="fileInputNouvelleFiche" class="d-block" style="cursor: pointer;">
-                                @if (uploadEnCoursNouvelleFiche)
-                                {
-                                    <div class="spinner-border text-primary mb-3"></div>
-                                    <p class="mb-0 text-primary">Upload en cours...</p>
-                                }
-                                else
-                                {
-                                    <i class="oi oi-cloud-upload display-4 text-muted mb-3"></i>
-                                    <p class="mb-2"><strong>Cliquez ici ou glissez-déposez vos fichiers PDF</strong></p>
-                                    <p class="text-muted mb-0">Taille maximum : @tailleMaxFichierLabel par fichier</p>
-                                }
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Liste des PDF ajoutés -->
-                @if (pdfsFicheNouvelle.Any())
-                {
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="oi oi-document"></i>
-                                Documents PDF ajoutés (@pdfsFicheNouvelle.Count)
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-3">
-                                @foreach (var pdf in pdfsFicheNouvelle)
-                                {
-                                    <div class="col-md-6 col-lg-4">
-                                        <div class="card h-100 border">
-                                            <div class="card-body p-3">
-                                                <h6 class="card-title text-truncate">@pdf.NomFichierOriginal</h6>
-                                                <select class="form-select form-select-sm mb-2" @bind="pdf.TypeDocumentImportId">
-                                                    @foreach (var typeDoc in typesDocuments)
-                                                    {
-                                                        <option value="@typeDoc.Id">@typeDoc.Nom</option>
-                                                    }
-                                                </select>
-                                                <small class="text-muted">@FormatTailleFichier(pdf.TailleFichier)</small>
-                                            </div>
-                                            <div class="card-footer p-2">
-                                                <button class="btn btn-outline-danger btn-sm w-100"
-                                                        @onclick="() => SupprimerPDFNouvelleFiche(pdf)">
-                                                    <i class="oi oi-trash"></i> Supprimer
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="FermerModalPDFNouvelleFiche">
-                    @(pdfsFicheNouvelle.Any() ? "Terminer" : "Passer cette étape")
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<GestionPDFModal IsVisible="@afficherModalPDFNouvelleFiche"
+                 FicheTechnique="@ficheEnCoursCreation"
+                 PDFs="@pdfsFicheNouvelle"
+                 PDFsChanged="@((pdfs) => { pdfsFicheNouvelle = pdfs; StateHasChanged(); })"
+                 OnClosed="@FermerModalPDFNouvelleFiche"
+                 Titre="@($"Ajouter des PDF - {ficheEnCoursCreation?.NomProduit}")"
+                 ZIndex="1060"
+                 EnableDragDrop="false" />
 
 <!-- Composants Modal Réutilisables -->
 <FabricantModal IsVisible="@afficherModalNouveauFabricant"
@@ -427,11 +346,7 @@
 
     // Variables pour la modal PDF de nouvelle fiche
     private bool afficherModalPDFNouvelleFiche = false;
-    private bool uploadEnCoursNouvelleFiche = false;
     private List<ImportPDF> pdfsFicheNouvelle = new();
-    private List<TypeDocumentImport> typesDocuments = new();
-    private string tailleMaxFichierLabel = "10MB";
-    private long tailleMaxFichierBytes = 10 * 1024 * 1024;
 
     // Variables pour les modals de création fabricant/type produit
     private bool afficherModalNouveauFabricant = false;
@@ -501,13 +416,7 @@
                 .OrderBy(f => f)
                 .ToList();
 
-            // Charger les types de documents
-            typesDocuments = (await typeDocumentImportService.GetAllAsync().ConfigureAwait(false)).ToList();
-
-            // Charger la config pour taille max fichier
-            var config = await configurationService.GetAppSettingsAsync().ConfigureAwait(false);
-            tailleMaxFichierLabel = config.TailleMaxFichierPDF ?? "10MB";
-            tailleMaxFichierBytes = configurationService.ParseTailleMaxFichierToBytes(tailleMaxFichierLabel);
+            // Les types de documents et la config sont maintenant gérés par GestionPDFModal
         }
         catch (Exception ex)
         {
@@ -955,81 +864,6 @@
         ficheEnCoursCreation = null;
     }
 
-    private async Task OnFileSelectedNouvelleFiche(InputFileChangeEventArgs e)
-    {
-        if (ficheEnCoursCreation == null) return;
-
-        uploadEnCoursNouvelleFiche = true;
-
-        try
-        {
-            foreach (var file in e.GetMultipleFiles())
-            {
-                // Vérifier la taille du fichier
-                if (file.Size > tailleMaxFichierBytes)
-                {
-                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Fichier trop volumineux",
-                        $"{file.Name} dépasse la taille maximale autorisée ({tailleMaxFichierLabel})");
-                    continue;
-                }
-
-                // Vérifier le type de fichier
-                if (!file.ContentType.Contains("pdf") && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                {
-                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Type de fichier non supporté",
-                        $"{file.Name} n'est pas un fichier PDF");
-                    continue;
-                }
-
-                // Upload du fichier
-                using var stream = file.OpenReadStream(tailleMaxFichierBytes);
-                var cheminFichier = await ficheTechniqueService.SavePDFFileAsync(stream, file.Name).ConfigureAwait(false);
-
-                var nouveauPDF = new ImportPDF
-                {
-                    CheminFichier = cheminFichier,
-                    NomFichierOriginal = file.Name,
-                    TypeDocumentImportId = typesDocuments.FirstOrDefault()?.Id ?? 1,
-                    TailleFichier = file.Size
-                };
-
-                var pdfCree = await ficheTechniqueService.AddPDFAsync(ficheEnCoursCreation.Id, nouveauPDF).ConfigureAwait(false);
-                pdfsFicheNouvelle.Add(pdfCree);
-            }
-
-            if (pdfsFicheNouvelle.Any())
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Succès",
-                    $"{pdfsFicheNouvelle.Count} fichier(s) PDF ajouté(s)");
-            }
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                $"Erreur lors de l'upload: {ex.Message}");
-        }
-        finally
-        {
-            uploadEnCoursNouvelleFiche = false;
-        }
-    }
-
-    private void SupprimerPDFNouvelleFiche(ImportPDF pdf)
-    {
-        pdfsFicheNouvelle.Remove(pdf);
-        NotificationService.Notify(Radzen.NotificationSeverity.Info, "Supprimé",
-            $"{pdf.NomFichierOriginal} a été retiré de la liste");
-    }
-
-    private string FormatTailleFichier(long taille)
-    {
-        if (taille < 1024)
-            return $"{taille} B";
-        else if (taille < 1024 * 1024)
-            return $"{taille / 1024.0:F2} KB";
-        else
-            return $"{taille / (1024.0 * 1024.0):F2} MB";
-    }
 
     // ========== Méthodes pour les modals fabricant/type produit ==========
 
