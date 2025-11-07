@@ -3,6 +3,8 @@
 @using GenerateurDOE.Services.Interfaces
 @inject ITypeProduitService TypeProduitService
 @inject IJSRuntime JSRuntime
+@inject Radzen.DialogService DialogService
+@inject ILogger<TypeProduitModal> Logger
 
 <!-- Modal Nouveau Type de Produit -->
 <div class="modal fade @(IsVisible ? "show d-block" : "")" tabindex="-1" style="@(IsVisible ? "background: rgba(0,0,0,0.5);" : "")">
@@ -106,16 +108,17 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Erreur lors de la création du type de produit: {ex.Message}");
-            // En cas d'erreur, créer un objet temporaire avec le nom saisi
-            var typeTemporaire = new TypeProduit
-            {
-                Nom = typeProduitNom,
-                Description = typeProduitDescription,
-                IsActive = true
-            };
-            await OnTypeProduitCreated.InvokeAsync(typeTemporaire);
-            ResetForm();
+            Logger.LogError(ex, "Erreur lors de la création du type de produit: {NomType}", typeProduitNom);
+
+            // ✅ FIX : Utiliser Radzen DialogService pour notification utilisateur
+            await DialogService.Alert(
+                $"Erreur lors de la création : {ex.Message}",
+                "Échec de création",
+                new Radzen.AlertOptions { OkButtonText = "OK" }
+            );
+
+            // ❌ NE PAS créer d'objet temporaire - laisser l'utilisateur réessayer
+            // La modal reste ouverte pour permettre une nouvelle tentative
         }
         finally
         {

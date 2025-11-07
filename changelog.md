@@ -5,6 +5,44 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2025-11-07
+
+### 🐛 **Correction Bug Ajout Catégorie Produit**
+- **Problème résolu** : Le programme plantait lors de l'ajout d'une catégorie de produit depuis la fenêtre modale de création d'une fiche technique
+- **Cause racine** : Entity Framework Core retournait des entités détachées (detached entities) causant des erreurs de tracking lors de l'assignation
+
+### 🔧 **Corrections Techniques**
+
+#### **Fix #1 - TypeProduitService.CreateAsync()**
+- Rechargement de l'entité avec un nouveau `DbContext` après création
+- Utilisation de `.AsNoTracking()` pour éviter le tracking d'entités déjà disposées
+- **Impact** : Les nouvelles catégories sont maintenant correctement retournées à l'interface
+
+#### **Fix #2 - TypeProduitService.GetActiveAsync()**
+- Ajout de `.AsNoTracking()` dans la requête de cache L1
+- **Impact** : Les entités en cache ne sont plus trackées inutilement par EF Core
+
+#### **Fix #3 - TypeProduit.cs**
+- Suppression du mot-clé `virtual` sur la propriété `FichesTechniques`
+- **Impact** : Désactivation des lazy loading proxies qui causaient des problèmes sur entités détachées
+
+#### **Fix #4 - TypeProduitModal.razor**
+- Remplacement de `console.error()` par `DialogService.Alert()` (Radzen)
+- Suppression de la création d'objet temporaire avec `Id=0` en cas d'erreur
+- Ajout de logging avec `ILogger<TypeProduitModal>`
+- **Impact** : L'utilisateur voit maintenant un message d'erreur clair au lieu d'un crash
+
+#### **Fix #5 - FichesTechniques.razor**
+- Changement de `AjouterNouveauTypeProduit()` de `void` vers `async Task`
+- Remplacement de la gestion manuelle de liste par un rechargement complet via `ChargerDonnees()`
+- **Impact** : Synchronisation garantie entre l'UI et la base de données
+
+### ✅ **Résultat**
+- ✅ Ajout de catégories fonctionnel sans crash
+- ✅ Messages d'erreur clairs pour l'utilisateur
+- ✅ Architecture EF Core robuste avec gestion correcte des entités
+- ✅ 0 erreurs de compilation, 34 warnings existants non liés
+
 ## [2.3.0] - 2025-11-05
 
 ### ✨ **Amélioration Affichage Table des Matières**

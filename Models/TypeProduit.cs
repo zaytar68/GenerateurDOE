@@ -17,6 +17,6 @@ public class TypeProduit
     
     public DateTime DateCreation { get; set; } = DateTime.Now;
     public DateTime DateModification { get; set; } = DateTime.Now;
-    
-    public virtual ICollection<FicheTechnique> FichesTechniques { get; set; } = new List<FicheTechnique>();
+
+    public ICollection<FicheTechnique> FichesTechniques { get; set; } = new List<FicheTechnique>();
 }

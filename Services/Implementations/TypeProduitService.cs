@@ -37,6 +37,7 @@ public class TypeProduitService : ITypeProduitService
         {
             using var context = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
             return await context.TypesProduits
+                .AsNoTracking()
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Nom)
                 .ToListAsync().ConfigureAwait(false);
@@ -65,7 +66,14 @@ public class TypeProduitService : ITypeProduitService
         // ⚡ Invalidation cache après création
         _cache.RemoveByPrefix(TYPES_PREFIX);
 
-        return typeProduit;
+        // ✅ FIX : Recharger l'entité avec un nouveau contexte pour éviter detached state
+        using var reloadContext = await _contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        var reloadedEntity = await reloadContext.TypesProduits
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == typeProduit.Id)
+            .ConfigureAwait(false);
+
+        return reloadedEntity ?? typeProduit;
     }
 
     public async Task<bool> UpdateAsync(TypeProduit typeProduit)

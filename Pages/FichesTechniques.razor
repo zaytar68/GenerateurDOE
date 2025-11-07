@@ -601,19 +601,13 @@
         afficherModalNouveauTypeProduit = false;
     }
 
-    private void AjouterNouveauTypeProduit(TypeProduit typeProduit)
+    private async Task AjouterNouveauTypeProduit(TypeProduit typeProduit)
     {
         if (typeProduit == null)
             return;
 
-        // Vérifier si le type existe déjà dans la liste locale
-        var typeExistant = typesProduits.FirstOrDefault(t => t.Id == typeProduit.Id);
-        if (typeExistant == null)
-        {
-            // Ajouter à la liste locale
-            typesProduits.Add(typeProduit);
-            typesProduits.Sort((a, b) => a.Nom.CompareTo(b.Nom));
-        }
+        // ✅ FIX : Recharger toutes les données depuis la base pour éviter les problèmes de tracking
+        await ChargerDonnees();
 
         // Assigner à la fiche en cours
         ficheEnCours.TypeProduit = typeProduit.Nom;
