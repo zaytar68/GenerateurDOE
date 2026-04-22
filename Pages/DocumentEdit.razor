@@ -119,14 +119,3 @@
         </DocumentEditTabs>
     }
 </div>
-
-<script>
-    window.downloadFile = function (fileName, base64String, mimeType = 'application/pdf') {
-        const link = document.createElement('a');
-        link.href = 'data:' + mimeType + ';base64,' + base64String;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-</script>

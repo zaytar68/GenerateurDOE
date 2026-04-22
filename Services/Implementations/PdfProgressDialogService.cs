@@ -22,55 +22,23 @@ public class PdfProgressDialogService : IPdfProgressDialogService
     {
         try
         {
-            // Démarrer la génération en arrière-plan AVANT d'ouvrir la modal
-            _ = Task.Run(async () =>
+            // 🚀 Démarrer la génération PDF EN ARRIÈRE-PLAN avant d'ouvrir la modal
+            // La modal va suivre la progression via le ProgressService
+            var generationTask = Task.Run(async () =>
             {
                 try
                 {
-                    // Utilisation du service factorisé pour la génération AVEC mise à jour de progression
-                    var result = await downloadService.PrepareDocumentForDownloadAsync(documentId);
-
-                    if (result.Success)
-                    {
-                        // Téléchargement automatique du fichier via JavaScript
-                        var base64 = Convert.ToBase64String(result.FileBytes);
-
-                        try
-                        {
-                            // Téléchargement direct via JavaScript (ne nécessite pas InvokeAsync car déjà sur un thread séparé)
-                            await jsRuntime.InvokeVoidAsync("downloadFile", result.FileName, base64, "application/pdf");
-
-                            // Notification de succès
-                            notificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement",
-                                $"PDF {result.FileName} généré avec succès");
-                        }
-                        catch (Exception jsEx)
-                        {
-                            // Fallback : seulement notification si le JS échoue
-                            notificationService.Notify(Radzen.NotificationSeverity.Warning, "Génération réussie",
-                                $"PDF {result.FileName} généré mais téléchargement automatique échoué");
-                            Console.WriteLine($"[DEBUG] JavaScript download error: {jsEx.Message}");
-                        }
-                    }
-                    else
-                    {
-                        notificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur", result.ErrorMessage);
-                    }
+                    // Génération du PDF avec suivi de progression
+                    await downloadService.PrepareDocumentForDownloadAsync(documentId);
                 }
                 catch (Exception ex)
                 {
-                    // Masquer les erreurs de concurrence DbContext (temporaire)
-                    if (!ex.Message.Contains("A second operation was started on this context") &&
-                        !ex.Message.Contains("context instance"))
-                    {
-                        notificationService.Notify(Radzen.NotificationSeverity.Error, "Erreur",
-                            $"Erreur lors de la génération: {ex.Message}");
-                    }
-                    Console.WriteLine($"[DEBUG] PdfProgressDialogService error (masqué): {ex.Message}");
+                    Console.WriteLine($"[ERROR] Erreur génération PDF: {ex.Message}");
                 }
             });
 
-            // Ouvrir la modal de progression PDF APRÈS avoir démarré la génération
+            // ⏱️ Ouvrir la modal de progression IMMÉDIATEMENT
+            // La modal va afficher la progression en temps réel via polling
             var modalResult = await dialogService.OpenAsync<PdfProgressModal>("Génération PDF",
                 new Dictionary<string, object>
                 {
@@ -86,6 +54,29 @@ public class PdfProgressDialogService : IPdfProgressDialogService
                     CloseDialogOnOverlayClick = false,
                     CloseDialogOnEsc = false
                 });
+
+            // Attendre que la génération soit terminée (au cas où la modal se ferme avant)
+            await generationTask;
+
+            // 📥 Déclencher le téléchargement via l'API après la fermeture de la modal
+            try
+            {
+                // Utiliser l'API de téléchargement pour éviter les limitations de taille
+                var downloadUrl = $"/api/DocumentDownload/{documentId}";
+
+                // Ouvrir le téléchargement dans une nouvelle fenêtre
+                await jsRuntime.InvokeVoidAsync("open", downloadUrl, "_blank");
+
+                // Notification de succès
+                notificationService.Notify(Radzen.NotificationSeverity.Success, "Téléchargement",
+                    "Le téléchargement du PDF devrait démarrer dans quelques instants...");
+            }
+            catch (Exception jsEx)
+            {
+                notificationService.Notify(Radzen.NotificationSeverity.Warning, "Information",
+                    "Veuillez utiliser le bouton de téléchargement pour récupérer le document.");
+                Console.WriteLine($"[ERROR] JavaScript download error: {jsEx.Message}");
+            }
         }
         catch (Exception ex)
         {

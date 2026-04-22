@@ -20,6 +20,8 @@ public class DocumentGenereService : IDocumentGenereService
     private readonly IFicheTechniqueService _ficheTechniqueService;
     private readonly IMemoireTechniqueService _memoireTechniqueService;
     private readonly IPdfGenerationService _pdfGenerationService;
+    private readonly ICacheService _cache;
+    private readonly ILogger<DocumentGenereService> _logger;
 
     /// <summary>
     /// Initialise une nouvelle instance du service DocumentGenereService
@@ -31,9 +33,18 @@ public class DocumentGenereService : IDocumentGenereService
     /// <param name="ficheTechniqueService">Service de gestion des fiches techniques</param>
     /// <param name="memoireTechniqueService">Service de gestion des mémoires techniques</param>
     /// <param name="pdfGenerationService">Service de génération PDF avec PuppeteerSharp + PDFSharp</param>
-    public DocumentGenereService(IDbContextFactory<ApplicationDbContext> contextFactory, IDocumentRepositoryService documentRepository,
-        IDocumentExportService documentExport, IOptions<AppSettings> appSettings, IFicheTechniqueService ficheTechniqueService,
-        IMemoireTechniqueService memoireTechniqueService, IPdfGenerationService pdfGenerationService)
+    /// <param name="cache">Service de cache pour optimiser les performances</param>
+    /// <param name="logger">Logger pour tracer les opérations</param>
+    public DocumentGenereService(
+        IDbContextFactory<ApplicationDbContext> contextFactory,
+        IDocumentRepositoryService documentRepository,
+        IDocumentExportService documentExport,
+        IOptions<AppSettings> appSettings,
+        IFicheTechniqueService ficheTechniqueService,
+        IMemoireTechniqueService memoireTechniqueService,
+        IPdfGenerationService pdfGenerationService,
+        ICacheService cache,
+        ILogger<DocumentGenereService> logger)
     {
         _contextFactory = contextFactory;
         _documentRepository = documentRepository;
@@ -42,6 +53,8 @@ public class DocumentGenereService : IDocumentGenereService
         _ficheTechniqueService = ficheTechniqueService;
         _memoireTechniqueService = memoireTechniqueService;
         _pdfGenerationService = pdfGenerationService;
+        _cache = cache;
+        _logger = logger;
     }
 
     /// <summary>
@@ -115,7 +128,16 @@ public class DocumentGenereService : IDocumentGenereService
     /// <returns>Document sauvegardé avec son identifiant généré</returns>
     public async Task<DocumentGenere> SaveDocumentGenereAsync(DocumentGenere documentGenere)
     {
-        return await _documentRepository.CreateAsync(documentGenere);
+        var savedDocument = await _documentRepository.CreateAsync(documentGenere);
+
+        // ⚡ INVALIDATION CACHE PDF lors de la modification (pas nécessaire pour création)
+        if (documentGenere.Id > 0)
+        {
+            _cache.RemoveByPrefix($"pdf:document:{savedDocument.Id}:");
+            _logger.LogInformation("🗑️ Cache PDF invalidé pour le document {DocumentId}", savedDocument.Id);
+        }
+
+        return savedDocument;
     }
 
     /// <summary>
@@ -159,7 +181,13 @@ public class DocumentGenereService : IDocumentGenereService
     /// <returns>Document mis à jour</returns>
     public async Task<DocumentGenere> UpdateAsync(DocumentGenere documentGenere)
     {
-        return await _documentRepository.UpdateAsync(documentGenere);
+        var updatedDocument = await _documentRepository.UpdateAsync(documentGenere);
+
+        // ⚡ INVALIDATION CACHE PDF
+        _cache.RemoveByPrefix($"pdf:document:{updatedDocument.Id}:");
+        _logger.LogInformation("🗑️ Cache PDF invalidé pour le document {DocumentId}", updatedDocument.Id);
+
+        return updatedDocument;
     }
 
     /// <summary>
@@ -766,6 +794,11 @@ public class DocumentGenereService : IDocumentGenereService
 
         document.EnCours = false;
         await context.SaveChangesAsync().ConfigureAwait(false);
+
+        // ⚡ INVALIDATION CACHE PDF lors de la finalisation
+        _cache.RemoveByPrefix($"pdf:document:{documentGenereId}:");
+        _logger.LogInformation("🗑️ Cache PDF invalidé lors de la finalisation du document {DocumentId}", documentGenereId);
+
         return document;
     }
 

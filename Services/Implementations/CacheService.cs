@@ -187,7 +187,11 @@ public static class CacheServiceExtensions
     public const string TEMPLATE_SECTION_LIBRE_KEY = "template:html:sectionlibre";
     public const string TEMPLATE_FT_CONTENEUR_KEY = "template:html:ftconteneur";
     public const string TEMPLATE_CSS_BASE_KEY = "template:css:base";
-    
+
+    // Clés de cache pour PDFs générés (Phase 3D - Optimisation téléchargement)
+    public const string PDF_DOCUMENT_PREFIX = "pdf:document:";
+    public const string PDF_PREFIX = "pdf:";
+
     // Préfixes pour nettoyage groupé
     public const string TYPES_PREFIX = "types:";
     public const string CONFIG_PREFIX = "config:";

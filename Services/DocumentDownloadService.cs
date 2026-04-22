@@ -6,13 +6,16 @@ namespace GenerateurDOE.Services;
 public class DocumentDownloadService : IDocumentDownloadService
 {
     private readonly IDocumentGenereService _documentGenereService;
+    private readonly ICacheService _cache;
     private readonly ILogger<DocumentDownloadService> _logger;
 
     public DocumentDownloadService(
         IDocumentGenereService documentGenereService,
+        ICacheService cache,
         ILogger<DocumentDownloadService> logger)
     {
         _documentGenereService = documentGenereService;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -38,9 +41,18 @@ public class DocumentDownloadService : IDocumentDownloadService
             // Génération selon le format demandé
             if (document.FormatExport == FormatExport.PDF)
             {
-                // Utilisation de la génération PDF complète avec PuppeteerSharp + PDFSharp
-                fileBytes = await _documentGenereService.GenerateCompletePdfAsync(document.Id);
-                _logger.LogInformation("PDF généré avec succès pour le document {DocumentId}", documentId);
+                // ✅ GÉNÉRATION PDF AVEC CACHE (5 minutes)
+                // Invalidation manuelle via RemoveByPrefix lors de modifications
+                var cacheKey = $"pdf:document:{document.Id}";
+
+                fileBytes = await _cache.GetOrCreateAsync(cacheKey, async () =>
+                {
+                    _logger.LogInformation("🔄 Génération PDF (cache MISS) pour le document {DocumentId}", documentId);
+                    return await _documentGenereService.GenerateCompletePdfAsync(document.Id);
+                }, TimeSpan.FromMinutes(5));
+
+                _logger.LogInformation("✅ PDF récupéré pour le document {DocumentId} - Taille: {Size} octets",
+                    documentId, fileBytes.Length);
             }
             else
             {
